@@ -168,7 +168,7 @@ function deleteSchedule(id, schIndex) {
     }
 }
 
-// Mostrar detalhes no modal
+// Mostrar detalhes no modal com botão de WhatsApp
 function showDetails(item, tab) {
     currentItem = item;
     currentTab = tab;
@@ -186,6 +186,21 @@ function showDetails(item, tab) {
         <p><strong>Cidade:</strong> ${item.Cidade}</p>
         <p><strong>Endereço Completo:</strong> ${item.Endereco}, ${item.Numero}, ${item.Bairro}, ${item.Cidade}, ${item.UF}, ${item.CEP}</p>
     `;
+
+    // Adicionar botão de WhatsApp ao lado do Celular
+    const celularP = details.querySelector('p:nth-of-type(5)'); // Seleciona o <p> do Celular
+    if (item.Celular) {
+        const cleanNumber = item.Celular.replace(/\D/g, ''); // Remove não-dígitos
+        if (cleanNumber.length >= 10) { // Verifica se é um número válido
+            const whatsappLink = document.createElement('a');
+            whatsappLink.href = `https://wa.me/55${cleanNumber}`;
+            whatsappLink.textContent = 'Abrir WhatsApp';
+            whatsappLink.className = 'whatsapp-btn';
+            whatsappLink.target = '_blank';
+            celularP.appendChild(whatsappLink);
+        }
+    }
+
     const address = encodeURIComponent(`${item.Endereco}, ${item.Numero}, ${item.Bairro}, ${item.Cidade}, ${item.UF}, ${item.CEP}`);
     const mapLink = document.createElement('a');
     mapLink.href = `https://www.google.com/maps/search/?api=1&query=${address}`;
