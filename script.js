@@ -108,7 +108,10 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function populateCidades() {
-  const cidades = [...new Set(data.map(item => item['Cidade']))].sort();
+  // Coleta, normaliza e ordena alfabeticamente as cidades
+  const cidades = [...new Set(data.map(item => (item['Cidade'] || '').trim()))]
+    .filter(c => c)
+    .sort((a, b) => a.localeCompare(b, 'pt-BR', {sensitivity: 'base'}));
   const list = document.getElementById('cidadeList');
   if (!list) return;
   list.innerHTML = '';
@@ -246,23 +249,8 @@ function showDetails(item, tab) {
     <p><strong>Cidade:</strong> ${item.Cidade || ''}</p>
     <p><strong>Endereço Completo:</strong> ${item.Endereco || ''}, ${item.Numero || ''}, ${item.Bairro || ''}, ${item.Cidade || ''}, ${item.UF || ''}, ${item.CEP || ''}</p>
   `;
-  if (item.Celular) {
-    const cleanNumber = item.Celular.replace(/\D/g, '');
-    if (cleanNumber.length >= 10) {
-      const whatsappLink = document.createElement('a');
-      whatsappLink.href = `https://wa.me/55${cleanNumber}`;
-      whatsappLink.textContent = 'Abrir WhatsApp';
-      whatsappLink.className = 'whatsapp-btn';
-      whatsappLink.target = '_blank';
-      details.appendChild(whatsappLink);
-    }
-  }
-  const address = encodeURIComponent(`${item.Endereco || ''}, ${item.Numero || ''}, ${item.Bairro || ''}, ${item.Cidade || ''}, ${item.UF || ''}, ${item.CEP || ''}`);
-  const mapLink = document.createElement('a');
-  mapLink.href = `https://www.google.com/maps/search/?api=1&query=${address}`;
-  mapLink.textContent = 'Abrir no Google Maps';
-  mapLink.target = '_blank';
-  details.appendChild(mapLink);
+  // Ações rápidas
+  if (typeof updateAcoesRapidas === 'function') updateAcoesRapidas(item);
   const sch = schedules[item.id] && schedules[item.id].length > 0 ? schedules[item.id][0] : {};
   if (document.getElementById('diaSemana')) document.getElementById('diaSemana').value = sch.dia || '';
   if (document.getElementById('horario')) document.getElementById('horario').value = sch.horario || '';
@@ -391,7 +379,6 @@ function saveSchedule() {
   }
 }
 
-// Exporta funções para o escopo global
 window.openTab = openTab;
 window.toggleCidades = toggleCidades;
 window.prepareTornarAtivo = prepareTornarAtivo;
