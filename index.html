@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clientes Inativos e Ativos SJC</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <h1>Gerenciamento de Clientes</h1>
+    <div id="tabs">
+        <button onclick="openTab('inativos')" class="active">Inativos</button>
+        <button onclick="openTab('ativos')">Ativos</button>
+        <button onclick="openTab('agenda')">Agenda</button>
+    </div>
+    
+    <div id="inativos" class="tab-content active">
+        <div id="upload">
+            <input type="file" id="xlsxFile" accept=".xlsx">
+        </div>
+        <div id="filters">
+            <input type="number" id="saldoFilter" placeholder="Filtro por Saldo de Crédito (mínimo)">
+            <div>Selecione Cidades:</div>
+            <div id="cidadeList"></div>
+            <select id="sortOption">
+                <option value="">Ordenar por...</option>
+                <option value="nome-az">Nome Fantasia (A-Z)</option>
+                <option value="nome-za">Nome Fantasia (Z-A)</option>
+                <option value="saldo-desc">Saldo de Crédito (Maior-Menor)</option>
+                <option value="saldo-asc">Saldo de Crédito (Menor-Maior)</option>
+                <option value="data-asc">Data Último Pedido (Antigo-Recente)</option>
+                <option value="data-desc">Data Último Pedido (Recente-Antigo)</option>
+            </select>
+        </div>
+        <ol id="list"></ol>
+    </div>
+    
+    <div id="ativos" class="tab-content">
+        <ol id="ativos-list"></ol>
+        <button onclick="clearAtivos()">Limpar Ativos</button>
+    </div>
+    
+    <div id="agenda" class="tab-content">
+        <div id="agenda-list"></div>
+    </div>
+    
+    <div id="modal">
+        <div id="modal-content">
+            <span id="close">&times;</span>
+            <div id="details"></div>
+            <div id="edit-date" style="display: none;">
+                <label for="editDataPedido">Data Último Pedido (DD/MM/AAAA):</label>
+                <input type="text" id="editDataPedido" placeholder="DD/MM/AAAA">
+            </div>
+            <div id="schedule">
+                <h3>Agendamento</h3>
+                <select id="diaSemana">
+                    <option value="">Dia da Semana</option>
+                    <option value="Segunda">Segunda</option>
+                    <option value="Terça">Terça</option>
+                    <option value="Quarta">Quarta</option>
+                    <option value="Quinta">Quinta</option>
+                    <option value="Sexta">Sexta</option>
+                    <option value="Sábado">Sábado</option>
+                    <option value="Domingo">Domingo</option>
+                </select>
+                <input type="time" id="horario">
+                <select id="tipo">
+                    <option value="">Tipo</option>
+                    <option value="Visita">Visita</option>
+                    <option value="Ligação">Ligação</option>
+                    <option value="WhatsApp">WhatsApp</option>
+                </select>
+                <select id="repeticao">
+                    <option value="">Repetição</option>
+                    <option value="semanal">Semanal</option>
+                    <option value="quinzenal">Quinzenal</option>
+                    <option value="mensal">Mensal</option>
+                </select>
+                <button onclick="saveSchedule()">Salvar Agendamento</button>
+            </div>
+            <button id="tornarAtivo" style="display: none;" onclick="prepareTornarAtivo()">Tornar Ativo</button>
+            <button id="confirmarAtivo" style="display: none;" onclick="tornarAtivo()">Confirmar</button>
+            <button id="excluirAtivo" style="display: none;" onclick="excluirAtivo()">Excluir dos Ativos</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
