@@ -1,6 +1,6 @@
 let data = []; // Inativos
-let ativos = JSON.parse(localStorage.getItem('ativos')) || []; // Ativos persistentes
-let schedules = JSON.parse(localStorage.getItem('schedules')) || {}; // Agendamentos por cliente ID (array para múltiplos)
+let ativos = JSON.parse(localStorage.getItem('ativos')) || [];
+let schedules = JSON.parse(localStorage.getItem('schedules')) || {};
 let filteredData = [];
 let currentItem = null;
 let currentTab = 'inativos';
@@ -91,6 +91,16 @@ function populateCidades() {
   });
 }
 
+// Minimizar/maximizar seleção de cidades
+function toggleCidades() {
+  const selector = document.getElementById('cidadeSelector');
+  const list = document.getElementById('cidadeList');
+  const aberto = list.classList.toggle('visivel');
+  list.classList.toggle('escondido', !aberto);
+  selector.classList.toggle('aberto', aberto);
+  document.getElementById('cidadeSelectorText').textContent = aberto ? 'Ocultar cidades' : 'Selecionar cidades';
+}
+
 // Aplicar filtros e ordenação com tratamento de erro
 function applyFiltersAndSort() {
   try {
@@ -152,7 +162,7 @@ function renderAgenda() {
       }
     });
   });
-  agendaItems.sort((a, b) => a.date - b.date); // Próxima no topo
+  agendaItems.sort((a, b) => a.date - b.date);
   agendaItems.forEach(item => {
     const div = document.createElement('div');
     div.innerHTML = `${item.date.toLocaleDateString('pt-BR')} - ${item.client} - ${item.tipo} às ${item.horario}`;
@@ -181,22 +191,22 @@ function deleteSchedule(id, schIndex) {
   }
 }
 
-// Mostrar detalhes no modal com botão de WhatsApp
+// Mostrar detalhes no modal com botão de WhatsApp e Google Maps
 function showDetails(item, tab) {
   currentItem = item;
   currentTab = tab;
   const details = document.getElementById('details');
   details.innerHTML = `
-    <p><strong>Cliente:</strong> ${item.Cliente}</p>
-    <p><strong>CNPJ/CPF:</strong> ${item['CNPJ / CPF']}</p>
-    <p><strong>Contato:</strong> ${item.Contato}</p>
-    <p><strong>Telefone Comercial:</strong> ${item['Telefone Comercial']}</p>
-    <p><strong>Celular:</strong> ${item.Celular}</p>
-    <p><strong>Email:</strong> ${item.Email}</p>
-    <p><strong>Saldo de Crédito:</strong> ${item['Saldo de Credito']}</p>
-    <p><strong>Data Último Pedido:</strong> ${formatDateUS2BR(item['Data Ultimo Pedido'])}</p>
-    <p><strong>Cidade:</strong> ${item.Cidade}</p>
-    <p><strong>Endereço Completo:</strong> ${item.Endereco}, ${item.Numero}, ${item.Bairro}, ${item.Cidade}, ${item.UF}, ${item.CEP}</p>
+    <p><strong>Cliente:</strong> ${item.Cliente || ''}</p>
+    <p><strong>CNPJ/CPF:</strong> ${item['CNPJ / CPF'] || ''}</p>
+    <p><strong>Contato:</strong> ${item.Contato || ''}</p>
+    <p><strong>Telefone Comercial:</strong> ${item['Telefone Comercial'] || ''}</p>
+    <p><strong>Celular:</strong> ${item.Celular || ''}</p>
+    <p><strong>Email:</strong> ${item.Email || ''}</p>
+    <p><strong>Saldo de Crédito:</strong> ${item['Saldo de Credito'] || ''}</p>
+    <p><strong>Data Último Pedido:</strong> ${formatDateUS2BR(item['Data Ultimo Pedido']) || ''}</p>
+    <p><strong>Cidade:</strong> ${item.Cidade || ''}</p>
+    <p><strong>Endereço Completo:</strong> ${item.Endereco || ''}, ${item.Numero || ''}, ${item.Bairro || ''}, ${item.Cidade || ''}, ${item.UF || ''}, ${item.CEP || ''}</p>
   `;
 
   // Botão WhatsApp ao lado do Celular
@@ -212,10 +222,13 @@ function showDetails(item, tab) {
       celularP.appendChild(whatsappLink);
     }
   }
-  const address = encodeURIComponent(`${item.Endereco}, ${item.Numero}, ${item.Bairro}, ${item.Cidade}, ${item.UF}, ${item.CEP}`);
+
+  // Botão Google Maps
+  const address = encodeURIComponent(`${item.Endereco || ''}, ${item.Numero || ''}, ${item.Bairro || ''}, ${item.Cidade || ''}, ${item.UF || ''}, ${item.CEP || ''}`);
   const mapLink = document.createElement('a');
   mapLink.href = `https://www.google.com/maps/search/?api=1&query=${address}`;
   mapLink.textContent = 'Abrir no Google Maps';
+  mapLink.target = '_blank';
   details.appendChild(mapLink);
 
   // Preencher agendamento (pegando o primeiro para simplicidade)
@@ -224,25 +237,54 @@ function showDetails(item, tab) {
   document.getElementById('horario').value = sch.horario || '';
   document.getElementById('tipo').value = sch.tipo || '';
   document.getElementById('repeticao').value = sch.repeticao || '';
-  document.getElementById('tornarAtivo').style.display = (tab === 'inativos') ? 'block' : 'none';
-  document.getElementById('excluirAtivo').style.display = (tab === 'ativos') ? 'block' : 'none';
-  document.getElementById('edit-date').style.display = 'none';
+
+  document.getElementById('tornarAtivo').style.display = (tab === 'inativos') ? 'inline-block' : 'none';
+  document.getElementById('excluirAtivo').style.display = (tab === 'ativos') ? 'inline-block' : 'none';
+  document.getElementById('editDataPedido').style.display = 'none';
+  document.getElementById('confirmarAtivo').style.display = 'none';
   document.getElementById('modal').style.display = 'flex';
 }
 
-// Preparar para tornar ativo com edição de data
+// Função para inserir "/" automaticamente no campo de data
+document.addEventListener('DOMContentLoaded', function() {
+  const editDataPedido = document.getElementById('editDataPedido');
+  if (editDataPedido) {
+    editDataPedido.addEventListener('input', function(e) {
+      let value = this.value.replace(/\D/g, '').slice(0,8);
+      if (value.length > 4)
+        value = value.slice(0,2) + '/' + value.slice(2,4) + '/' + value.slice(4,8);
+      else if (value.length > 2)
+        value = value.slice(0,2) + '/' + value.slice(2,4);
+      this.value = value;
+    });
+  }
+});
+
+// Função para mostrar campo de data e botão ao lado do "Salvar agendamento"
 function prepareTornarAtivo() {
-  document.getElementById('edit-date').style.display = 'block';
+  document.getElementById('editDataPedido').style.display = 'inline-block';
+  document.getElementById('confirmarAtivo').style.display = 'inline-block';
   document.getElementById('tornarAtivo').style.display = 'none';
-  document.getElementById('confirmarAtivo').style.display = 'block';
 }
 
-// Tornar ativo com edição e validação
+// Função para validar e salvar a nova data ao tornar ativo
 function tornarAtivo() {
   try {
     const newDate = document.getElementById('editDataPedido').value;
-    if (!newDate || !/^\d{2}\/\d{2}\/\d{4}$/.test(newDate)) {
-      return alert('Data inválida! Use o formato DD/MM/AAAA.');
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(newDate)) {
+      alert('Data inválida! Use o formato DD/MM/AAAA.');
+      return;
+    }
+    // Validação extra para datas impossíveis
+    const [day, month, year] = newDate.split('/').map(Number);
+    const dateObj = new Date(year, month - 1, day);
+    if (
+      dateObj.getFullYear() !== year ||
+      dateObj.getMonth() !== month - 1 ||
+      dateObj.getDate() !== day
+    ) {
+      alert('Data inválida! Use uma data real no formato DD/MM/AAAA.');
+      return;
     }
     currentItem['Data Ultimo Pedido'] = newDate;
     ativos.push(currentItem);
@@ -275,7 +317,7 @@ function getInterval(type) {
   if (type === 'semanal') return 7;
   if (type === 'quinzenal') return 14;
   if (type === 'mensal') return 30;
-  return Infinity; // Sem repetição, apenas uma vez
+  return Infinity;
 }
 
 // Salvar agendamento com repetição e limitações
@@ -291,15 +333,14 @@ function saveSchedule() {
     const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
     const dayIndex = dayNames.indexOf(dia);
     if (dayIndex === -1) return alert('Dia inválido!');
-    // Encontrar a próxima data correspondente ao dia da semana
     let daysToAdd = (dayIndex - baseDate.getDay() + 7) % 7;
-    if (daysToAdd === 0) daysToAdd = 7; // Se for hoje, agenda para a próxima semana
+    if (daysToAdd === 0) daysToAdd = 7;
     const interval = getInterval(repeticao);
-    const maxRepetitions = 48; // Limite para evitar loops infinitos
+    const maxRepetitions = 48;
     for (let i = 0; i < maxRepetitions; i++) {
       const nextDate = new Date(baseDate);
       nextDate.setDate(nextDate.getDate() + daysToAdd + (i * interval));
-      if (nextDate > new Date(baseDate.getTime() + 30 * 24 * 60 * 60 * 1000)) break; // Limite de 30 dias
+      if (nextDate > new Date(baseDate.getTime() + 30 * 24 * 60 * 60 * 1000)) break;
       schedules[currentItem.id].push({ date: nextDate.toISOString().split('T')[0], dia, horario, tipo, repeticao });
     }
     localStorage.setItem('schedules', JSON.stringify(schedules));
@@ -336,6 +377,18 @@ document.getElementById('close').addEventListener('click', () => {
   document.getElementById('modal').style.display = 'none';
 });
 
-// Inicializar listas
-renderAtivos();
-renderAgenda();
+// Inicializar listas e estado da seleção de cidades
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('cidadeList').classList.add('escondido');
+  renderAtivos();
+  renderAgenda();
+});
+
+// Expor funções globais para botões HTML
+window.openTab = openTab;
+window.toggleCidades = toggleCidades;
+window.prepareTornarAtivo = prepareTornarAtivo;
+window.tornarAtivo = tornarAtivo;
+window.excluirAtivo = excluirAtivo;
+window.saveSchedule = saveSchedule;
+window.clearAtivos = clearAtivos;
