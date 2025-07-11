@@ -53,49 +53,59 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   if (typeof renderAtivos === 'function') renderAtivos();
   if (typeof renderAgenda === 'function') renderAgenda();
+
+  if (document.getElementById('saldoFilter')) {
+    document.getElementById('saldoFilter').addEventListener('input', applyFiltersAndSort);
+  }
+  if (document.getElementById('sortOption')) {
+    document.getElementById('sortOption').addEventListener('change', applyFiltersAndSort);
+  }
+  if (document.getElementById('close')) {
+    document.getElementById('close').addEventListener('click', () => {
+      document.getElementById('modal').style.display = 'none';
+    });
+  }
+  if (document.getElementById('xlsxFile')) {
+    document.getElementById('xlsxFile').addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (!file) return alert('Nenhum arquivo selecionado!');
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const bytes = e.target.result;
+          const workbook = XLSX.read(bytes, { type: 'binary' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          data = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
+          const headers = data[0].map(h => h.trim().replace(/\s+/g, ' ').normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+          data = data.slice(1).map(row => {
+            let obj = {};
+            headers.forEach((header, i) => obj[header] = row[i] || '');
+            obj.id = `inactive-${Math.random().toString(36).substr(2, 9)}`;
+            return obj;
+          });
+          populateCidades();
+          applyFiltersAndSort();
+        } catch (error) {
+          alert('Erro ao ler o arquivo: ' + (error.message || error));
+        }
+      };
+      reader.onerror = () => alert('Erro ao ler o arquivo.');
+      reader.readAsBinaryString(file);
+    });
+  }
+  const editDataPedido = document.getElementById('editDataPedido');
+  if (editDataPedido) {
+    editDataPedido.addEventListener('input', function(e) {
+      let value = this.value.replace(/\D/g, '').slice(0,8);
+      if (value.length > 4)
+        value = value.slice(0,2) + '/' + value.slice(2,4) + '/' + value.slice(4,8);
+      else if (value.length > 2)
+        value = value.slice(0,2) + '/' + value.slice(2,4);
+      this.value = value;
+    });
+  }
 });
-
-if (document.getElementById('saldoFilter')) {
-  document.getElementById('saldoFilter').addEventListener('input', applyFiltersAndSort);
-}
-if (document.getElementById('sortOption')) {
-  document.getElementById('sortOption').addEventListener('change', applyFiltersAndSort);
-}
-if (document.getElementById('close')) {
-  document.getElementById('close').addEventListener('click', () => {
-    document.getElementById('modal').style.display = 'none';
-  });
-}
-
-if (document.getElementById('xlsxFile')) {
-  document.getElementById('xlsxFile').addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    if (!file) return alert('Nenhum arquivo selecionado!');
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const bytes = e.target.result;
-        const workbook = XLSX.read(bytes, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        data = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
-        const headers = data[0].map(h => h.trim().replace(/\s+/g, ' ').normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
-        data = data.slice(1).map(row => {
-          let obj = {};
-          headers.forEach((header, i) => obj[header] = row[i] || '');
-          obj.id = `inactive-${Math.random().toString(36).substr(2, 9)}`;
-          return obj;
-        });
-        populateCidades();
-        applyFiltersAndSort();
-      } catch (error) {
-        alert('Erro ao ler o arquivo: ' + (error.message || error));
-      }
-    };
-    reader.onerror = () => alert('Erro ao ler o arquivo.');
-    reader.readAsBinaryString(file);
-  });
-}
 
 function populateCidades() {
   const cidades = [...new Set(data.map(item => item['Cidade']))].sort();
@@ -193,7 +203,7 @@ function renderAgenda() {
     const div = document.createElement('div');
     div.innerHTML = `
       ${dataStr} - ${item.client}
-      - <strong>${item.tipo || ''}</strong>
+      <strong>${item.tipo || ''}</strong>
     `;
     const btn = document.createElement('button');
     btn.textContent = 'Excluir';
@@ -236,8 +246,7 @@ function showDetails(item, tab) {
     <p><strong>Cidade:</strong> ${item.Cidade || ''}</p>
     <p><strong>Endereço Completo:</strong> ${item.Endereco || ''}, ${item.Numero || ''}, ${item.Bairro || ''}, ${item.Cidade || ''}, ${item.UF || ''}, ${item.CEP || ''}</p>
   `;
-  const celularP = details.querySelector('p:nth-of-type(5)');
-  if (item.Celular && celularP) {
+  if (item.Celular) {
     const cleanNumber = item.Celular.replace(/\D/g, '');
     if (cleanNumber.length >= 10) {
       const whatsappLink = document.createElement('a');
@@ -245,7 +254,7 @@ function showDetails(item, tab) {
       whatsappLink.textContent = 'Abrir WhatsApp';
       whatsappLink.className = 'whatsapp-btn';
       whatsappLink.target = '_blank';
-      celularP.appendChild(whatsappLink);
+      details.appendChild(whatsappLink);
     }
   }
   const address = encodeURIComponent(`${item.Endereco || ''}, ${item.Numero || ''}, ${item.Bairro || ''}, ${item.Cidade || ''}, ${item.UF || ''}, ${item.CEP || ''}`);
@@ -254,19 +263,17 @@ function showDetails(item, tab) {
   mapLink.textContent = 'Abrir no Google Maps';
   mapLink.target = '_blank';
   details.appendChild(mapLink);
-
   const sch = schedules[item.id] && schedules[item.id].length > 0 ? schedules[item.id][0] : {};
   if (document.getElementById('diaSemana')) document.getElementById('diaSemana').value = sch.dia || '';
   if (document.getElementById('horario')) document.getElementById('horario').value = sch.horario || '';
   if (document.getElementById('tipo')) document.getElementById('tipo').value = sch.tipo || '';
   if (document.getElementById('repeticao')) document.getElementById('repeticao').value = sch.repeticao || '';
-
   if (document.getElementById('tornarAtivo')) document.getElementById('tornarAtivo').style.display = (tab === 'inativos') ? 'inline-block' : 'none';
   if (document.getElementById('excluirAtivo')) document.getElementById('excluirAtivo').style.display = (tab === 'ativos') ? 'inline-block' : 'none';
   if (document.getElementById('editDataPedido')) document.getElementById('editDataPedido').style.display = 'none';
+  if (document.getElementById('labelEditDataPedido')) document.getElementById('labelEditDataPedido').style.display = 'none';
   if (document.getElementById('confirmarAtivo')) document.getElementById('confirmarAtivo').style.display = 'none';
   if (document.getElementById('modal')) document.getElementById('modal').style.display = 'flex';
-
   const obsKey = 'observacoes_' + item.id;
   const obsTextarea = document.getElementById('observacoes');
   if (obsTextarea) {
@@ -284,22 +291,9 @@ function showDetails(item, tab) {
   }
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-  const editDataPedido = document.getElementById('editDataPedido');
-  if (editDataPedido) {
-    editDataPedido.addEventListener('input', function(e) {
-      let value = this.value.replace(/\D/g, '').slice(0,8);
-      if (value.length > 4)
-        value = value.slice(0,2) + '/' + value.slice(2,4) + '/' + value.slice(4,8);
-      else if (value.length > 2)
-        value = value.slice(0,2) + '/' + value.slice(2,4);
-      this.value = value;
-    });
-  }
-});
-
 function prepareTornarAtivo() {
   if (document.getElementById('editDataPedido')) document.getElementById('editDataPedido').style.display = 'inline-block';
+  if (document.getElementById('labelEditDataPedido')) document.getElementById('labelEditDataPedido').style.display = 'inline-block';
   if (document.getElementById('confirmarAtivo')) document.getElementById('confirmarAtivo').style.display = 'inline-block';
   if (document.getElementById('tornarAtivo')) document.getElementById('tornarAtivo').style.display = 'none';
 }
@@ -319,6 +313,10 @@ function tornarAtivo() {
       dateObj.getDate() !== day
     ) {
       alert('Data inválida! Use uma data real no formato DD/MM/AAAA.');
+      return;
+    }
+    if (!currentItem) {
+      alert('Erro interno: Nenhum cliente selecionado.');
       return;
     }
     currentItem['Data Ultimo Pedido'] = newDate;
@@ -393,11 +391,10 @@ function saveSchedule() {
   }
 }
 
-
+// Exporta funções para o escopo global
 window.openTab = openTab;
 window.toggleCidades = toggleCidades;
 window.prepareTornarAtivo = prepareTornarAtivo;
 window.tornarAtivo = tornarAtivo;
 window.excluirAtivo = excluirAtivo;
 window.saveSchedule = saveSchedule;
-window.clearAtivos = clearAtivos;

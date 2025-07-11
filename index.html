@@ -2,241 +2,71 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gerenciamento de Clientes</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="styles.css">
   <style>
-    /* Ajustes responsivos de fonte e layout */
-    html {
-      font-size: 16px;
-    }
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 10px;
-      background: #f4f4f4;
-      font-size: 1rem;
-    }
-    h1 {
-      text-align: center;
-      font-size: 1.4rem;
-    }
-    #tabs {
-      display: flex;
-      justify-content: space-around;
-      background: #ddd;
-      padding: 10px;
-    }
-    #tabs button {
-      background: #eee;
-      border: none;
-      padding: 10px;
-      cursor: pointer;
-      font-size: 1rem;
-    }
-    #tabs button.active {
-      background: #ccc;
-    }
-    .tab-content {
-      display: none;
-    }
-    .tab-content.active {
-      display: block;
-    }
-    #upload {
-      margin: 10px 0;
-      text-align: center;
-    }
-    #filters {
-      margin: 10px;
+    #modal-content {
       display: flex;
       flex-direction: column;
-      align-items: center;
+      gap: 22px;
     }
-    #filters input, #filters select {
-      padding: 8px;
-      width: 90%;
-      max-width: 340px;
-      margin-bottom: 10px;
-      font-size: 1rem;
+    .cliente-info {
+      background: #f8f8f8;
+      padding: 12px 16px;
+      border-radius: 7px;
+      margin-bottom: 0;
     }
-    #cidadeSelector {
-      cursor: pointer;
-      background: #eee;
-      padding: 8px;
-      border-radius: 5px;
-      width: 90%;
-      max-width: 340px;
+    .acoes-rapidas {
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 5px;
-      font-size: 1rem;
+      gap: 16px;
+      justify-content: flex-start;
+      margin-bottom: 0;
     }
-    #cidadeSelector .seta {
-      font-size: 1.2em;
-      transition: transform 0.2s;
+    .acoes-rapidas a {
+      flex: 1 1 0;
+      margin: 0;
     }
-    #cidadeSelector.aberto .seta {
-      transform: rotate(180deg);
+    fieldset {
+      border: 1px solid #ddd;
+      border-radius: 7px;
+      padding: 12px 16px 16px 16px;
+      margin: 0;
     }
-    #cidadeList.escondido {
-      display: none;
+    fieldset legend {
+      font-weight: bold;
+      font-size: 1em;
+      padding: 0 8px;
     }
-    #cidadeList.visivel {
-      display: block;
-      background: #fff;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      padding: 10px;
-      margin-bottom: 10px;
-      max-height: 200px;
-      overflow-y: auto;
-      width: 90%;
-      max-width: 340px;
-      font-size: 1rem;
-    }
-    #cidadeList div {
-      margin-bottom: 5px;
-    }
-    #list, #ativos-list, #agenda-list {
-      list-style: none;
-      padding: 0;
-      font-size: 1rem;
-    }
-    #list li, #ativos-list li {
-      background: white;
-      margin: 5px;
-      padding: 10px;
-      border-radius: 5px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      cursor: pointer;
-      font-size: 1rem;
-    }
-    #modal {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.5);
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-    }
-    #modal-content {
-      background: white;
-      padding: 20px;
-      border-radius: 10px;
-      max-width: 95vw;
-      max-height: 90vh;
-      overflow-y: auto;
-      font-size: 1rem;
-    }
-    #modal-content h2 { margin-top: 0; }
-    #modal-content .highlight { font-weight: bold; color: #007bff; }
-    #modal-content a {
-      display: block;
-      margin-top: 10px;
-      padding: 10px;
-      background: #28a745;
-      color: white;
-      text-decoration: none;
-      text-align: center;
-      border-radius: 5px;
-      font-size: 1rem;
-    }
-    #close {
-      float: right;
-      cursor: pointer;
-      font-size: 1.5em;
-    }
-    #agenda-list div {
-      margin: 10px 0;
-      padding: 10px;
-      background: #fff;
-      border-radius: 5px;
+    .status-btns {
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 1rem;
-    }
-    #agenda-list button {
-      background: #dc3545;
-      color: white;
-      border: none;
-      padding: 5px 10px;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 1rem;
-    }
-    .days-since {
-      font-size: 0.9em;
-      color: #666;
-      margin-left: 10px;
-    }
-    .whatsapp-btn {
-      background: #25D366;
-      color: white;
-      padding: 5px 10px;
-      border-radius: 5px;
-      text-decoration: none;
-      margin-left: 10px;
-      font-size: 0.95em;
-    }
-    #observacoes {
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      padding: 10px;
-      resize: vertical;
-      width: 100%;
-      max-width: 100%;
-      min-height: 80px;
-      font-size: 1rem;
+      gap: 12px;
       margin-top: 10px;
+    }
+    #editDataPedido, #labelEditDataPedido {
+      margin-bottom: 8px;
+      margin-right: 8px;
+    }
+    .observacoes {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
     }
     #observacoes-contador {
-      font-size: 0.95em;
-      color: #666;
-      float: right;
-      margin-bottom: 10px;
+      align-self: flex-end;
     }
-    #salvarObservacoes {
-      margin-top: 10px;
-      background: #007bff;
-      color: white;
-      border: none;
-      padding: 8px 16px;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 1rem;
-    }
-
-    /* Responsividade */
     @media (max-width: 600px) {
-      html { font-size: 15px; }
-      h1 { font-size: 1.1rem; }
-      #tabs button { font-size: 0.95rem; padding: 8px; }
-      #filters input, #filters select, #cidadeSelector, #cidadeList.visivel {
-        width: 98%;
-        max-width: 98vw;
-        font-size: 0.98rem;
-      }
       #modal-content {
-        padding: 8px;
-        font-size: 0.98rem;
+        gap: 14px;
       }
-      #list li, #ativos-list li, #agenda-list div {
-        font-size: 0.98rem;
-        padding: 8px;
+      .acoes-rapidas {
+        flex-direction: column;
+        gap: 8px;
       }
-      #observacoes { font-size: 0.98rem; }
-      #salvarObservacoes { font-size: 0.98rem; }
-      #agenda-list button { font-size: 0.98rem; }
-      .whatsapp-btn { font-size: 0.97em; }
-    }
-    @media (max-width: 400px) {
-      html { font-size: 14px; }
-      h1 { font-size: 1rem; }
-      #modal-content { font-size: 0.95rem; }
+      .status-btns {
+        flex-direction: column;
+        gap: 8px;
+      }
     }
   </style>
 </head>
@@ -244,37 +74,38 @@
   <h1>Gerenciamento de Clientes</h1>
 
   <div id="tabs">
-    <button class="active" onclick="openTab('inativos')">Inativos</button>
+    <button onclick="openTab('inativos')" class="active">Inativos</button>
     <button onclick="openTab('ativos')">Ativos</button>
     <button onclick="openTab('agenda')">Agenda</button>
   </div>
 
   <div id="inativos-content" class="tab-content active">
-    <div id="upload">
-      <input type="file" id="xlsxFile" accept=".xlsx,.xls">
-    </div>
-    <div id="filters">
-      <input type="number" id="saldoFilter" placeholder="Saldo mínimo em mil reais">
-      <div id="cidadeSelector" onclick="toggleCidades()">
-        <span id="cidadeSelectorText">Selecionar cidades</span>
-        <span class="seta">&#9660;</span>
+    <div id="inativos-controls">
+      <div id="upload">
+        <input type="file" id="xlsxFile" accept=".xlsx,.xls">
       </div>
-      <div id="cidadeList" class="escondido"></div>
-      <select id="sortOption">
-        <option value="nome-az">Nome Fantasia (A-Z)</option>
-        <option value="nome-za">Nome Fantasia (Z-A)</option>
-        <option value="saldo-desc">Saldo de Crédito (Maior-Menor)</option>
-        <option value="saldo-asc">Saldo de Crédito (Menor-Maior)</option>
-        <option value="data-asc">Data Último Pedido (Antigo-Recente)</option>
-        <option value="data-desc">Data Último Pedido (Recente-Antigo)</option>
-      </select>
+      <div id="filters">
+        <input type="number" id="saldoFilter" placeholder="Saldo mínimo" min="0" step="0.01">
+        <select id="sortOption">
+          <option value="nome-az">Nome Fantasia (A-Z)</option>
+          <option value="nome-za">Nome Fantasia (Z-A)</option>
+          <option value="saldo-desc">Saldo de Crédito (Maior-Menor)</option>
+          <option value="saldo-asc">Saldo de Crédito (Menor-Maior)</option>
+          <option value="data-asc">Data Último Pedido (Antigo-Recente)</option>
+          <option value="data-desc">Data Último Pedido (Recente-Antigo)</option>
+        </select>
+        <div id="cidadeSelector" onclick="toggleCidades()">
+          <span id="cidadeSelectorText">Selecionar cidades</span>
+          <span class="seta">&#9660;</span>
+        </div>
+        <div id="cidadeList" class="escondido"></div>
+      </div>
     </div>
     <ul id="list"></ul>
   </div>
 
   <div id="ativos-content" class="tab-content">
     <ul id="ativos-list"></ul>
-    
   </div>
 
   <div id="agenda-content" class="tab-content">
@@ -284,63 +115,108 @@
   <div id="modal">
     <div id="modal-content">
       <span id="close">&times;</span>
-      <div id="details"></div>
 
-      <div id="agendamento">
-        <label for="diaSemana">Dia da Semana:</label>
-        <select id="diaSemana">
-          <option value="">Selecione</option>
-          <option>Segunda</option>
-          <option>Terça</option>
-          <option>Quarta</option>
-          <option>Quinta</option>
-          <option>Sexta</option>
-          <option>Sábado</option>
-          <option>Domingo</option>
-        </select>
-        <label for="horario">Horário:</label>
-        <input id="horario" type="time">
-        <label for="tipo">Tipo:</label>
-        <select id="tipo">
-          <option value="">Selecione</option>
-          <option>Visita</option>
-          <option>Ligação</option>
-          <option>WhatsApp</option>
-        </select>
-        <label for="repeticao">Repetição:</label>
-        <select id="repeticao">
-          <option>Única</option>
-          <option>Semanal</option>
-          <option>Quinzenal</option>
-          <option>Mensal</option>
-        </select>
-        <button onclick="saveSchedule()">Salvar agendamento</button>
-        <input id="editDataPedido" type="text" placeholder="DD/MM/AAAA" style="display:none;">
-        <button id="confirmarAtivo" style="display:none;">Confirmar Ativo</button>
-        <button id="tornarAtivo" style="display:none;" onclick="prepareTornarAtivo()">Tornar Ativo</button>
-        <button id="excluirAtivo" style="display:none;" onclick="excluirAtivo()">Excluir dos Ativos</button>
-      </div>
+      <!-- Informações do Cliente -->
+      <div class="cliente-info" id="details"></div>
 
-      <label for="observacoes">Observações do Cliente:</label>
-      <textarea id="observacoes" maxlength="2000" rows="6" placeholder="Digite observações sobre o cliente (máximo 2000 caracteres)"></textarea>
-      <span id="observacoes-contador">0/2000</span>
-      <button id="salvarObservacoes">Salvar Observações</button>
+      <!-- Ações Rápidas -->
+      <div class="acoes-rapidas" id="acoes-rapidas"></div>
+
+      <!-- Agendamento -->
+      <fieldset class="agendamento">
+        <legend>Agendamento</legend>
+        <div>
+          <label for="diaSemana">Dia da Semana:</label>
+          <select id="diaSemana">
+            <option value="">Selecione</option>
+            <option value="Domingo">Domingo</option>
+            <option value="Segunda">Segunda</option>
+            <option value="Terça">Terça</option>
+            <option value="Quarta">Quarta</option>
+            <option value="Quinta">Quinta</option>
+            <option value="Sexta">Sexta</option>
+            <option value="Sábado">Sábado</option>
+          </select>
+        </div>
+        <div>
+          <label for="horario">Horário:</label>
+          <input type="time" id="horario">
+        </div>
+        <div>
+          <label for="tipo">Tipo:</label>
+          <select id="tipo">
+            <option value="">Selecione</option>
+            <option value="Visita">Visita</option>
+            <option value="Ligação">Ligação</option>
+            <option value="WhatsApp">WhatsApp</option>
+          </select>
+        </div>
+        <div>
+          <label for="repeticao">Repetição:</label>
+          <select id="repeticao">
+            <option value="Única">Única</option>
+            <option value="Semanal">Semanal</option>
+            <option value="Quinzenal">Quinzenal</option>
+            <option value="Mensal">Mensal</option>
+          </select>
+        </div>
+        <button id="salvarAgendamento" onclick="saveSchedule()">Salvar agendamento</button>
+      </fieldset>
+
+      <!-- Status do Cliente -->
+      <fieldset class="status">
+        <legend>Status</legend>
+        <div style="margin-bottom: 8px;">
+          <label for="editDataPedido" style="display:none;" id="labelEditDataPedido">Data Último Pedido:</label>
+          <input type="text" id="editDataPedido" placeholder="DD/MM/AAAA" style="display:none;" maxlength="10">
+        </div>
+        <div class="status-btns">
+          <button id="tornarAtivo" onclick="prepareTornarAtivo()">Tornar Ativo</button>
+          <button id="confirmarAtivo" onclick="tornarAtivo()" style="display:none;">Confirmar Ativo</button>
+          <button id="excluirAtivo" onclick="excluirAtivo()" style="display:none;">Excluir dos Ativos</button>
+        </div>
+      </fieldset>
+
+      <!-- Observações -->
+      <fieldset class="observacoes">
+        <legend>Observações</legend>
+        <textarea id="observacoes" maxlength="2000"></textarea>
+        <div id="observacoes-contador">0/2000</div>
+        <button id="salvarObservacoes">Salvar Observações</button>
+      </fieldset>
     </div>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="script.js"></script>
   <script>
-    function openTab(tab) {
-      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-      document.querySelectorAll('#tabs button').forEach(el => el.classList.remove('active'));
-      document.getElementById(tab + '-content').classList.add('active');
-      document.querySelector(`button[onclick="openTab('${tab}')"]`).classList.add('active');
-      if (tab === 'inativos') { if (typeof renderList === 'function') renderList(); }
-      if (tab === 'ativos') { if (typeof renderAtivos === 'function') renderAtivos(); }
-      if (tab === 'agenda') { if (typeof renderAgenda === 'function') renderAgenda(); }
+    // Organização dos botões de ação rápida no modal
+    function updateAcoesRapidas(item) {
+      const acoes = document.getElementById('acoes-rapidas');
+      if (!acoes) return;
+      acoes.innerHTML = '';
+      // WhatsApp
+      if (item.Celular) {
+        const cleanNumber = item.Celular.replace(/\D/g, '');
+        if (cleanNumber.length >= 10) {
+          const whatsappLink = document.createElement('a');
+          whatsappLink.href = `https://wa.me/55${cleanNumber}`;
+          whatsappLink.textContent = 'Abrir WhatsApp';
+          whatsappLink.className = 'whatsapp-btn';
+          whatsappLink.target = '_blank';
+          acoes.appendChild(whatsappLink);
+        }
+      }
+      // Google Maps
+      const address = encodeURIComponent(`${item.Endereco || ''}, ${item.Numero || ''}, ${item.Bairro || ''}, ${item.Cidade || ''}, ${item.UF || ''}, ${item.CEP || ''}`);
+      const mapLink = document.createElement('a');
+      mapLink.href = `https://www.google.com/maps/search/?api=1&query=${address}`;
+      mapLink.textContent = 'Abrir no Google Maps';
+      mapLink.className = 'whatsapp-btn';
+      mapLink.target = '_blank';
+      acoes.appendChild(mapLink);
     }
-    window.openTab = openTab;
+    window.updateAcoesRapidas = updateAcoesRapidas;
   </script>
 </body>
 </html>
