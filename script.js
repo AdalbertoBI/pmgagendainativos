@@ -1,4 +1,4 @@
-let data = []; // Inativos
+let data = [];
 let ativos = JSON.parse(localStorage.getItem('ativos')) || [];
 let schedules = JSON.parse(localStorage.getItem('schedules')) || {};
 let filteredData = [];
@@ -6,7 +6,6 @@ let currentItem = null;
 let currentTab = 'inativos';
 const today = new Date();
 
-// Função robusta para parsear datas no formato DD/MM/AAAA
 function parseDate(dateStr) {
   if (!dateStr) return 0;
   const regex = /^\d{2}\/\d{2}\/\d{4}$/;
@@ -21,7 +20,6 @@ function parseDate(dateStr) {
   return date.getTime();
 }
 
-// Função para formatar datas para DD/MM/AAAA (corrige datas americanas)
 function formatDateUS2BR(dateStr) {
   if (!dateStr) return '';
   if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) return dateStr;
@@ -32,56 +30,77 @@ function formatDateUS2BR(dateStr) {
   return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
 }
 
-// Calcular dias desde último pedido
 function daysSince(dateStr) {
   const lastDate = new Date(parseDate(formatDateUS2BR(dateStr)));
   const diff = Math.floor((today - lastDate) / (1000 * 60 * 60 * 24));
   return isNaN(diff) ? 'N/A' : diff;
 }
 
-// Função para abrir abas
 function openTab(tab) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('#tabs button').forEach(el => el.classList.remove('active'));
-  document.getElementById(tab).classList.add('active');
+  document.getElementById(tab + '-content').classList.add('active');
   document.querySelector(`button[onclick="openTab('${tab}')"]`).classList.add('active');
   currentTab = tab;
+  if (tab === 'inativos') renderList();
   if (tab === 'ativos') renderAtivos();
   if (tab === 'agenda') renderAgenda();
 }
 
-// Carregar XLSX com tratamento de erro
-document.getElementById('xlsxFile').addEventListener('change', (event) => {
-  const file = event.target.files[0];
-  if (!file) return alert('Nenhum arquivo selecionado!');
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const bytes = e.target.result;
-      const workbook = XLSX.read(bytes, { type: 'binary' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      data = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
-      const headers = data[0].map(h => h.trim().replace(/\s+/g, ' ').normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
-      data = data.slice(1).map(row => {
-        let obj = {};
-        headers.forEach((header, i) => obj[header] = row[i] || '');
-        obj.id = `inactive-${Math.random().toString(36).substr(2, 9)}`;
-        return obj;
-      });
-      populateCidades();
-      applyFiltersAndSort();
-    } catch (error) {
-      alert('Erro ao ler o arquivo: ' + error.message);
-    }
-  };
-  reader.readAsBinaryString(file);
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.getElementById('cidadeList')) {
+    document.getElementById('cidadeList').classList.add('escondido');
+  }
+  if (typeof renderAtivos === 'function') renderAtivos();
+  if (typeof renderAgenda === 'function') renderAgenda();
 });
 
-// Popular lista de cidades com checkboxes
+if (document.getElementById('saldoFilter')) {
+  document.getElementById('saldoFilter').addEventListener('input', applyFiltersAndSort);
+}
+if (document.getElementById('sortOption')) {
+  document.getElementById('sortOption').addEventListener('change', applyFiltersAndSort);
+}
+if (document.getElementById('close')) {
+  document.getElementById('close').addEventListener('click', () => {
+    document.getElementById('modal').style.display = 'none';
+  });
+}
+
+if (document.getElementById('xlsxFile')) {
+  document.getElementById('xlsxFile').addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (!file) return alert('Nenhum arquivo selecionado!');
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const bytes = e.target.result;
+        const workbook = XLSX.read(bytes, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        data = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
+        const headers = data[0].map(h => h.trim().replace(/\s+/g, ' ').normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+        data = data.slice(1).map(row => {
+          let obj = {};
+          headers.forEach((header, i) => obj[header] = row[i] || '');
+          obj.id = `inactive-${Math.random().toString(36).substr(2, 9)}`;
+          return obj;
+        });
+        populateCidades();
+        applyFiltersAndSort();
+      } catch (error) {
+        alert('Erro ao ler o arquivo: ' + (error.message || error));
+      }
+    };
+    reader.onerror = () => alert('Erro ao ler o arquivo.');
+    reader.readAsBinaryString(file);
+  });
+}
+
 function populateCidades() {
   const cidades = [...new Set(data.map(item => item['Cidade']))].sort();
   const list = document.getElementById('cidadeList');
+  if (!list) return;
   list.innerHTML = '';
   cidades.forEach(cidade => {
     const div = document.createElement('div');
@@ -91,22 +110,21 @@ function populateCidades() {
   });
 }
 
-// Minimizar/maximizar seleção de cidades
 function toggleCidades() {
   const selector = document.getElementById('cidadeSelector');
   const list = document.getElementById('cidadeList');
+  if (!selector || !list) return;
   const aberto = list.classList.toggle('visivel');
   list.classList.toggle('escondido', !aberto);
   selector.classList.toggle('aberto', aberto);
   document.getElementById('cidadeSelectorText').textContent = aberto ? 'Ocultar cidades' : 'Selecionar cidades';
 }
 
-// Aplicar filtros e ordenação com tratamento de erro
 function applyFiltersAndSort() {
   try {
-    const saldoMin = parseFloat(document.getElementById('saldoFilter').value) || 0;
+    const saldoMin = parseFloat(document.getElementById('saldoFilter')?.value) || 0;
     const cidadesSelecionadas = Array.from(document.querySelectorAll('#cidadeList input:checked')).map(input => input.value);
-    const sort = document.getElementById('sortOption').value;
+    const sort = document.getElementById('sortOption')?.value;
     filteredData = data.filter(item => {
       const saldo = parseFloat(item['Saldo de Credito']) || 0;
       const itemCidade = item['Cidade'] || '';
@@ -120,13 +138,13 @@ function applyFiltersAndSort() {
     else if (sort === 'data-desc') filteredData.sort((a, b) => parseDate(formatDateUS2BR(b['Data Ultimo Pedido'])) - parseDate(formatDateUS2BR(a['Data Ultimo Pedido'])));
     renderList();
   } catch (error) {
-    alert('Erro ao aplicar filtros: ' + error.message);
+    alert('Erro ao aplicar filtros: ' + (error.message || error));
   }
 }
 
-// Renderizar lista de inativos (numerada)
 function renderList() {
   const list = document.getElementById('list');
+  if (!list) return;
   list.innerHTML = '';
   filteredData.forEach((item, index) => {
     const li = document.createElement('li');
@@ -136,9 +154,9 @@ function renderList() {
   });
 }
 
-// Renderizar lista de ativos (numerada)
 function renderAtivos() {
   const list = document.getElementById('ativos-list');
+  if (!list) return;
   list.innerHTML = '';
   let sortedAtivos = [...ativos].sort((a, b) => (a['Nome Fantasia'] || '').localeCompare(b['Nome Fantasia'] || ''));
   sortedAtivos.forEach((item, index) => {
@@ -149,23 +167,34 @@ function renderAtivos() {
   });
 }
 
-// Renderizar agenda (próxima no topo, com botão de excluir)
 function renderAgenda() {
   const agendaList = document.getElementById('agenda-list');
+  if (!agendaList) return;
   agendaList.innerHTML = '';
   let agendaItems = [];
   Object.entries(schedules).forEach(([id, schArray]) => {
     schArray.forEach((sch, schIndex) => {
       const client = [...data, ...ativos].find(c => c.id === id);
-      if (client) {
-        agendaItems.push({ date: new Date(sch.date), client: client['Nome Fantasia'], tipo: sch.tipo, horario: sch.horario, id, schIndex });
+      if (client && sch.dateTime) {
+        agendaItems.push({
+          dateTime: sch.dateTime,
+          client: client['Nome Fantasia'],
+          tipo: sch.tipo,
+          id,
+          schIndex
+        });
       }
     });
   });
-  agendaItems.sort((a, b) => a.date - b.date);
+  agendaItems.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
   agendaItems.forEach(item => {
+    let dt = new Date(item.dateTime);
+    let dataStr = isNaN(dt) ? 'Data inválida' : dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
     const div = document.createElement('div');
-    div.innerHTML = `${item.date.toLocaleDateString('pt-BR')} - ${item.client} - ${item.tipo} às ${item.horario}`;
+    div.innerHTML = `
+      ${dataStr} - ${item.client}
+      - <strong>${item.tipo || ''}</strong>
+    `;
     const btn = document.createElement('button');
     btn.textContent = 'Excluir';
     btn.onclick = () => deleteSchedule(item.id, item.schIndex);
@@ -174,7 +203,6 @@ function renderAgenda() {
   });
 }
 
-// Excluir agendamento específico com tratamento de erro
 function deleteSchedule(id, schIndex) {
   try {
     if (schedules[id]) {
@@ -187,15 +215,15 @@ function deleteSchedule(id, schIndex) {
       alert('Agendamento não encontrado!');
     }
   } catch (error) {
-    alert('Erro ao excluir agendamento: ' + error.message);
+    alert('Erro ao excluir agendamento: ' + (error.message || error));
   }
 }
 
-// Mostrar detalhes no modal com botão de WhatsApp e Google Maps
 function showDetails(item, tab) {
   currentItem = item;
   currentTab = tab;
   const details = document.getElementById('details');
+  if (!details) return;
   details.innerHTML = `
     <p><strong>Cliente:</strong> ${item.Cliente || ''}</p>
     <p><strong>CNPJ/CPF:</strong> ${item['CNPJ / CPF'] || ''}</p>
@@ -208,10 +236,8 @@ function showDetails(item, tab) {
     <p><strong>Cidade:</strong> ${item.Cidade || ''}</p>
     <p><strong>Endereço Completo:</strong> ${item.Endereco || ''}, ${item.Numero || ''}, ${item.Bairro || ''}, ${item.Cidade || ''}, ${item.UF || ''}, ${item.CEP || ''}</p>
   `;
-
-  // Botão WhatsApp ao lado do Celular
   const celularP = details.querySelector('p:nth-of-type(5)');
-  if (item.Celular) {
+  if (item.Celular && celularP) {
     const cleanNumber = item.Celular.replace(/\D/g, '');
     if (cleanNumber.length >= 10) {
       const whatsappLink = document.createElement('a');
@@ -222,8 +248,6 @@ function showDetails(item, tab) {
       celularP.appendChild(whatsappLink);
     }
   }
-
-  // Botão Google Maps
   const address = encodeURIComponent(`${item.Endereco || ''}, ${item.Numero || ''}, ${item.Bairro || ''}, ${item.Cidade || ''}, ${item.UF || ''}, ${item.CEP || ''}`);
   const mapLink = document.createElement('a');
   mapLink.href = `https://www.google.com/maps/search/?api=1&query=${address}`;
@@ -231,21 +255,35 @@ function showDetails(item, tab) {
   mapLink.target = '_blank';
   details.appendChild(mapLink);
 
-  // Preencher agendamento (pegando o primeiro para simplicidade)
   const sch = schedules[item.id] && schedules[item.id].length > 0 ? schedules[item.id][0] : {};
-  document.getElementById('diaSemana').value = sch.dia || '';
-  document.getElementById('horario').value = sch.horario || '';
-  document.getElementById('tipo').value = sch.tipo || '';
-  document.getElementById('repeticao').value = sch.repeticao || '';
+  if (document.getElementById('diaSemana')) document.getElementById('diaSemana').value = sch.dia || '';
+  if (document.getElementById('horario')) document.getElementById('horario').value = sch.horario || '';
+  if (document.getElementById('tipo')) document.getElementById('tipo').value = sch.tipo || '';
+  if (document.getElementById('repeticao')) document.getElementById('repeticao').value = sch.repeticao || '';
 
-  document.getElementById('tornarAtivo').style.display = (tab === 'inativos') ? 'inline-block' : 'none';
-  document.getElementById('excluirAtivo').style.display = (tab === 'ativos') ? 'inline-block' : 'none';
-  document.getElementById('editDataPedido').style.display = 'none';
-  document.getElementById('confirmarAtivo').style.display = 'none';
-  document.getElementById('modal').style.display = 'flex';
+  if (document.getElementById('tornarAtivo')) document.getElementById('tornarAtivo').style.display = (tab === 'inativos') ? 'inline-block' : 'none';
+  if (document.getElementById('excluirAtivo')) document.getElementById('excluirAtivo').style.display = (tab === 'ativos') ? 'inline-block' : 'none';
+  if (document.getElementById('editDataPedido')) document.getElementById('editDataPedido').style.display = 'none';
+  if (document.getElementById('confirmarAtivo')) document.getElementById('confirmarAtivo').style.display = 'none';
+  if (document.getElementById('modal')) document.getElementById('modal').style.display = 'flex';
+
+  const obsKey = 'observacoes_' + item.id;
+  const obsTextarea = document.getElementById('observacoes');
+  if (obsTextarea) {
+    obsTextarea.value = localStorage.getItem(obsKey) || '';
+    if (document.getElementById('observacoes-contador')) document.getElementById('observacoes-contador').textContent = obsTextarea.value.length + '/2000';
+    obsTextarea.oninput = function() {
+      if (document.getElementById('observacoes-contador')) document.getElementById('observacoes-contador').textContent = this.value.length + '/2000';
+    };
+  }
+  if (document.getElementById('salvarObservacoes')) {
+    document.getElementById('salvarObservacoes').onclick = function() {
+      if (obsTextarea) localStorage.setItem(obsKey, obsTextarea.value);
+      alert('Observações salvas!');
+    };
+  }
 }
 
-// Função para inserir "/" automaticamente no campo de data
 document.addEventListener('DOMContentLoaded', function() {
   const editDataPedido = document.getElementById('editDataPedido');
   if (editDataPedido) {
@@ -260,22 +298,19 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
-// Função para mostrar campo de data e botão ao lado do "Salvar agendamento"
 function prepareTornarAtivo() {
-  document.getElementById('editDataPedido').style.display = 'inline-block';
-  document.getElementById('confirmarAtivo').style.display = 'inline-block';
-  document.getElementById('tornarAtivo').style.display = 'none';
+  if (document.getElementById('editDataPedido')) document.getElementById('editDataPedido').style.display = 'inline-block';
+  if (document.getElementById('confirmarAtivo')) document.getElementById('confirmarAtivo').style.display = 'inline-block';
+  if (document.getElementById('tornarAtivo')) document.getElementById('tornarAtivo').style.display = 'none';
 }
 
-// Função para validar e salvar a nova data ao tornar ativo
 function tornarAtivo() {
   try {
-    const newDate = document.getElementById('editDataPedido').value;
+    const newDate = document.getElementById('editDataPedido')?.value;
     if (!/^\d{2}\/\d{2}\/\d{4}$/.test(newDate)) {
       alert('Data inválida! Use o formato DD/MM/AAAA.');
       return;
     }
-    // Validação extra para datas impossíveis
     const [day, month, year] = newDate.split('/').map(Number);
     const dateObj = new Date(year, month - 1, day);
     if (
@@ -291,42 +326,43 @@ function tornarAtivo() {
     data = data.filter(d => d.id !== currentItem.id);
     localStorage.setItem('ativos', JSON.stringify(ativos));
     applyFiltersAndSort();
-    document.getElementById('modal').style.display = 'none';
+    if (document.getElementById('modal')) document.getElementById('modal').style.display = 'none';
     alert('Cliente tornado ativo com sucesso!');
   } catch (error) {
-    alert('Erro ao tornar cliente ativo: ' + error.message);
+    alert('Erro ao tornar cliente ativo: ' + (error.message || error));
   }
 }
 
-// Excluir dos ativos com tratamento de erro
 function excluirAtivo() {
   try {
     data.push(currentItem);
     ativos = ativos.filter(a => a.id !== currentItem.id);
     localStorage.setItem('ativos', JSON.stringify(ativos));
     renderAtivos();
-    document.getElementById('modal').style.display = 'none';
+    if (document.getElementById('modal')) document.getElementById('modal').style.display = 'none';
     alert('Cliente retornado para inativos!');
   } catch (error) {
-    alert('Erro ao excluir dos ativos: ' + error.message);
+    alert('Erro ao excluir dos ativos: ' + (error.message || error));
   }
 }
 
-// Função auxiliar para intervalo de repetição
 function getInterval(type) {
-  if (type === 'semanal') return 7;
-  if (type === 'quinzenal') return 14;
-  if (type === 'mensal') return 30;
+  if (type === 'Semanal') return 7;
+  if (type === 'Quinzenal') return 14;
+  if (type === 'Mensal') return 30;
   return Infinity;
 }
 
-// Salvar agendamento com repetição e limitações
 function saveSchedule() {
-  const dia = document.getElementById('diaSemana').value;
-  const horario = document.getElementById('horario').value;
-  const tipo = document.getElementById('tipo').value;
-  const repeticao = document.getElementById('repeticao').value;
+  const dia = document.getElementById('diaSemana')?.value;
+  const horario = document.getElementById('horario')?.value;
+  const tipo = document.getElementById('tipo')?.value;
+  const repeticao = document.getElementById('repeticao')?.value;
   if (!dia || !horario || !tipo) return alert('Preencha todos os campos obrigatórios!');
+  if (!/^\d{2}:\d{2}$/.test(horario)) {
+    alert('Horário inválido! Use o formato HH:MM.');
+    return;
+  }
   try {
     schedules[currentItem.id] = [];
     const baseDate = new Date();
@@ -336,55 +372,28 @@ function saveSchedule() {
     let daysToAdd = (dayIndex - baseDate.getDay() + 7) % 7;
     if (daysToAdd === 0) daysToAdd = 7;
     const interval = getInterval(repeticao);
-    const maxRepetitions = 48;
+    const maxRepetitions = 4;
     for (let i = 0; i < maxRepetitions; i++) {
       const nextDate = new Date(baseDate);
       nextDate.setDate(nextDate.getDate() + daysToAdd + (i * interval));
-      if (nextDate > new Date(baseDate.getTime() + 30 * 24 * 60 * 60 * 1000)) break;
-      schedules[currentItem.id].push({ date: nextDate.toISOString().split('T')[0], dia, horario, tipo, repeticao });
+      const dateStr = nextDate.toISOString().split('T')[0];
+      const dateTime = `${dateStr}T${horario}`;
+      if (isNaN(new Date(dateTime))) continue;
+      schedules[currentItem.id].push({
+        dateTime,
+        dia, horario, tipo, repeticao
+      });
     }
     localStorage.setItem('schedules', JSON.stringify(schedules));
     alert('Agendamento salvo com sucesso!');
-    document.getElementById('modal').style.display = 'none';
+    if (document.getElementById('modal')) document.getElementById('modal').style.display = 'none';
     renderAgenda();
   } catch (error) {
-    alert('Erro ao salvar agendamento: ' + error.message);
+    alert('Erro ao salvar agendamento: ' + (error.message || error));
   }
 }
 
-// Limpar ativos com confirmação
-function clearAtivos() {
-  if (!confirm('Tem certeza que deseja limpar todos os ativos e agendamentos?')) return;
-  try {
-    ativos = [];
-    schedules = {};
-    localStorage.removeItem('ativos');
-    localStorage.removeItem('schedules');
-    renderAtivos();
-    renderAgenda();
-    alert('Dados limpos com sucesso!');
-  } catch (error) {
-    alert('Erro ao limpar dados: ' + error.message);
-  }
-}
 
-// Eventos para filtros e ordenação
-document.getElementById('saldoFilter').addEventListener('input', applyFiltersAndSort);
-document.getElementById('sortOption').addEventListener('change', applyFiltersAndSort);
-
-// Fechar modal
-document.getElementById('close').addEventListener('click', () => {
-  document.getElementById('modal').style.display = 'none';
-});
-
-// Inicializar listas e estado da seleção de cidades
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('cidadeList').classList.add('escondido');
-  renderAtivos();
-  renderAgenda();
-});
-
-// Expor funções globais para botões HTML
 window.openTab = openTab;
 window.toggleCidades = toggleCidades;
 window.prepareTornarAtivo = prepareTornarAtivo;

@@ -4,19 +4,17 @@
   <meta charset="UTF-8">
   <title>Gerenciamento de Clientes</title>
   <link rel="stylesheet" href="styles.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script defer src="script.js"></script>
 </head>
 <body>
   <h1>Gerenciamento de Clientes</h1>
+
   <div id="tabs">
-    <button onclick="openTab('inativos')" class="active">Inativos</button>
+    <button class="active" onclick="openTab('inativos')">Inativos</button>
     <button onclick="openTab('ativos')">Ativos</button>
     <button onclick="openTab('agenda')">Agenda</button>
   </div>
 
-  <!-- Aba Inativos: Filtros visíveis apenas aqui -->
-  <div class="tab-content active" id="inativos">
+  <div id="inativos-content" class="tab-content active">
     <div id="upload">
       <input type="file" id="xlsxFile" accept=".xlsx,.xls">
     </div>
@@ -37,59 +35,76 @@
       </select>
     </div>
     <ul id="list"></ul>
-  
   </div>
 
-  <!-- Aba Ativos: Sem filtros -->
-  <div class="tab-content" id="ativos">
+  <div id="ativos-content" class="tab-content">
     <ul id="ativos-list"></ul>
+    <button onclick="clearAtivos()">Limpar Ativos</button>
   </div>
 
-  <!-- Aba Agenda: Sem filtros -->
-  <div class="tab-content" id="agenda">
+  <div id="agenda-content" class="tab-content">
     <div id="agenda-list"></div>
   </div>
 
-  <!-- Modal de detalhes -->
   <div id="modal">
     <div id="modal-content">
       <span id="close">&times;</span>
       <div id="details"></div>
-      <div style="margin-top:10px;">
+
+      <div id="agendamento">
         <label for="diaSemana">Dia da Semana:</label>
         <select id="diaSemana">
           <option value="">Selecione</option>
-          <option value="Segunda">Segunda</option>
-          <option value="Terça">Terça</option>
-          <option value="Quarta">Quarta</option>
-          <option value="Quinta">Quinta</option>
-          <option value="Sexta">Sexta</option>
-          <option value="Sábado">Sábado</option>
-          <option value="Domingo">Domingo</option>
+          <option>Segunda</option>
+          <option>Terça</option>
+          <option>Quarta</option>
+          <option>Quinta</option>
+          <option>Sexta</option>
+          <option>Sábado</option>
+          <option>Domingo</option>
         </select>
         <label for="horario">Horário:</label>
-        <input type="time" id="horario">
+        <input id="horario" type="time">
         <label for="tipo">Tipo:</label>
         <select id="tipo">
           <option value="">Selecione</option>
-          <option value="Visita">Visita</option>
-          <option value="Ligação">Ligação</option>
-          <option value="WhatsApp">WhatsApp</option>
+          <option>Visita</option>
+          <option>Ligação</option>
+          <option>WhatsApp</option>
         </select>
         <label for="repeticao">Repetição:</label>
         <select id="repeticao">
-          <option value="">Única</option>
-          <option value="semanal">Semanal</option>
-          <option value="quinzenal">Quinzenal</option>
-          <option value="mensal">Mensal</option>
+          <option>Semanal</option>
+          <option>Quinzenal</option>
+          <option>Mensal</option>
         </select>
         <button onclick="saveSchedule()">Salvar agendamento</button>
-        <button id="tornarAtivo" onclick="prepareTornarAtivo()" style="display:none;">Tornar Ativo</button>
-        <input type="text" id="editDataPedido" placeholder="Data Último Pedido (DD/MM/AAAA)" style="display:none; width:170px;">
-        <button id="confirmarAtivo" onclick="tornarAtivo()" style="display:none;">Confirmar Ativo</button>
-        <button id="excluirAtivo" onclick="excluirAtivo()" style="display:none;">Excluir dos Ativos</button>
+        <input id="editDataPedido" type="text" placeholder="DD/MM/AAAA" style="display:none;">
+        <button id="confirmarAtivo" style="display:none;">Confirmar Ativo</button>
+        <button id="tornarAtivo" style="display:none;" onclick="prepareTornarAtivo()">Tornar Ativo</button>
+        <button id="excluirAtivo" style="display:none;" onclick="excluirAtivo()">Excluir dos Ativos</button>
       </div>
+
+      <label for="observacoes">Observações do Cliente:</label>
+      <textarea id="observacoes" maxlength="2000" rows="6" placeholder="Digite observações sobre o cliente (máximo 2000 caracteres)"></textarea>
+      <span id="observacoes-contador">0/2000</span>
+      <button id="salvarObservacoes">Salvar Observações</button>
     </div>
   </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="script.js"></script>
+  <script>
+    function openTab(tab) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('#tabs button').forEach(el => el.classList.remove('active'));
+      document.getElementById(tab + '-content').classList.add('active');
+      document.querySelector(`button[onclick="openTab('${tab}')"]`).classList.add('active');
+      if (tab === 'inativos') { if (typeof renderList === 'function') renderList(); }
+      if (tab === 'ativos') { if (typeof renderAtivos === 'function') renderAtivos(); }
+      if (tab === 'agenda') { if (typeof renderAgenda === 'function') renderAgenda(); }
+    }
+    window.openTab = openTab;
+  </script>
 </body>
 </html>
