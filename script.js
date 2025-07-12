@@ -37,14 +37,68 @@ function daysSince(dateStr) {
     return isNaN(diff) ? 'N/A' : diff;
 }
 
+function resetAllData() {
+    console.log('🔄 Iniciando reset completo dos dados...');
+    
+    data = [];
+    filteredData = [];
+    
+    const inativosList = document.getElementById('list');
+    if (inativosList) {
+        inativosList.innerHTML = '<li style="text-align: center; color: #666;">Carregando dados...</li>';
+    }
+    
+    const ativosList = document.getElementById('ativos-list');
+    if (ativosList) {
+        ativosList.innerHTML = '';
+    }
+    
+    const cidadeList = document.getElementById('cidadeList');
+    if (cidadeList) {
+        cidadeList.innerHTML = '';
+        cidadeList.classList.remove('visivel');
+        cidadeList.classList.add('escondido');
+    }
+    
+    const saldoFilter = document.getElementById('saldoFilter');
+    if (saldoFilter) saldoFilter.value = '';
+    
+    const sortOption = document.getElementById('sortOption');
+    if (sortOption) sortOption.value = '';
+    
+    const cidadeSelector = document.getElementById('cidadeSelector');
+    if (cidadeSelector) {
+        cidadeSelector.classList.remove('aberto');
+        const selectorText = document.getElementById('cidadeSelectorText');
+        if (selectorText) selectorText.textContent = 'Selecionar cidades';
+    }
+    
+    // Limpar marcadores do mapa COM VERIFICAÇÃO SEGURA
+    try {
+        if (typeof window.clearMarkers === 'function') {
+            window.clearMarkers();
+        }
+    } catch (error) {
+        console.log('Função clearMarkers não disponível:', error.message);
+    }
+    
+    console.log('✅ Reset completo finalizado');
+}
+
 function openTab(tab) {
+    console.log(`📂 Abrindo aba: ${tab}`);
+    
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('#tabs button').forEach(el => el.classList.remove('active'));
-    document.getElementById(tab + '-content').classList.add('active');
-    document.querySelector(`button[onclick="openTab('${tab}')"]`).classList.add('active');
+    
+    const tabContent = document.getElementById(tab + '-content');
+    const tabButton = document.querySelector(`button[onclick="openTab('${tab}')"]`);
+    
+    if (tabContent) tabContent.classList.add('active');
+    if (tabButton) tabButton.classList.add('active');
+    
     currentTab = tab;
     
-    // Controlar visibilidade do botão de upload
     const uploadDiv = document.getElementById('upload');
     if (uploadDiv) {
         uploadDiv.style.display = (tab === 'inativos' || tab === 'mapa') ? 'block' : 'none';
@@ -54,11 +108,29 @@ function openTab(tab) {
     if (tab === 'ativos') renderAtivos();
     if (tab === 'agenda') renderAgenda();
     if (tab === 'mapa') {
-        if (typeof initMap === 'function') {
-            if (!map) {
-                initMap();
+        console.log('🗺️ Inicializando aba mapa...');
+        
+        // Garantir que o mapa seja inicializado
+        if (typeof window.initMap === 'function') {
+            try {
+                window.initMap();
+                
+                // Carregar dados após pequeno delay
+                setTimeout(() => {
+                    if (data.length > 0 || ativos.length > 0) {
+                        if (typeof window.loadMapData === 'function') {
+                            window.loadMapData();
+                        }
+                    } else {
+                        console.log('📋 Nenhum dado disponível para o mapa');
+                    }
+                }, 300);
+                
+            } catch (error) {
+                console.error('❌ Erro ao inicializar mapa:', error);
             }
-            // Removido loadMapData() para evitar recarregamento desnecessário
+        } else {
+            console.error('❌ Função initMap não encontrada');
         }
     }
 }
@@ -91,18 +163,19 @@ function getFullAddress(item) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Inicializar visibilidade do upload
+    console.log('🚀 Inicializando aplicação...');
+    
     const uploadDiv = document.getElementById('upload');
     if (uploadDiv) {
-        uploadDiv.style.display = 'block'; // Inicialmente visível na aba inativos
+        uploadDiv.style.display = 'block';
     }
     
     if (document.getElementById('cidadeList')) {
         document.getElementById('cidadeList').classList.add('escondido');
     }
     
-    if (typeof renderAtivos === 'function') renderAtivos();
-    if (typeof renderAgenda === 'function') renderAgenda();
+    renderAtivos();
+    renderAgenda();
     
     if (document.getElementById('saldoFilter')) {
         document.getElementById('saldoFilter').addEventListener('input', applyFiltersAndSort);
@@ -123,6 +196,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const file = event.target.files[0];
             if (!file) return alert('Nenhum arquivo selecionado!');
             
+            console.log('📁 Processando arquivo:', file.name);
+            resetAllData();
+            
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
@@ -130,28 +206,78 @@ document.addEventListener('DOMContentLoaded', () => {
                     const workbook = XLSX.read(bytes, { type: 'binary' });
                     const sheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[sheetName];
-                    data = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
                     
-                    const headers = data[0].map(h => h.trim().replace(/\s+/g, ' ').normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
-                    data = data.slice(1).map(row => {
-                        let obj = {};
-                        headers.forEach((header, i) => obj[header] = row[i] || '');
-                        obj.id = `inactive-${Math.random().toString(36).substr(2, 9)}`;
-                        return obj;
+                    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
+                    
+                    if (rawData.length === 0) {
+                        alert('❌ Arquivo vazio ou inválido!');
+                        return;
+                    }
+                    
+                    if (rawData.length === 1) {
+                        alert('❌ Arquivo contém apenas cabeçalhos!');
+                        return;
+                    }
+                    
+                    const headers = rawData[0].map(h => 
+                        h ? h.trim().replace(/\s+/g, ' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '') : ''
+                    );
+                    
+                    const dataRows = rawData.slice(1);
+                    data = [];
+                    
+                    dataRows.forEach((row, index) => {
+                        const hasValidData = row.some(cell => cell && cell.toString().trim() !== '');
+                        
+                        if (hasValidData) {
+                            let obj = {};
+                            headers.forEach((header, i) => {
+                                obj[header] = row[i] || '';
+                            });
+                            
+                            obj.id = `inactive-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`;
+                            data.push(obj);
+                        }
                     });
+                    
+                    if (data.length === 0) {
+                        alert('❌ Nenhum cliente válido encontrado no arquivo!');
+                        return;
+                    }
+                    
+                    // Disponibilizar globalmente para o mapa
+                    window.data = data;
+                    window.ativos = ativos;
                     
                     populateCidades();
                     applyFiltersAndSort();
                     
-                    // Carregar dados do mapa após novo arquivo ser carregado
-                    if (typeof loadMapData === 'function') {
-                        loadMapData();
+                    const message = `✅ Arquivo carregado com sucesso!\n\n📊 ${data.length} clientes inativos encontrados\n📁 Arquivo: ${file.name}`;
+                    alert(message);
+                    
+                    console.log('✅ Dados processados e disponibilizados globalmente');
+                    
+                    // Se estiver na aba mapa, recarregar
+                    if (currentTab === 'mapa') {
+                        setTimeout(() => {
+                            if (typeof window.loadMapData === 'function') {
+                                window.loadMapData();
+                            }
+                        }, 500);
                     }
+                    
                 } catch (error) {
-                    alert('Erro ao ler o arquivo: ' + (error.message || error));
+                    console.error('❌ Erro ao processar arquivo:', error);
+                    alert('❌ Erro ao processar o arquivo:\n' + error.message);
+                    resetAllData();
                 }
             };
-            reader.onerror = () => alert('Erro ao ler o arquivo.');
+            
+            reader.onerror = () => {
+                alert('❌ Erro ao ler o arquivo.');
+                resetAllData();
+            };
+            
             reader.readAsBinaryString(file);
         });
     }
@@ -167,6 +293,8 @@ document.addEventListener('DOMContentLoaded', () => {
             this.value = value;
         });
     }
+    
+    console.log('✅ Aplicação inicializada');
 });
 
 function populateCidades() {
@@ -184,6 +312,8 @@ function populateCidades() {
         div.querySelector('input').addEventListener('change', applyFiltersAndSort);
         list.appendChild(div);
     });
+    
+    console.log(`🏙️ ${cidades.length} cidades encontradas`);
 }
 
 function toggleCidades() {
@@ -217,8 +347,10 @@ function applyFiltersAndSort() {
         else if (sort === 'data-desc') filteredData.sort((a, b) => parseDate(formatDateUS2BR(b['Data Ultimo Pedido'])) - parseDate(formatDateUS2BR(a['Data Ultimo Pedido'])));
         
         renderList();
+        
+        console.log(`🔍 Filtros aplicados: ${filteredData.length}/${data.length} clientes exibidos`);
     } catch (error) {
-        alert('Erro ao aplicar filtros: ' + (error.message || error));
+        console.error('❌ Erro ao aplicar filtros:', error);
     }
 }
 
@@ -227,6 +359,12 @@ function renderList() {
     if (!list) return;
     
     list.innerHTML = '';
+    
+    if (filteredData.length === 0) {
+        list.innerHTML = '<li style="text-align: center; color: #666;">Nenhum cliente encontrado com os filtros aplicados</li>';
+        return;
+    }
+    
     filteredData.forEach((item, index) => {
         const li = document.createElement('li');
         li.innerHTML = `${index + 1}. ${item['Nome Fantasia'] || 'Sem Nome'} <span class="days-since">(${daysSince(item['Data Ultimo Pedido'])} dias sem pedir)</span>`;
@@ -329,7 +467,6 @@ function showDetails(item, tab) {
         <p><strong>Endereço Completo:</strong> ${getFullAddress(item)}</p>
     `;
     
-    // Configurar botões WhatsApp e Maps
     const whatsappBtn = document.getElementById('whatsapp-btn');
     const mapsBtn = document.getElementById('maps-btn');
     
@@ -414,11 +551,16 @@ function tornarAtivo() {
         ativos.push(currentItem);
         data = data.filter(d => d.id !== currentItem.id);
         localStorage.setItem('ativos', JSON.stringify(ativos));
+        
+        // Atualizar dados globais
+        window.data = data;
+        window.ativos = ativos;
+        
         applyFiltersAndSort();
         
-        // Atualizar mapa após mudança de status
-        if (typeof loadMapData === 'function') {
-            loadMapData();
+        // Atualizar mapa se ativo
+        if (currentTab === 'mapa' && typeof window.loadMapData === 'function') {
+            setTimeout(() => window.loadMapData(), 300);
         }
         
         if (document.getElementById('modal')) document.getElementById('modal').style.display = 'none';
@@ -433,11 +575,16 @@ function excluirAtivo() {
         data.push(currentItem);
         ativos = ativos.filter(a => a.id !== currentItem.id);
         localStorage.setItem('ativos', JSON.stringify(ativos));
+        
+        // Atualizar dados globais
+        window.data = data;
+        window.ativos = ativos;
+        
         renderAtivos();
         
-        // Atualizar mapa após mudança de status
-        if (typeof loadMapData === 'function') {
-            loadMapData();
+        // Atualizar mapa se ativo
+        if (currentTab === 'mapa' && typeof window.loadMapData === 'function') {
+            setTimeout(() => window.loadMapData(), 300);
         }
         
         if (document.getElementById('modal')) document.getElementById('modal').style.display = 'none';
@@ -512,3 +659,10 @@ window.prepareTornarAtivo = prepareTornarAtivo;
 window.tornarAtivo = tornarAtivo;
 window.excluirAtivo = excluirAtivo;
 window.saveSchedule = saveSchedule;
+window.resetAllData = resetAllData;
+window.showDetails = showDetails;
+window.generateWhatsAppLink = generateWhatsAppLink;
+window.generateMapsLink = generateMapsLink;
+window.getFullAddress = getFullAddress;
+
+console.log('🚀 script.js carregado com sucesso');
