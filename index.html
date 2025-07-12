@@ -1,222 +1,132 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Prospecção de Clientes Inativos</title>
-  <link rel="stylesheet" href="styles.css">
-  <style>
-    #modal-content {
-      display: flex;
-      flex-direction: column;
-      gap: 22px;
-    }
-    .cliente-info {
-      background: #f8f8f8;
-      padding: 12px 16px;
-      border-radius: 7px;
-      margin-bottom: 0;
-    }
-    .acoes-rapidas {
-      display: flex;
-      gap: 16px;
-      justify-content: flex-start;
-      margin-bottom: 0;
-    }
-    .acoes-rapidas a {
-      flex: 1 1 0;
-      margin: 0;
-    }
-    fieldset {
-      border: 1px solid #ddd;
-      border-radius: 7px;
-      padding: 12px 16px 16px 16px;
-      margin: 0;
-    }
-    fieldset legend {
-      font-weight: bold;
-      font-size: 1em;
-      padding: 0 8px;
-    }
-    .status-btns {
-      display: flex;
-      gap: 12px;
-      margin-top: 10px;
-    }
-    #editDataPedido, #labelEditDataPedido {
-      margin-bottom: 8px;
-      margin-right: 8px;
-    }
-    .observacoes {
-      display: flex;
-      flex-direction: column;
-      gap: 7px;
-    }
-    #observacoes-contador {
-      align-self: flex-end;
-    }
-    @media (max-width: 600px) {
-      #modal-content {
-        gap: 14px;
-      }
-      .acoes-rapidas {
-        flex-direction: column;
-        gap: 8px;
-      }
-      .status-btns {
-        flex-direction: column;
-        gap: 8px;
-      }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prospecção de Clientes Inativos</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
-  <h1>Prospecção de Clientes Inativos</h1>
-
-  <div id="tabs">
-    <button onclick="openTab('inativos')" class="active">Inativos</button>
-    <button onclick="openTab('ativos')">Ativos</button>
-    <button onclick="openTab('agenda')">Agenda</button>
-  </div>
-
-  <div id="inativos-content" class="tab-content active">
-    <div id="inativos-controls">
-      <div id="upload">
-        <input type="file" id="xlsxFile" accept=".xlsx,.xls">
-      </div>
-      <div id="filters">
-        <input type="number" id="saldoFilter" placeholder="Saldo mínimo em mil reais" min="0" step="0.01">
-        <select id="sortOption">
-          <option value="nome-az">Nome Fantasia (A-Z)</option>
-          <option value="nome-za">Nome Fantasia (Z-A)</option>
-          <option value="saldo-desc">Saldo de Crédito (Maior-Menor)</option>
-          <option value="saldo-asc">Saldo de Crédito (Menor-Maior)</option>
-          <option value="data-asc">Data Último Pedido (Antigo-Recente)</option>
-          <option value="data-desc">Data Último Pedido (Recente-Antigo)</option>
-        </select>
-        <div id="cidadeSelector" onclick="toggleCidades()">
-          <span id="cidadeSelectorText">Selecionar cidades</span>
-          <span class="seta">&#9660;</span>
-        </div>
-        <div id="cidadeList" class="escondido"></div>
-      </div>
+    <h1>Prospecção de Clientes Inativos</h1>
+    
+    <div id="upload">
+        <input type="file" id="xlsxFile" accept=".xlsx,.xls" />
+        <label for="xlsxFile">Selecione o arquivo Excel</label>
     </div>
-    <ul id="list"></ul>
-  </div>
 
-  <div id="ativos-content" class="tab-content">
-    <ul id="ativos-list"></ul>
-  </div>
+    <div id="tabs">
+        <button onclick="openTab('inativos')" class="active">Inativos</button>
+        <button onclick="openTab('ativos')">Ativos</button>
+        <button onclick="openTab('agenda')">Agenda</button>
+        <button onclick="openTab('mapa')">Mapa</button>
+    </div>
 
-  <div id="agenda-content" class="tab-content">
-    <div id="agenda-list"></div>
-  </div>
-
-  <div id="modal">
-    <div id="modal-content">
-      <span id="close">&times;</span>
-
-      <!-- Informações do Cliente -->
-      <div class="cliente-info" id="details"></div>
-
-      <!-- Ações Rápidas -->
-      <div class="acoes-rapidas" id="acoes-rapidas"></div>
-
-      <!-- Agendamento -->
-      <fieldset class="agendamento">
-        <legend>Agendamento</legend>
-        <div>
-          <label for="diaSemana">Dia da Semana:</label>
-          <select id="diaSemana">
-            <option value="">Selecione</option>
-            <option value="Domingo">Domingo</option>
-            <option value="Segunda">Segunda</option>
-            <option value="Terça">Terça</option>
-            <option value="Quarta">Quarta</option>
-            <option value="Quinta">Quinta</option>
-            <option value="Sexta">Sexta</option>
-            <option value="Sábado">Sábado</option>
-          </select>
+    <div id="inativos-content" class="tab-content active">
+        <div id="filters">
+            <input type="number" id="saldoFilter" placeholder="Saldo mínimo de crédito" min="0" step="0.01">
+            <select id="sortOption">
+                <option value="">Ordenar por...</option>
+                <option value="nome-az">Nome Fantasia (A-Z)</option>
+                <option value="nome-za">Nome Fantasia (Z-A)</option>
+                <option value="saldo-desc">Saldo de Crédito (Maior-Menor)</option>
+                <option value="saldo-asc">Saldo de Crédito (Menor-Maior)</option>
+                <option value="data-asc">Data Último Pedido (Antigo-Recente)</option>
+                <option value="data-desc">Data Último Pedido (Recente-Antigo)</option>
+            </select>
+            <div id="cidadeSelector" onclick="toggleCidades()">
+                <span id="cidadeSelectorText">Selecionar cidades</span>
+                <span class="seta">▼</span>
+            </div>
+            <div id="cidadeList" class="escondido"></div>
         </div>
-        <div>
-          <label for="horario">Horário:</label>
-          <input type="time" id="horario">
+        <ul id="list"></ul>
+    </div>
+
+    <div id="ativos-content" class="tab-content">
+        <ul id="ativos-list"></ul>
+    </div>
+
+    <div id="agenda-content" class="tab-content">
+        <div id="agenda-list"></div>
+    </div>
+
+    <div id="mapa-content" class="tab-content">
+        <div id="mapa-controls">
+            <button id="showInativos" onclick="toggleClientType('inativos')" class="map-control-btn active">Mostrar Inativos</button>
+            <button id="showAtivos" onclick="toggleClientType('ativos')" class="map-control-btn active">Mostrar Ativos</button>
+            <button onclick="fitMapToMarkers()" class="map-control-btn">Ajustar Zoom</button>
+            <span id="map-status">Carregando mapa...</span>
         </div>
-        <div>
-          <label for="tipo">Tipo:</label>
-          <select id="tipo">
-            <option value="">Selecione</option>
-            <option value="Visita">Visita</option>
-            <option value="Ligação">Ligação</option>
-            <option value="WhatsApp">WhatsApp</option>
-          </select>
-        </div>
-        <div>
-          <label for="repeticao">Repetição:</label>
-          <select id="repeticao">
+        <div id="map" style="height: 500px; width: 100%;"></div>
+    </div>
+
+    <div id="modal" style="display: none;">
+        <div id="modal-content">
+            <span id="close">&times;</span>
+            <h2>Detalhes do Cliente</h2>
+            <div id="details"></div>
             
-            <option value="Semanal">Semanal</option>
-            <option value="Quinzenal">Quinzenal</option>
-            <option value="Mensal">Mensal</option>
-          </select>
+            <h3>Agendamento</h3>
+            <div>
+                <label>Dia da Semana:</label>
+                <select id="diaSemana">
+                    <option value="">Selecione</option>
+                    <option value="Domingo">Domingo</option>
+                    <option value="Segunda">Segunda</option>
+                    <option value="Terça">Terça</option>
+                    <option value="Quarta">Quarta</option>
+                    <option value="Quinta">Quinta</option>
+                    <option value="Sexta">Sexta</option>
+                    <option value="Sábado">Sábado</option>
+                </select>
+            </div>
+            <div>
+                <label>Horário:</label>
+                <input type="time" id="horario">
+            </div>
+            <div>
+                <label>Tipo:</label>
+                <select id="tipo">
+                    <option value="">Selecione</option>
+                    <option value="Visita">Visita</option>
+                    <option value="Ligação">Ligação</option>
+                    <option value="WhatsApp">WhatsApp</option>
+                </select>
+            </div>
+            <div>
+                <label>Repetição:</label>
+                <select id="repeticao">
+                    <option value="Semanal">Semanal</option>
+                    <option value="Quinzenal">Quinzenal</option>
+                    <option value="Mensal">Mensal</option>
+                </select>
+            </div>
+            <button onclick="saveSchedule()">Salvar agendamento</button>
+            
+            <h3>Ações</h3>
+            <div id="modal-actions">
+                <a id="whatsapp-btn" href="#" target="_blank" class="whatsapp-btn">📱 WhatsApp</a>
+                <a id="maps-btn" href="#" target="_blank" class="maps-btn">🗺️ Traçar Rota</a>
+            </div>
+            
+            <h3>Status</h3>
+            <label id="labelEditDataPedido" style="display: none;">Data Último Pedido:</label>
+            <input type="text" id="editDataPedido" placeholder="DD/MM/AAAA" maxlength="10" style="display: none;">
+            <button id="tornarAtivo" onclick="prepareTornarAtivo()">Tornar Ativo</button>
+            <button id="confirmarAtivo" onclick="tornarAtivo()" style="display: none;">Confirmar Ativo</button>
+            <button id="excluirAtivo" onclick="excluirAtivo()" style="display: none;">Excluir dos Ativos</button>
+            
+            <h3>Observações</h3>
+            <textarea id="observacoes" maxlength="2000" placeholder="Digite suas observações..."></textarea>
+            <div id="observacoes-contador">0/2000</div>
+            <button id="salvarObservacoes">Salvar Observações</button>
         </div>
-        <button id="salvarAgendamento" onclick="saveSchedule()">Salvar agendamento</button>
-      </fieldset>
-
-      <!-- Status do Cliente -->
-      <fieldset class="status">
-        <legend>Status</legend>
-        <div style="margin-bottom: 8px;">
-          <label for="editDataPedido" style="display:none;" id="labelEditDataPedido">Data Último Pedido:</label>
-          <input type="text" id="editDataPedido" placeholder="DD/MM/AAAA" style="display:none;" maxlength="10">
-        </div>
-        <div class="status-btns">
-          <button id="tornarAtivo" onclick="prepareTornarAtivo()">Tornar Ativo</button>
-          <button id="confirmarAtivo" onclick="tornarAtivo()" style="display:none;">Confirmar Ativo</button>
-          <button id="excluirAtivo" onclick="excluirAtivo()" style="display:none;">Excluir dos Ativos</button>
-        </div>
-      </fieldset>
-
-      <!-- Observações -->
-      <fieldset class="observacoes">
-        <legend>Observações</legend>
-        <textarea id="observacoes" maxlength="2000"></textarea>
-        <div id="observacoes-contador">0/2000</div>
-        <button id="salvarObservacoes">Salvar Observações</button>
-      </fieldset>
     </div>
-  </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="script.js"></script>
-  <script>
-    // Organização dos botões de ação rápida no modal
-    function updateAcoesRapidas(item) {
-      const acoes = document.getElementById('acoes-rapidas');
-      if (!acoes) return;
-      acoes.innerHTML = '';
-      // WhatsApp
-      if (item.Celular) {
-        const cleanNumber = item.Celular.replace(/\D/g, '');
-        if (cleanNumber.length >= 10) {
-          const whatsappLink = document.createElement('a');
-          whatsappLink.href = `https://wa.me/55${cleanNumber}`;
-          whatsappLink.textContent = 'Abrir WhatsApp';
-          whatsappLink.className = 'whatsapp-btn';
-          whatsappLink.target = '_blank';
-          acoes.appendChild(whatsappLink);
-        }
-      }
-      // Google Maps
-      const address = encodeURIComponent(`${item.Endereco || ''}, ${item.Numero || ''}, ${item.Bairro || ''}, ${item.Cidade || ''}, ${item.UF || ''}, ${item.CEP || ''}`);
-      const mapLink = document.createElement('a');
-      mapLink.href = `https://www.google.com/maps/search/?api=1&query=${address}`;
-      mapLink.textContent = 'Abrir no Google Maps';
-      mapLink.className = 'whatsapp-btn';
-      mapLink.target = '_blank';
-      acoes.appendChild(mapLink);
-    }
-    window.updateAcoesRapidas = updateAcoesRapidas;
-  </script>
+    <script src="script.js"></script>
+    <script src="map.js"></script>
 </body>
 </html>

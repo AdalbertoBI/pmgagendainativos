@@ -18,26 +18,24 @@ h1 { text-align: center; font-size: 1.2em; }
 
 #cidadeList.visivel { display: block; background: #fff; border: 1px solid #ccc; border-radius: 5px; padding: 10px; margin-bottom: 10px; max-height: 200px; overflow-y: auto; width: 80%; max-width: 300px; }
 
-/* CORREÇÃO: Alinhar checkbox e nome da cidade lado a lado */
 #cidadeList div {
-  display: flex;
-  align-items: center;
-  margin-bottom: 5px;
-  gap: 8px; /* espaço entre checkbox e texto */
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+    gap: 8px;
 }
 
-/* Opcional: ajustar o tamanho do checkbox */
 #cidadeList input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  margin: 0;
+    width: 16px;
+    height: 16px;
+    margin: 0;
 }
 
 #list, #ativos-list, #agenda-list { list-style: none; padding: 0; }
 
 #list li, #ativos-list li { background: white; margin: 5px; padding: 10px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; }
 
-#modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+#modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
 
 #modal-content { background: white; padding: 20px; border-radius: 10px; max-width: 90%; max-height: 80%; overflow-y: auto; }
 
@@ -45,15 +43,15 @@ h1 { text-align: center; font-size: 1.2em; }
 
 #modal-content .highlight { font-weight: bold; color: #007bff; }
 
-#modal-content a { display: block; margin-top: 10px; padding: 10px; background: #28a745; color: white; text-decoration: none; text-align: center; border-radius: 5px; }
+#modal-actions { margin: 15px 0; display: flex; gap: 10px; flex-wrap: wrap; }
 
 #close { float: right; cursor: pointer; font-size: 1.5em; }
 
 #tabs { display: flex; justify-content: space-around; background: #ddd; padding: 10px; }
 
-#tabs button { background: #eee; border: none; padding: 10px; cursor: pointer; }
+#tabs button { background: #eee; border: none; padding: 10px; cursor: pointer; border-radius: 5px; margin: 0 2px; }
 
-#tabs button.active { background: #ccc; }
+#tabs button.active { background: #007bff; color: white; }
 
 .tab-content { display: none; }
 
@@ -63,35 +61,168 @@ h1 { text-align: center; font-size: 1.2em; }
 
 #agenda-list button { background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
 
+/* Estilos para o Mapa */
+#mapa-controls {
+    margin: 10px 0;
+    padding: 10px;
+    background: #fff;
+    border-radius: 5px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+}
+
+.map-control-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.map-control-btn:not(.active) {
+    background: #6c757d;
+    color: white;
+}
+
+.map-control-btn.active {
+    background: #28a745;
+    color: white;
+}
+
+.map-control-btn:hover {
+    opacity: 0.8;
+}
+
+#map-status {
+    font-size: 12px;
+    color: #666;
+    margin-left: 10px;
+}
+
+#map {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin-top: 10px;
+}
+
+/* Estilos para os marcadores customizados */
+.custom-marker {
+    background: transparent;
+    border: none;
+}
+
+.leaflet-popup-content {
+    margin: 8px 12px;
+    line-height: 1.4;
+}
+
+.leaflet-popup-content h4 {
+    margin: 0 0 8px 0;
+    color: #333;
+}
+
+.leaflet-popup-content p {
+    margin: 4px 0;
+    font-size: 13px;
+}
+
 .days-since { font-size: 0.8em; color: #666; margin-left: 10px; }
 
-.whatsapp-btn { background: #25D366; color: white; padding: 5px 10px; border-radius: 5px; text-decoration: none; margin-left: 10px; font-size: 0.9em; }
+.whatsapp-btn { 
+    background: #25D366; 
+    color: white; 
+    padding: 8px 16px; 
+    border-radius: 5px; 
+    text-decoration: none; 
+    font-size: 14px;
+    display: inline-block;
+    margin-right: 10px;
+}
+
+.whatsapp-btn:hover {
+    background: #1da851;
+    color: white;
+}
+
+.maps-btn { 
+    background: #17a2b8; 
+    color: white; 
+    padding: 8px 16px; 
+    border-radius: 5px; 
+    text-decoration: none; 
+    font-size: 14px;
+    display: inline-block;
+}
+
+.maps-btn:hover {
+    background: #117a8b;
+    color: white;
+}
 
 #observacoes {
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  padding: 10px;
-  resize: vertical;
-  width: 100%;
-  max-width: 100%;
-  min-height: 80px;
-  font-size: 1em;
-  margin-top: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+    resize: vertical;
+    width: 100%;
+    max-width: 100%;
+    min-height: 80px;
+    font-size: 1em;
+    margin-top: 10px;
 }
 
 #observacoes-contador {
-  font-size: 0.9em;
-  color: #666;
-  float: right;
-  margin-bottom: 10px;
+    font-size: 0.9em;
+    color: #666;
+    float: right;
+    margin-bottom: 10px;
 }
 
 #salvarObservacoes {
-  margin-top: 10px;
-  background: #007bff;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 5px;
-  cursor: pointer;
+    margin-top: 10px;
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+/* Responsividade para dispositivos móveis */
+@media (max-width: 768px) {
+    #tabs {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    #tabs button {
+        margin: 2px 0;
+    }
+    
+    #mapa-controls {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .map-control-btn {
+        width: 100%;
+        max-width: 200px;
+    }
+    
+    #map {
+        height: 300px !important;
+    }
+    
+    #modal-actions {
+        flex-direction: column;
+    }
+    
+    .whatsapp-btn, .maps-btn {
+        margin: 5px 0;
+        text-align: center;
+    }
 }
