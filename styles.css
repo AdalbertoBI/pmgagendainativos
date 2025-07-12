@@ -18,7 +18,20 @@ h1 { text-align: center; font-size: 1.2em; }
 
 #cidadeList.visivel { display: block; background: #fff; border: 1px solid #ccc; border-radius: 5px; padding: 10px; margin-bottom: 10px; max-height: 200px; overflow-y: auto; width: 80%; max-width: 300px; }
 
-#cidadeList div { margin-bottom: 5px; }
+/* CORREÇÃO: Alinhar checkbox e nome da cidade lado a lado */
+#cidadeList div {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+  gap: 8px; /* espaço entre checkbox e texto */
+}
+
+/* Opcional: ajustar o tamanho do checkbox */
+#cidadeList input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
 
 #list, #ativos-list, #agenda-list { list-style: none; padding: 0; }
 
