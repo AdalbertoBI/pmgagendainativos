@@ -10,12 +10,11 @@
 <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Prospecção de Clientes Inativos</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
     <link rel="stylesheet" href="styles.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icons/icon-192.png" type="image/png">
+    <link rel="manifest" href="manifest.json">
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
 </head>
 <body>
     <h1>Prospecção de Clientes Inativos</h1>
@@ -135,19 +134,18 @@
         </div>
     </div>
 
-     <button id="install-btn" style="display: none;">Instalar App</button>
+      <button id="install-btn" style="display: none;">Instalar App</button>
      <script src="script.js"></script>
     <script src="map.js"></script>
 
 <script>
-  if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js');
+ if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js')
+                .then(() => console.log('Service Worker registrado com sucesso'))
+                .catch(err => console.error('Erro ao registrar Service Worker:', err));
         }
 </script>
 
-<button id="install-btn" style="display: none; position: fixed; bottom: 20px; right: 20px; z-index: 2000;">
-  Instalar App
-</button>
 
 </body>
 </html>

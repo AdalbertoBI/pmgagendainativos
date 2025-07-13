@@ -380,6 +380,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Instalação do PWA ---
 
 
+// script.js (versão corrigida)
 let deferredPrompt;
 const installBtn = document.getElementById('install-btn');
 
@@ -390,9 +391,9 @@ function isPWAInstalled() {
 function updateInstallButton() {
     if (isPWAInstalled()) {
         installBtn.style.display = 'none';
-        console.log('PWA já instalado, botão oculto.');
+        console.log('PWA já instalado.');
     } else {
-        console.log('PWA não instalado, aguardando prompt.');
+        console.log('Aguardando prompt de instalação.');
     }
 }
 
@@ -401,7 +402,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
     deferredPrompt = e;
     if (!isPWAInstalled()) {
         installBtn.style.display = 'block';
-        console.log('Evento beforeinstallprompt disparado, botão exibido.');
+        console.log('Prompt de instalação disponível.');
     }
 });
 
@@ -417,15 +418,10 @@ installBtn.addEventListener('click', () => {
 
 window.addEventListener('appinstalled', () => {
     installBtn.style.display = 'none';
-    console.log('App instalado com sucesso.');
+    console.log('App instalado.');
 });
 
-document.addEventListener('DOMContentLoaded', () => {
-    updateInstallButton();
-    
-});
-
-
+document.addEventListener('DOMContentLoaded', updateInstallButton);
 
 // Detecta se o app está rodando como PWA (já instalado)
 function isPWAInstalled() {
