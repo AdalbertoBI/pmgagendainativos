@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
-<link rel="manifest" href="/manifest.json">
+<link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png" type="image/png">
 </head>
 <body>
@@ -135,15 +135,14 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+     <button id="install-btn" style="display: none;">Instalar App</button>
+     <script src="script.js"></script>
     <script src="map.js"></script>
 
 <script>
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function() {
-      navigator.serviceWorker.register('service-worker.js');
-    });
-  }
+            navigator.serviceWorker.register('/service-worker.js');
+        }
 </script>
 
 <button id="install-btn" style="display: none; position: fixed; bottom: 20px; right: 20px; z-index: 2000;">

@@ -61,6 +61,28 @@ h1 { text-align: center; font-size: 1.2em; }
 
 #agenda-list button { background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
 
+/* ... (resto do CSS original) */
+
+#install-btn {
+    display: none;
+    background: #28a745;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+#install-btn:hover {
+    background: #218838;
+}
+
+/* ... (resto do CSS) */
+
 /* Estilos para o Mapa */
 #mapa-controls {
     margin: 10px 0;
