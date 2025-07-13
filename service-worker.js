@@ -1,13 +1,13 @@
 const CACHE_NAME = 'agenda-inativos-v1';
 
 const urlsToCache = [
-  '/pmgagendainativos/',
-  '/pmgagendainativos/index.html',
-  '/pmgagendainativos/styles.css',
-  '/pmgagendainativos/script.js',
-  '/pmgagendainativos/map.js',
-  '/pmgagendainativos/icon-192.png',
-  '/pmgagendainativos/icon-512.png'
+  '/',
+  '/index.html',
+  '/styles.css',
+  '/script.js',
+  '/map.js',
+  '/icones/icon-192.png',
+  '/icones/icon-512.png'
 ];
 
 // Instala o service worker e faz cache dos arquivos
