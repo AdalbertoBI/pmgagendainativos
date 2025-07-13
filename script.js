@@ -133,51 +133,21 @@ function updateProgress(message, progress = null) {
     setTimeout(() => statusElement.remove(), 3000);
 }
 
-// Limpa todos os dados e filtros
-async function resetAllData() {
-    console.log('🔄 Iniciando reset completo dos dados...');
-    try {
-        if (typeof window.clearMapDataCache === 'function') {
-            window.clearMapDataCache();
-            console.log('🗑️ Cache do mapa limpo via resetAllData');
-        }
-        data = [];
-        ativos = [];
-        schedules = {};
-        filteredData = [];
-        savedFilters = { saldoMin: 0, cidadesSelecionadas: [], sort: 'nome-az' }; // Resetar filtros
-        localStorage.removeItem('savedFilters'); // Limpar filtros salvos
-        const db = await initIndexedDB();
-        const transaction = db.transaction(['clients', 'ativos', 'schedules'], 'readwrite');
-        transaction.objectStore('clients').clear();
-        transaction.objectStore('ativos').clear();
-        transaction.objectStore('schedules').clear();
-        window.data = data;
-        window.ativos = ativos;
-        window.filteredData = filteredData;
-        applyFiltersAndSort();
-        
-        const inativosList = document.getElementById('list');
-        if (inativosList) {
-            inativosList.innerHTML = '<li>Nenhum cliente inativo carregado</li>';
-        }
-        
-        const ativosList = document.getElementById('ativos-list');
-        if (ativosList) {
-            ativosList.innerHTML = '<li>Nenhum cliente ativo</li>';
-        }
-        
-        const agendaList = document.getElementById('agenda-list');
-        if (agendaList) {
-            agendaList.innerHTML = '<div>Nenhum agendamento</div>';
-        }
-        
-        console.log('✅ Reset completo finalizado');
-    } catch (error) {
-        console.error('❌ Erro ao resetar dados:', error);
-        updateProgress('Erro ao resetar dados');
-    }
+// Limpa apenas os dados de clientes inativos
+async function resetInativosOnly() {
+  console.log('🔄 Resetando apenas dados de inativos...');
+  data = [];
+  window.data = data;
+  const db = await initIndexedDB();
+  const transaction = db.transaction(['clients'], 'readwrite');
+  transaction.objectStore('clients').clear();
+  await new Promise((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(new Error('Erro ao limpar clients'));
+  });
+  console.log('✅ Dados de inativos resetados');
 }
+
 
 // Carrega dados do arquivo Excel
 async function loadFileData(fileData) {
@@ -464,7 +434,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 
                 console.log('📁 Processando arquivo:', file.name);
-                await resetAllData();
+                await resetInativosOnly();
                 
                 const reader = new FileReader();
                 reader.onload = async (e) => {
@@ -549,13 +519,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     } catch (error) {
                         console.error('❌ Erro ao processar arquivo:', error);
                         alert('❌ Erro ao processar o arquivo:\n' + error.message);
-                        await resetAllData();
+                        await resetInativosOnly();
                     }
                 };
                 
                 reader.onerror = () => {
                     alert('❌ Erro ao ler o arquivo.');
-                    resetAllData();
+                    resetInativosOnly();
                 };
                 
                 reader.readAsBinaryString(file);
