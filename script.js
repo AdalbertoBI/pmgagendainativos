@@ -380,48 +380,95 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Instalação do PWA ---
 
 
-// script.js (versão corrigida)
+// Registro do Service Worker - Versão corrigida para mobile
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/pmgagendainativos/service-worker.js', {
+            scope: '/pmgagendainativos/'
+        })
+        .then(registration => {
+            console.log('✅ Service Worker registrado com sucesso:', registration.scope);
+            
+            // Verifica por atualizações
+            registration.addEventListener('updatefound', () => {
+                console.log('🔄 Nova versão do Service Worker encontrada');
+                const newWorker = registration.installing;
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        console.log('📱 Nova versão disponível, recarregue a página');
+                        // Opcional: mostrar notificação para o usuário
+                        if (confirm('Nova versão disponível! Deseja recarregar?')) {
+                            window.location.reload();
+                        }
+                    }
+                });
+            });
+        })
+        .catch(error => {
+            console.error('❌ Erro ao registrar Service Worker:', error);
+        });
+    });
+}
+
+// PWA Install - Versão corrigida para mobile
 let deferredPrompt;
 const installBtn = document.getElementById('install-btn');
 
+// Detecta se o app está rodando como PWA
 function isPWAInstalled() {
-    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    return window.matchMedia('(display-mode: standalone)').matches ||
+           window.navigator.standalone === true ||
+           document.referrer.includes('android-app://');
 }
 
+// Atualiza visibilidade do botão
 function updateInstallButton() {
     if (isPWAInstalled()) {
         installBtn.style.display = 'none';
-        console.log('PWA já instalado.');
+        console.log('📱 PWA já instalado');
     } else {
-        console.log('Aguardando prompt de instalação.');
+        console.log('⏳ Aguardando prompt de instalação...');
     }
 }
 
+// Captura o evento de instalação
 window.addEventListener('beforeinstallprompt', (e) => {
+    console.log('📥 Prompt de instalação disponível');
     e.preventDefault();
     deferredPrompt = e;
+    
     if (!isPWAInstalled()) {
         installBtn.style.display = 'block';
-        console.log('Prompt de instalação disponível.');
     }
 });
 
-installBtn.addEventListener('click', () => {
+// Clique no botão de instalação
+installBtn.addEventListener('click', async () => {
     if (deferredPrompt) {
+        console.log('🚀 Iniciando instalação...');
         deferredPrompt.prompt();
-        deferredPrompt.userChoice.then(() => {
+        
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`👤 Usuário ${outcome === 'accepted' ? 'aceitou' : 'rejeitou'} a instalação`);
+        
+        if (outcome === 'accepted') {
             installBtn.style.display = 'none';
-            deferredPrompt = null;
-        });
+        }
+        
+        deferredPrompt = null;
     }
 });
 
+// Evento pós-instalação
 window.addEventListener('appinstalled', () => {
+    console.log('✅ PWA instalado com sucesso');
     installBtn.style.display = 'none';
-    console.log('App instalado.');
+    deferredPrompt = null;
 });
 
+// Inicializa ao carregar
 document.addEventListener('DOMContentLoaded', updateInstallButton);
+
 
 // Detecta se o app está rodando como PWA (já instalado)
 function isPWAInstalled() {
