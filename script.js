@@ -10,6 +10,7 @@ let currentTab = 'inativos';
 const today = new Date();
 const BATCH_SIZE = 500; // Tamanho do lote para processamento
 const MAX_RECORDS = 10000; // Limite máximo de registros
+let savedFilters = JSON.parse(localStorage.getItem('savedFilters')) || { saldoMin: 0, cidadesSelecionadas: [], sort: 'nome-az' };
 
 // Disponibilizar dados globalmente para o mapa
 window.data = data;
@@ -20,21 +21,14 @@ window.filteredData = filteredData;
 function initIndexedDB() {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open('ClientDatabase', 1);
-        
         request.onupgradeneeded = (event) => {
             const db = event.target.result;
             db.createObjectStore('clients', { keyPath: 'id' });
             db.createObjectStore('ativos', { keyPath: 'id' });
             db.createObjectStore('schedules', { keyPath: 'id' });
         };
-
-        request.onsuccess = (event) => {
-            resolve(event.target.result);
-        };
-
-        request.onerror = (event) => {
-            reject(new Error('Erro ao abrir IndexedDB: ' + event.target.error));
-        };
+        request.onsuccess = (event) => { resolve(event.target.result); };
+        request.onerror = (event) => { reject(new Error('Erro ao abrir IndexedDB: ' + event.target.error)); };
     });
 }
 
@@ -44,11 +38,7 @@ async function saveToIndexedDB(storeName, data) {
     return new Promise((resolve, reject) => {
         const transaction = db.transaction([storeName], 'readwrite');
         const store = transaction.objectStore(storeName);
-        
-        data.forEach(item => {
-            store.put(item);
-        });
-
+        data.forEach(item => { store.put(item); });
         transaction.oncomplete = () => resolve();
         transaction.onerror = () => reject(new Error(`Erro ao salvar em ${storeName}`));
     });
@@ -61,10 +51,42 @@ async function loadFromIndexedDB(storeName) {
         const transaction = db.transaction([storeName], 'readonly');
         const store = transaction.objectStore(storeName);
         const request = store.getAll();
-
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(new Error(`Erro ao carregar ${storeName}`));
     });
+}
+
+// Função para salvar filtros no localStorage
+function saveFilters() {
+    const saldoMin = parseFloat(document.getElementById('saldoFilter')?.value) || 0;
+    const cidadesSelecionadas = Array.from(document.querySelectorAll('#cidadeList input:checked')).map(input => input.value);
+    const sort = document.getElementById('sortOption')?.value || 'nome-az';
+    savedFilters = { saldoMin, cidadesSelecionadas, sort };
+    localStorage.setItem('savedFilters', JSON.stringify(savedFilters));
+    console.log('💾 Filtros salvos:', savedFilters);
+}
+
+// Função para aplicar filtros salvos
+function applySavedFilters() {
+    if (savedFilters) {
+        const saldoFilter = document.getElementById('saldoFilter');
+        if (saldoFilter) {
+            saldoFilter.value = savedFilters.saldoMin || 0;
+        }
+        const cidadeList = document.getElementById('cidadeList');
+        if (cidadeList) {
+            const checkboxes = cidadeList.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = savedFilters.cidadesSelecionadas.includes(checkbox.value);
+            });
+        }
+        const sortOption = document.getElementById('sortOption');
+        if (sortOption) {
+            sortOption.value = savedFilters.sort || 'nome-az';
+        }
+        console.log('🔄 Filtros salvos aplicados:', savedFilters);
+        applyFiltersAndSort(); // <-- ESSA LINHA GARANTE QUE A LISTA É ATUALIZADA
+    }
 }
 
 function parseDate(dateStr) {
@@ -111,7 +133,7 @@ function updateProgress(message, progress = null) {
     setTimeout(() => statusElement.remove(), 3000);
 }
 
-// Limpa todos os dados
+// Limpa todos os dados e filtros
 async function resetAllData() {
     console.log('🔄 Iniciando reset completo dos dados...');
     try {
@@ -123,6 +145,8 @@ async function resetAllData() {
         ativos = [];
         schedules = {};
         filteredData = [];
+        savedFilters = { saldoMin: 0, cidadesSelecionadas: [], sort: 'nome-az' }; // Resetar filtros
+        localStorage.removeItem('savedFilters'); // Limpar filtros salvos
         const db = await initIndexedDB();
         const transaction = db.transaction(['clients', 'ativos', 'schedules'], 'readwrite');
         transaction.objectStore('clients').clear();
@@ -179,9 +203,9 @@ async function loadFileData(fileData) {
 // Aplica filtros e ordenação
 function applyFiltersAndSort() {
     try {
-        const saldoMin = parseFloat(document.getElementById('saldoFilter')?.value) || 0;
-        const cidadesSelecionadas = Array.from(document.querySelectorAll('#cidadeList input:checked')).map(input => input.value);
-        const sort = document.getElementById('sortOption')?.value;
+        const saldoMin = parseFloat(document.getElementById('saldoFilter')?.value) || savedFilters.saldoMin || 0;
+        const cidadesSelecionadas = Array.from(document.querySelectorAll('#cidadeList input:checked')).map(input => input.value) || savedFilters.cidadesSelecionadas;
+        const sort = document.getElementById('sortOption')?.value || savedFilters.sort || 'nome-az';
         
         if (currentTab === 'inativos') {
             filteredData = data.filter(item => {
@@ -324,6 +348,7 @@ function openTab(tab) {
     }
     
     if (tab === 'inativos') {
+        applySavedFilters();
         applyFiltersAndSort();
     }
     if (tab === 'ativos') renderAtivos();
@@ -391,6 +416,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.filteredData = filteredData;
         
         if (currentTab === 'inativos') {
+            applySavedFilters();
             applyFiltersAndSort();
         }
         
@@ -408,11 +434,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderAgenda();
         
         if (document.getElementById('saldoFilter')) {
-            document.getElementById('saldoFilter').addEventListener('input', applyFiltersAndSort);
+            document.getElementById('saldoFilter').addEventListener('input', () => {
+                applyFiltersAndSort();
+                saveFilters();
+            });
         }
         
         if (document.getElementById('sortOption')) {
-            document.getElementById('sortOption').addEventListener('change', applyFiltersAndSort);
+            document.getElementById('sortOption').addEventListener('change', () => {
+                applyFiltersAndSort();
+                saveFilters();
+            });
         }
         
         if (document.getElementById('close')) {
@@ -542,6 +574,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
         
+        // Adicionar evento para salvar filtros quando as cidades mudarem
+        if (document.getElementById('cidadeList')) {
+            document.getElementById('cidadeList').addEventListener('change', () => {
+                applyFiltersAndSort();
+                saveFilters();
+            });
+        }
+        
         console.log('✅ Aplicação inicializada');
     } catch (error) {
         console.error('❌ Erro ao inicializar aplicação:', error);
@@ -561,10 +601,11 @@ function populateCidades() {
     cidades.forEach(cidade => {
         const div = document.createElement('div');
         div.innerHTML = `<input type="checkbox" value="${cidade}" id="cidade-${cidade}"><label for="cidade-${cidade}">${cidade}</label>`;
-        div.querySelector('input').addEventListener('change', applyFiltersAndSort);
         list.appendChild(div);
     });
     
+    // Aplicar filtros salvos após preencher a lista de cidades
+    applySavedFilters();
     console.log(`🏙️ ${cidades.length} cidades encontradas`);
 }
 

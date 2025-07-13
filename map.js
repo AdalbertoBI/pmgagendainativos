@@ -12,6 +12,10 @@ let editingMarker = null;
 let editingClient = null;
 const MAX_GEOCODE_PER_BATCH = 100; // Limite de geocodificações por lote
 const GEOCODE_DELAY = 200; // Delay entre chamadas de geocodificação (ms)
+const DAILY_LIMIT = 1000; // Limite diário de requisições (ajuste conforme a API)
+let pendingGeocodes = JSON.parse(localStorage.getItem('pendingGeocodes')) || [];
+let geocodeCountToday = parseInt(localStorage.getItem('geocodeCountToday')) || 0;
+let lastGeocodeDate = localStorage.getItem('lastGeocodeDate') || null;
 
 // Base de dados de CEP para validação
 const CEP_DATABASE = {
@@ -46,6 +50,7 @@ function initMap() {
     
     addCustomControls();
     updateMapStatus('Mapa carregado');
+    checkPendingGeocodes(); // Verifica pendências ao inicializar
 }
 
 function addCustomControls() {
@@ -98,7 +103,13 @@ function clearMapDataCache() {
     mapDataCacheValid = false;
     localStorage.removeItem('mapDataCache');
     localStorage.removeItem('addressCache');
+    localStorage.removeItem('pendingGeocodes');
+    localStorage.removeItem('geocodeCountToday');
+    localStorage.removeItem('lastGeocodeDate');
     addressCache = {};
+    pendingGeocodes = [];
+    geocodeCountToday = 0;
+    lastGeocodeDate = null;
 }
 
 function isCacheValid() {
@@ -118,8 +129,29 @@ function isCacheValid() {
     return true;
 }
 
+// Verifica se há geocodificações pendentes e agenda para o próximo dia
+function checkPendingGeocodes() {
+    const today = new Date().toISOString().split('T')[0];
+    if (lastGeocodeDate !== today && pendingGeocodes.length > 0) {
+        console.log('📅 Processando geocodificações pendentes do dia anterior...');
+        geocodeCountToday = 0;
+        localStorage.setItem('geocodeCountToday', geocodeCountToday);
+        localStorage.setItem('lastGeocodeDate', today);
+        loadAndProcessMapData(true); // Processa pendências
+    } else if (pendingGeocodes.length > 0) {
+        updateMapStatus(`Aguardando próximo dia para processar ${pendingGeocodes.length} endereços pendentes`);
+    }
+}
+
 async function loadMapData() {
     console.log('🔄 loadMapData chamada');
+    
+    const today = new Date().toISOString().split('T')[0];
+    if (lastGeocodeDate !== today) {
+        geocodeCountToday = 0;
+        localStorage.setItem('geocodeCountToday', geocodeCountToday);
+        localStorage.setItem('lastGeocodeDate', today);
+    }
     
     if (mapDataCacheValid && mapDataCache && isCacheValid()) {
         console.log('📋 Usando dados do cache do mapa');
@@ -128,9 +160,12 @@ async function loadMapData() {
         console.log('🔄 Carregando dados do mapa pela primeira vez ou cache inválido...');
         await loadAndProcessMapData();
     }
+    
+    // Agenda verificação diária para pendências
+    setTimeout(checkPendingGeocodes, 24 * 60 * 60 * 1000); // Verifica a cada 24 horas
 }
 
-async function loadAndProcessMapData() {
+async function loadAndProcessMapData(processPending = false) {
     updateMapStatus('Processando dados do mapa...');
     
     if (!map) {
@@ -141,16 +176,22 @@ async function loadAndProcessMapData() {
     
     clearMarkers();
     
-    const allData = [];
+    let allData = [];
     
-    if (window.filteredData && Array.isArray(window.filteredData) && window.filteredData.length > 0) {
-        const inativosWithType = window.filteredData.map(item => ({ ...item, isAtivo: false }));
-        allData.push(...inativosWithType);
-    }
-    
-    if (window.ativos && Array.isArray(window.ativos) && window.ativos.length > 0) {
-        const ativosWithType = window.ativos.map(item => ({ ...item, isAtivo: true }));
-        allData.push(...ativosWithType);
+    if (processPending && pendingGeocodes.length > 0) {
+        allData = pendingGeocodes;
+        pendingGeocodes = [];
+        localStorage.setItem('pendingGeocodes', JSON.stringify(pendingGeocodes));
+    } else {
+        if (window.filteredData && Array.isArray(window.filteredData) && window.filteredData.length > 0) {
+            const inativosWithType = window.filteredData.map(item => ({ ...item, isAtivo: false }));
+            allData.push(...inativosWithType);
+        }
+        
+        if (window.ativos && Array.isArray(window.ativos) && window.ativos.length > 0) {
+            const ativosWithType = window.ativos.map(item => ({ ...item, isAtivo: true }));
+            allData.push(...ativosWithType);
+        }
     }
     
     if (allData.length === 0) {
@@ -165,6 +206,13 @@ async function loadAndProcessMapData() {
     let processedCount = 0;
     
     for (let i = 0; i < allData.length; i += MAX_GEOCODE_PER_BATCH) {
+        if (geocodeCountToday >= DAILY_LIMIT) {
+            pendingGeocodes.push(...allData.slice(i));
+            localStorage.setItem('pendingGeocodes', JSON.stringify(pendingGeocodes));
+            updateMapStatus(`Limite diário atingido. ${pendingGeocodes.length} endereços serão processados amanhã.`);
+            break;
+        }
+        
         const batch = allData.slice(i, i + MAX_GEOCODE_PER_BATCH);
         const batchPromises = batch.map(async (client) => {
             const address = getFullAddress(client);
@@ -173,9 +221,15 @@ async function loadAndProcessMapData() {
             try {
                 const coords = await geocodeAddressEnhanced(address);
                 if (coords) {
+                    geocodeCountToday++;
+                    localStorage.setItem('geocodeCountToday', geocodeCountToday);
                     return { client, coords, address };
                 }
             } catch (error) {
+                if (error.message.includes('429')) { // Limite de requisições atingido
+                    pendingGeocodes.push(client);
+                    return null;
+                }
                 console.error(`❌ Erro ao geocodificar ${address}:`, error);
             }
             return null;
@@ -396,7 +450,12 @@ async function tryMultipleProviders(query, options = {}) {
     for (const provider of providers) {
         try {
             const response = await fetch(provider.url);
-            if (!response.ok) continue;
+            if (!response.ok) {
+                if (response.status === 429) {
+                    throw new Error('429 Too Many Requests');
+                }
+                continue;
+            }
             const data = await response.json();
             if (data.hits && data.hits.length > 0) {
                 const hit = data.hits[0];
@@ -407,6 +466,9 @@ async function tryMultipleProviders(query, options = {}) {
             }
         } catch (error) {
             console.error(`Erro com provider ${provider.name}:`, error);
+            if (error.message.includes('429')) {
+                throw error; // Propaga erro de limite
+            }
         }
         await new Promise(resolve => setTimeout(resolve, 200));
     }
