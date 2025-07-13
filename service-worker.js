@@ -1,6 +1,6 @@
 const CACHE_NAME = 'agenda-inativos-v1';
+
 const urlsToCache = [
-  '/',
   '/pmgagendainativos/',
   '/pmgagendainativos/index.html',
   '/pmgagendainativos/styles.css',
@@ -24,7 +24,7 @@ self.addEventListener('activate', event => {
     caches.keys().then(keys =>
       Promise.all(
         keys.filter(key => key !== CACHE_NAME)
-            .map(key => caches.delete(key))
+          .map(key => caches.delete(key))
       )
     )
   );

@@ -2,19 +2,19 @@
   "name": "Agenda Inativos",
   "short_name": "AgendaInativos",
   "description": "Prospecção de Clientes Inativos",
-  "start_url": ".",
+  "start_url": "/pmgagendainativos/index.html",
   "display": "standalone",
   "background_color": "#f4f4f4",
   "theme_color": "#007bff",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "/pmgagendainativos/icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "icon-512.png",
+      "src": "/pmgagendainativos/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
