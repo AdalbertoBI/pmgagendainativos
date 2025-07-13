@@ -10,6 +10,8 @@ let mapDataCacheValid = mapDataCache !== null;
 const GRAPHHOPPER_API_KEY = '55b67cde-e051-409d-9440-171f4d6f52e0';
 let editingMarker = null;
 let editingClient = null;
+const MAX_GEOCODE_PER_BATCH = 100; // Limite de geocodificações por lote
+const GEOCODE_DELAY = 200; // Delay entre chamadas de geocodificação (ms)
 
 // Base de dados de CEP para validação
 const CEP_DATABASE = {
@@ -42,13 +44,11 @@ function initMap() {
         attribution: '© OpenStreetMap contributors'
     }).addTo(map);
     
-    // Adicionar controles personalizados
     addCustomControls();
     updateMapStatus('Mapa carregado');
 }
 
 function addCustomControls() {
-    // Controle de edição
     const editControl = L.control({ position: 'topleft' });
     editControl.onAdd = function(map) {
         const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
@@ -92,7 +92,6 @@ function updateMapStatus(message) {
     console.log(`📍 Status do mapa: ${message}`);
 }
 
-// Limpar cache do mapa
 function clearMapDataCache() {
     console.log('🗑️ Cache do mapa limpo');
     mapDataCache = null;
@@ -102,7 +101,6 @@ function clearMapDataCache() {
     addressCache = {};
 }
 
-// Verificar validade do cache
 function isCacheValid() {
     if (!mapDataCache || !window.data || !window.ativos || !window.filteredData) return false;
     
@@ -120,7 +118,6 @@ function isCacheValid() {
     return true;
 }
 
-// FUNÇÃO PRINCIPAL: loadMapData com cache otimizado
 async function loadMapData() {
     console.log('🔄 loadMapData chamada');
     
@@ -133,7 +130,6 @@ async function loadMapData() {
     }
 }
 
-// Função para carregar e processar dados do mapa
 async function loadAndProcessMapData() {
     updateMapStatus('Processando dados do mapa...');
     
@@ -147,7 +143,6 @@ async function loadAndProcessMapData() {
     
     const allData = [];
     
-    // Usar filteredData para inativos e todos os ativos
     if (window.filteredData && Array.isArray(window.filteredData) && window.filteredData.length > 0) {
         const inativosWithType = window.filteredData.map(item => ({ ...item, isAtivo: false }));
         allData.push(...inativosWithType);
@@ -169,23 +164,28 @@ async function loadAndProcessMapData() {
     const geocodedData = [];
     let processedCount = 0;
     
-    for (const client of allData) {
-        const address = getFullAddress(client);
-        if (!address) continue;
-        
-        try {
-            const coords = await geocodeAddressEnhanced(address);
-            if (coords) {
-                geocodedData.push({ client, coords, address });
-                console.log(`✅ Geocodificado: ${client['Nome Fantasia']} - ${address}`);
+    for (let i = 0; i < allData.length; i += MAX_GEOCODE_PER_BATCH) {
+        const batch = allData.slice(i, i + MAX_GEOCODE_PER_BATCH);
+        const batchPromises = batch.map(async (client) => {
+            const address = getFullAddress(client);
+            if (!address) return null;
+            
+            try {
+                const coords = await geocodeAddressEnhanced(address);
+                if (coords) {
+                    return { client, coords, address };
+                }
+            } catch (error) {
+                console.error(`❌ Erro ao geocodificar ${address}:`, error);
             }
-        } catch (error) {
-            console.error(`❌ Erro ao geocodificar ${address}:`, error);
-        }
+            return null;
+        });
         
-        processedCount++;
+        const batchResults = (await Promise.all(batchPromises)).filter(result => result !== null);
+        geocodedData.push(...batchResults);
+        processedCount += batch.length;
         updateMapStatus(`Processando: ${processedCount}/${allData.length}`);
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, GEOCODE_DELAY));
     }
     
     mapDataCache = geocodedData;
@@ -196,7 +196,6 @@ async function loadAndProcessMapData() {
     await renderMapData(geocodedData);
 }
 
-// Renderizar dados do cache
 async function renderCachedMapData() {
     if (!mapDataCache || mapDataCache.length === 0) {
         await loadAndProcessMapData();
@@ -207,14 +206,13 @@ async function renderCachedMapData() {
     clearMarkers();
     
     const filteredData = mapDataCache.filter(item => {
-        if (item.client.isAtivo) return true; // Sempre incluir ativos
-        return window.filteredData.some(fd => fd.id === item.client.id); // Inativos apenas se estiverem em filteredData
+        if (item.client.isAtivo) return true;
+        return window.filteredData.some(fd => fd.id === item.client.id);
     });
     
     await renderMapData(filteredData);
 }
 
-// Renderizar dados no mapa
 async function renderMapData(geocodedData) {
     if (!geocodedData || geocodedData.length === 0) {
         updateMapStatus('Nenhum endereço válido encontrado');
