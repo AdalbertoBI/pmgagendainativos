@@ -376,6 +376,53 @@ function getFullAddress(item) {
 
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 Inicializando aplicação...');
+
+    // --- Instalação do PWA ---
+let deferredPrompt;
+const installBtn = document.getElementById('install-btn');
+
+// Detecta se o app está rodando como PWA (já instalado)
+function isPWAInstalled() {
+  return window.matchMedia('(display-mode: standalone)').matches ||
+         window.navigator.standalone === true;
+}
+
+// Esconde o botão se já estiver instalado
+function updateInstallButton() {
+  if (isPWAInstalled()) {
+    installBtn.style.display = 'none';
+  }
+}
+
+// Captura o evento de oferta de instalação
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  if (!isPWAInstalled()) {
+    installBtn.style.display = 'block';
+  }
+});
+
+// Ao clicar no botão, dispara o prompt nativo
+installBtn.addEventListener('click', () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(() => {
+      installBtn.style.display = 'none';
+      deferredPrompt = null;
+    });
+  }
+});
+
+// Esconde o botão se o app já estiver instalado ao carregar
+window.addEventListener('DOMContentLoaded', updateInstallButton);
+
+// Esconde o botão após a instalação
+window.addEventListener('appinstalled', () => {
+  installBtn.style.display = 'none';
+});
+
+
     
     try {
         data = await loadFromIndexedDB('clients') || [];
