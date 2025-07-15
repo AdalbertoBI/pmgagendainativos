@@ -1,5 +1,4 @@
 // script.js - Arquivo principal corrigido
-
 let currentTab = 'inativos';
 
 // Inicialização da aplicação
@@ -61,7 +60,7 @@ function setupEventListeners() {
             document.getElementById('modal').style.display = 'none';
         });
     }
-
+    
     // Filtros
     const saldoFilter = document.getElementById('saldoFilter');
     if (saldoFilter) {
@@ -70,7 +69,7 @@ function setupEventListeners() {
             saveFilters();
         });
     }
-
+    
     const sortOption = document.getElementById('sortOption');
     if (sortOption) {
         sortOption.addEventListener('change', () => {
@@ -78,13 +77,13 @@ function setupEventListeners() {
             saveFilters();
         });
     }
-
+    
     // Seletor de cidades
     const cidadeSelector = document.getElementById('cidadeSelector');
     if (cidadeSelector) {
         cidadeSelector.addEventListener('click', toggleCidades);
     }
-
+    
     const cidadeList = document.getElementById('cidadeList');
     if (cidadeList) {
         cidadeList.addEventListener('change', () => {
@@ -92,24 +91,59 @@ function setupEventListeners() {
             saveFilters();
         });
     }
-
+    
     // Botão de cadastro
     const cadastrarBtn = document.getElementById('cadastrar-cliente-btn');
     if (cadastrarBtn) {
         cadastrarBtn.addEventListener('click', abrirModalCadastro);
     }
-
+    
     // Modal de cadastro
     const closeCadastroBtn = document.getElementById('close-cadastro');
     if (closeCadastroBtn) {
         closeCadastroBtn.addEventListener('click', fecharModalCadastro);
     }
-
+    
+    const cancelarCadastroBtn = document.getElementById('cancelar-cadastro');
+    if (cancelarCadastroBtn) {
+        cancelarCadastroBtn.addEventListener('click', fecharModalCadastro);
+    }
+    
     const formCadastro = document.getElementById('form-cadastro');
     if (formCadastro) {
         formCadastro.addEventListener('submit', handleCadastroSubmit);
     }
-
+    
+    // Modal de sucesso
+    const closeSucessoBtn = document.getElementById('close-sucesso');
+    if (closeSucessoBtn) {
+        closeSucessoBtn.addEventListener('click', fecharModalSucesso);
+    }
+    
+    const fecharSucessoBtn = document.getElementById('fechar-sucesso');
+    if (fecharSucessoBtn) {
+        fecharSucessoBtn.addEventListener('click', fecharModalSucesso);
+    }
+    
+    const cadastrarOutroBtn = document.getElementById('cadastrar-outro');
+    if (cadastrarOutroBtn) {
+        cadastrarOutroBtn.addEventListener('click', () => {
+            fecharModalSucesso();
+            abrirModalCadastro();
+        });
+    }
+    
+    // Botões de exportação
+    const exportarInativosBtn = document.getElementById('exportar-inativos');
+    if (exportarInativosBtn) {
+        exportarInativosBtn.addEventListener('click', () => exportarDados('inativos'));
+    }
+    
+    const exportarAtivosBtn = document.getElementById('exportar-ativos');
+    if (exportarAtivosBtn) {
+        exportarAtivosBtn.addEventListener('click', () => exportarDados('ativos'));
+    }
+    
     // Observações
     const observacoes = document.getElementById('observacoes');
     if (observacoes) {
@@ -120,12 +154,12 @@ function setupEventListeners() {
             }
         });
     }
-
+    
     const salvarObsBtn = document.getElementById('salvarObservacoes');
     if (salvarObsBtn) {
         salvarObsBtn.addEventListener('click', salvarObservacoes);
     }
-
+    
     // Formatação de data
     const editDataPedido = document.getElementById('editDataPedido');
     if (editDataPedido) {
@@ -147,7 +181,6 @@ function setupPWA() {
         navigator.serviceWorker.register('/pmgagendainativos/service-worker.js')
             .then(registration => {
                 console.log('✅ Service Worker registrado');
-                
                 registration.onupdatefound = () => {
                     const installingWorker = registration.installing;
                     installingWorker.onstatechange = () => {
@@ -160,23 +193,23 @@ function setupPWA() {
             })
             .catch(error => console.error('❌ Erro ao registrar Service Worker:', error));
     }
-
+    
     // Botão de instalação
     let deferredPrompt;
     const installBtn = document.getElementById('install-btn');
-
+    
     function isPWAInstalled() {
         return window.matchMedia('(display-mode: standalone)').matches ||
                window.navigator.standalone === true ||
                document.referrer.includes('android-app://');
     }
-
+    
     function updateInstallButton() {
         if (isPWAInstalled()) {
             installBtn.style.display = 'none';
         }
     }
-
+    
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
         deferredPrompt = e;
@@ -184,7 +217,7 @@ function setupPWA() {
             installBtn.style.display = 'block';
         }
     });
-
+    
     installBtn.addEventListener('click', async () => {
         if (deferredPrompt) {
             deferredPrompt.prompt();
@@ -195,12 +228,12 @@ function setupPWA() {
             deferredPrompt = null;
         }
     });
-
+    
     window.addEventListener('appinstalled', () => {
         installBtn.style.display = 'none';
         deferredPrompt = null;
     });
-
+    
     updateInstallButton();
 }
 
@@ -216,19 +249,19 @@ function setupUploadHandler() {
 async function handleFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
-
+    
     if (file.size > 10 * 1024 * 1024) {
         alert('Arquivo muito grande! O limite é 10MB.');
         return;
     }
-
+    
     console.log('📁 Processando arquivo:', file.name);
     
     // Limpar dados de inativos
     await window.dbManager.clearData('clients');
     window.clientManager.data = [];
     window.data = [];
-
+    
     const reader = new FileReader();
     reader.onload = async (e) => {
         try {
@@ -237,19 +270,16 @@ async function handleFileUpload(event) {
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
             const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
-
+            
             if (rawData.length <= 1) {
                 alert('❌ Arquivo inválido ou vazio!');
                 return;
             }
-
-            const headers = rawData[0].map(h => 
-                h ? h.trim().replace(/\s+/g, ' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '') : ''
-            );
             
+            const headers = rawData[0].map(h => h ? h.trim().replace(/\s+/g, ' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '');
             const dataRows = rawData.slice(1);
+            
             const processedData = [];
-
             dataRows.forEach((row, index) => {
                 const hasValidData = row.some(cell => cell && cell.toString().trim() !== '');
                 if (hasValidData) {
@@ -261,16 +291,15 @@ async function handleFileUpload(event) {
                     processedData.push(obj);
                 }
             });
-
+            
             if (processedData.length === 0) {
                 alert('❌ Nenhum cliente válido encontrado no arquivo!');
                 return;
             }
-
+            
             // Salvar dados
             window.clientManager.data = processedData;
             window.data = processedData;
-            
             await window.dbManager.saveData('clients', processedData);
             
             // Atualizar interface
@@ -284,40 +313,40 @@ async function handleFileUpload(event) {
             alert('❌ Erro ao processar o arquivo: ' + error.message);
         }
     };
-
+    
     reader.readAsBinaryString(file);
 }
 
-// Abrir modal de cadastro - MODAL VAZIO
+// Abrir modal de cadastro
 function abrirModalCadastro() {
     document.getElementById('modal-cadastro').style.display = 'flex';
-    // Limpar todos os campos do formulário
     document.getElementById('form-cadastro').reset();
-    
-    // Garantir que todos os campos estão vazios
-    document.getElementById('nome-fantasia').value = '';
-    document.getElementById('cliente').value = '';
-    document.getElementById('cnpj-cpf').value = '';
-    document.getElementById('contato').value = '';
-    document.getElementById('telefone-comercial').value = '';
-    document.getElementById('celular').value = '';
-    document.getElementById('email').value = '';
-    document.getElementById('endereco').value = '';
-    document.getElementById('numero').value = '';
-    document.getElementById('bairro').value = '';
-    document.getElementById('cidade').value = '';
-    document.getElementById('uf').value = '';
-    document.getElementById('cep').value = '';
-    document.getElementById('saldo-credito').value = '';
-    document.getElementById('data-ultimo-pedido').value = '';
-    
-    // Focar no primeiro campo
     document.getElementById('nome-fantasia').focus();
 }
 
 // Fechar modal de cadastro
 function fecharModalCadastro() {
     document.getElementById('modal-cadastro').style.display = 'none';
+}
+
+// Abrir modal de sucesso
+function abrirModalSucesso(clienteData) {
+    const modal = document.getElementById('modal-sucesso');
+    const info = document.getElementById('cliente-cadastrado-info');
+    
+    info.innerHTML = `
+        <p><strong>Nome Fantasia:</strong> ${clienteData['Nome Fantasia']}</p>
+        <p><strong>Cliente:</strong> ${clienteData['Cliente'] || 'Não informado'}</p>
+        <p><strong>Cidade:</strong> ${clienteData['Cidade'] || 'Não informado'}</p>
+        <p><strong>Contato:</strong> ${clienteData['Contato'] || 'Não informado'}</p>
+    `;
+    
+    modal.style.display = 'flex';
+}
+
+// Fechar modal de sucesso
+function fecharModalSucesso() {
+    document.getElementById('modal-sucesso').style.display = 'none';
 }
 
 // Manipular submissão do formulário de cadastro
@@ -341,30 +370,144 @@ async function handleCadastroSubmit(event) {
         saldoCredito: document.getElementById('saldo-credito').value,
         dataUltimoPedido: document.getElementById('data-ultimo-pedido').value
     };
-
+    
     // Validação básica
     if (!formData.nomeFantasia) {
         alert('❌ Nome Fantasia é obrigatório!');
         document.getElementById('nome-fantasia').focus();
         return;
     }
-
+    
     try {
-        await window.clientManager.cadastrarCliente(formData);
+        const clienteData = await window.clientManager.cadastrarCliente(formData);
+        
+        // Fechar modal de cadastro
+        fecharModalCadastro();
+        
+        // Abrir modal de sucesso
+        abrirModalSucesso(clienteData);
         
         // Atualizar interface
         populateCidades();
         window.clientManager.applyFiltersAndSort();
-        
-        fecharModalCadastro();
-        alert('✅ Cliente cadastrado com sucesso!');
         
     } catch (error) {
         alert('❌ Erro ao cadastrar cliente:\n' + error.message);
     }
 }
 
-// Navegação entre abas - CORRIGIDO para mostrar/esconder botão cadastrar
+// Função de exportação de dados
+function exportarDados(tipo) {
+    try {
+        let dados = [];
+        let nomeArquivo = '';
+        
+        if (tipo === 'inativos') {
+            dados = window.clientManager.data || [];
+            nomeArquivo = `clientes-inativos-${new Date().toISOString().split('T')[0]}.xlsx`;
+        } else if (tipo === 'ativos') {
+            dados = window.clientManager.ativos || [];
+            nomeArquivo = `clientes-ativos-${new Date().toISOString().split('T')[0]}.xlsx`;
+        }
+        
+        if (dados.length === 0) {
+            alert(`❌ Nenhum cliente ${tipo} encontrado para exportar!`);
+            return;
+        }
+        
+        // Estrutura das colunas baseada na planilha original
+        const colunas = [
+            'ID Cliente',
+            'Cliente',
+            'Nome Fantasia',
+            'CNPJ / CPF',
+            'Condição de Pagamento',
+            'Condição de Pagamento Padrão',
+            'Limite de Crédito',
+            'Saldo de Crédito',
+            'Limite de Crédito a Vista',
+            'Saldo de Crédito a Vista',
+            'Nota Fiscal',
+            'Inscrição Estadual',
+            'Tipo',
+            'Finalidade',
+            'Regime Tributário',
+            'Endereço',
+            'Número',
+            'Bairro',
+            'Cidade',
+            'UF',
+            'CEP',
+            'Contato',
+            'Telefone Comercial',
+            'Celular',
+            'Email',
+            'Zona',
+            'Zona ID',
+            'SubRegião',
+            'SubRegião ID',
+            'Segmento',
+            'Protestar (dias)',
+            'Negativar (dias)',
+            'Status',
+            'Bloqueio',
+            'Cliente Desde',
+            'Data Último Pedido',
+            'Vendedor',
+            'Boletos Vencidos',
+            'tipoPessoa PJ/PF'
+        ];
+        
+        // Preparar dados para exportação
+        const dadosExportacao = dados.map(cliente => {
+            const linha = {};
+            colunas.forEach(coluna => {
+                // Mapear campos do sistema para as colunas da planilha
+                switch (coluna) {
+                    case 'ID Cliente':
+                        linha[coluna] = cliente.id || cliente['ID Cliente'] || '';
+                        break;
+                    case 'Endereço':
+                        linha[coluna] = cliente.Endereco || cliente['Endereço'] || '';
+                        break;
+                    case 'Número':
+                        linha[coluna] = cliente.Numero || cliente['Número'] || '';
+                        break;
+                    case 'Status':
+                        linha[coluna] = tipo === 'ativos' ? 'Ativo' : 'Inativo';
+                        break;
+                    case 'Cliente Desde':
+                        linha[coluna] = cliente['Data Cadastro'] || cliente['Cliente Desde'] || '';
+                        break;
+                    case 'Saldo de Crédito':
+                        linha[coluna] = cliente['Saldo de Credito'] || cliente['Saldo de Crédito'] || '';
+                        break;
+                    default:
+                        linha[coluna] = cliente[coluna] || '';
+                }
+            });
+            return linha;
+        });
+        
+        // Criar workbook
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(dadosExportacao, { header: colunas });
+        
+        // Adicionar worksheet ao workbook
+        XLSX.utils.book_append_sheet(wb, ws, tipo.toUpperCase());
+        
+        // Salvar arquivo
+        XLSX.writeFile(wb, nomeArquivo);
+        
+        alert(`✅ Dados exportados com sucesso!\n📁 Arquivo: ${nomeArquivo}\n📊 ${dados.length} clientes exportados`);
+        
+    } catch (error) {
+        console.error('❌ Erro ao exportar dados:', error);
+        alert('❌ Erro ao exportar dados: ' + error.message);
+    }
+}
+
+// Navegação entre abas
 function openTab(tab) {
     console.log(`📂 Abrindo aba: ${tab}`);
     
@@ -382,7 +525,7 @@ function openTab(tab) {
     currentTab = tab;
     window.clientManager.currentTab = tab;
     
-    // Controlar visibilidade do upload e botão cadastrar - APENAS NA ABA INATIVOS
+    // Controlar visibilidade do upload - APENAS NA ABA INATIVOS
     const uploadDiv = document.getElementById('upload');
     if (uploadDiv) {
         uploadDiv.style.display = (tab === 'inativos') ? 'block' : 'none';
@@ -426,10 +569,10 @@ function populateCidades() {
     const cidades = [...new Set(window.clientManager.data.map(item => (item['Cidade'] || '').trim()))]
         .filter(c => c)
         .sort((a, b) => a.localeCompare(b, 'pt-BR', {sensitivity: 'base'}));
-
+    
     const list = document.getElementById('cidadeList');
     if (!list) return;
-
+    
     list.innerHTML = '';
     cidades.forEach(cidade => {
         const div = document.createElement('div');
@@ -439,7 +582,7 @@ function populateCidades() {
         `;
         list.appendChild(div);
     });
-
+    
     console.log(`🏙️ ${cidades.length} cidades encontradas`);
 }
 
@@ -447,283 +590,123 @@ function populateCidades() {
 function toggleCidades() {
     const selector = document.getElementById('cidadeSelector');
     const list = document.getElementById('cidadeList');
+    
     if (!selector || !list) return;
-
+    
     const aberto = list.classList.toggle('visivel');
     list.classList.toggle('escondido', !aberto);
     selector.classList.toggle('aberto', aberto);
     
-    document.getElementById('cidadeSelectorText').textContent = 
-        aberto ? 'Ocultar cidades' : 'Selecionar cidades';
+    document.getElementById('cidadeSelectorText').textContent = aberto ? 'Ocultar cidades' : 'Selecionar cidades';
 }
 
 // Renderizar lista de ativos
 function renderAtivos() {
     const list = document.getElementById('ativos-list');
     if (!list) return;
-
+    
     list.innerHTML = '';
     
     if (window.clientManager.ativos.length === 0) {
         list.innerHTML = '<li style="text-align: center; color: #666;">Nenhum cliente ativo encontrado</li>';
         return;
     }
-
-    const sortedAtivos = [...window.clientManager.ativos].sort((a, b) => 
-        (a['Nome Fantasia'] || '').localeCompare(b['Nome Fantasia'] || '')
-    );
-
-    sortedAtivos.forEach((item, index) => {
+    
+    window.clientManager.ativos.forEach(item => {
         const li = document.createElement('li');
-        const daysSinceOrder = window.clientManager.daysSince(item['Data Ultimo Pedido']);
-        
         li.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span>${index + 1}. ${item['Nome Fantasia'] || 'Sem Nome'}</span>
-                <span class="days-since">${daysSinceOrder} dias sem pedir</span>
+            <div>
+                <strong>${item['Nome Fantasia'] || 'Sem Nome'}</strong>
+                <span class="days-since">Ativo desde: ${item['Data Ultimo Pedido'] || 'N/A'}</span>
+            </div>
+            <div style="font-size: 0.9em; color: #666;">
+                ${item['Cidade'] || ''} - Saldo: R$ ${item['Saldo de Credito'] || '0'}
             </div>
         `;
-        
-        li.addEventListener('click', () => window.clientManager.showDetails(item, 'ativos'));
+        li.onclick = () => window.clientManager.openModal(item, 'ativos');
         list.appendChild(li);
     });
 }
 
 // Renderizar agenda
 function renderAgenda() {
-    const agendaList = document.getElementById('agenda-list');
-    if (!agendaList) return;
-
-    agendaList.innerHTML = '';
+    const list = document.getElementById('agenda-list');
+    if (!list) return;
     
-    const schedules = window.clientManager.schedules || {};
-    let agendaItems = [];
-
-    Object.entries(schedules).forEach(([id, schArray]) => {
-        if (Array.isArray(schArray)) {
-            schArray.forEach((sch, schIndex) => {
-                const client = [...window.clientManager.data, ...window.clientManager.ativos]
-                    .find(c => c.id === id);
-                
-                if (client && sch.dateTime) {
-                    agendaItems.push({
-                        dateTime: sch.dateTime,
-                        client: client['Nome Fantasia'],
-                        tipo: sch.tipo,
-                        id,
-                        schIndex,
-                        clientData: client
-                    });
-                }
-            });
-        }
-    });
-
-    agendaItems.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
-
-    if (agendaItems.length === 0) {
-        agendaList.innerHTML = '<div style="text-align: center; color: #666;">Nenhum agendamento encontrado</div>';
+    list.innerHTML = '';
+    
+    const schedules = window.clientManager.schedules;
+    const scheduleEntries = Object.entries(schedules);
+    
+    if (scheduleEntries.length === 0) {
+        list.innerHTML = '<div style="text-align: center; color: #666;">Nenhum agendamento encontrado</div>';
         return;
     }
-
-    agendaItems.forEach(item => {
-        const dt = new Date(item.dateTime);
-        const dataStr = isNaN(dt) ? 'Data inválida' : 
-            dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
-
+    
+    scheduleEntries.forEach(([clientId, schedule]) => {
         const div = document.createElement('div');
-        div.style.cssText = 'cursor: pointer; margin: 10px 0; padding: 10px; background: #fff; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;';
-        
         div.innerHTML = `
-            <span>${dataStr} - ${item.client} (${item.tipo})</span>
-            <button onclick="removeAgendamento('${item.id}', ${item.schIndex})" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;">
-                Remover
-            </button>
+            <div>
+                <strong>${schedule.cliente}</strong><br>
+                ${schedule.diaSemana} às ${schedule.horario} - ${schedule.tipo}
+            </div>
+            <button onclick="removerAgendamento('${clientId}')">Remover</button>
         `;
-        
-        div.addEventListener('click', (e) => {
-            if (e.target.tagName !== 'BUTTON') {
-                window.clientManager.showDetails(item.clientData, 'agenda');
-            }
-        });
-        
-        agendaList.appendChild(div);
+        list.appendChild(div);
     });
-}
-
-// Salvar agendamento
-async function salvarAgendamento() {
-    if (!window.clientManager.currentItem) return;
-
-    const dia = document.getElementById('diaSemana').value;
-    const horario = document.getElementById('horario').value;
-    const tipo = document.getElementById('tipo').value;
-    const repeticao = document.getElementById('repeticao').value;
-
-    if (!dia || !horario || !tipo) {
-        alert('Por favor, preencha todos os campos do agendamento.');
-        return;
-    }
-
-    const agendamento = {
-        dia,
-        horario,
-        tipo,
-        repeticao,
-        dateTime: calcularProximaData(dia, horario)
-    };
-
-    const clientId = window.clientManager.currentItem.id;
-    
-    if (!window.clientManager.schedules[clientId]) {
-        window.clientManager.schedules[clientId] = [];
-    }
-    
-    window.clientManager.schedules[clientId].push(agendamento);
-    
-    await window.dbManager.saveData('schedules', window.clientManager.schedules);
-    
-    alert('Agendamento salvo com sucesso!');
-    renderAgenda();
-}
-
-// Calcular próxima data baseada no dia da semana
-function calcularProximaData(diaSemana, horario) {
-    const dias = {
-        'Domingo': 0, 'Segunda': 1, 'Terça': 2, 'Quarta': 3,
-        'Quinta': 4, 'Sexta': 5, 'Sábado': 6
-    };
-
-    const hoje = new Date();
-    const diaAlvo = dias[diaSemana];
-    const diasAteAlvo = (diaAlvo + 7 - hoje.getDay()) % 7;
-    
-    const proximaData = new Date(hoje);
-    proximaData.setDate(hoje.getDate() + (diasAteAlvo || 7));
-    
-    const [hora, minuto] = horario.split(':');
-    proximaData.setHours(parseInt(hora), parseInt(minuto), 0, 0);
-    
-    return proximaData.toISOString();
-}
-
-// Remover agendamento
-async function removeAgendamento(clientId, schIndex) {
-    if (window.clientManager.schedules[clientId] && window.clientManager.schedules[clientId][schIndex]) {
-        window.clientManager.schedules[clientId].splice(schIndex, 1);
-        
-        if (window.clientManager.schedules[clientId].length === 0) {
-            delete window.clientManager.schedules[clientId];
-        }
-        
-        await window.dbManager.saveData('schedules', window.clientManager.schedules);
-        renderAgenda();
-    }
-}
-
-// Tornar cliente ativo
-async function tornarAtivo() {
-    if (!window.clientManager.currentItem) return;
-
-    const editDataPedido = document.getElementById('editDataPedido');
-    const confirmarAtivo = document.getElementById('confirmarAtivo');
-    const tornarAtivo = document.getElementById('tornarAtivo');
-    const labelEditDataPedido = document.getElementById('labelEditDataPedido');
-
-    if (editDataPedido.style.display === 'none') {
-        editDataPedido.style.display = 'inline-block';
-        confirmarAtivo.style.display = 'inline-block';
-        tornarAtivo.style.display = 'none';
-        labelEditDataPedido.style.display = 'inline-block';
-        editDataPedido.focus();
-    }
-}
-
-// Confirmar cliente ativo
-async function confirmarAtivo() {
-    if (!window.clientManager.currentItem) return;
-
-    const novaData = document.getElementById('editDataPedido').value;
-    
-    if (!novaData || !/^\d{2}\/\d{2}\/\d{4}$/.test(novaData)) {
-        alert('Por favor, insira uma data válida no formato DD/MM/AAAA.');
-        return;
-    }
-
-    try {
-        await window.clientManager.tornarAtivo(window.clientManager.currentItem, novaData);
-        
-        // Atualizar interface
-        window.clientManager.applyFiltersAndSort();
-        renderAtivos();
-        
-        // Atualizar mapa se necessário
-        if (typeof window.updateMapOnClientStatusChange === 'function') {
-            window.updateMapOnClientStatusChange();
-        }
-        
-        document.getElementById('modal').style.display = 'none';
-        alert('✅ Cliente tornado ativo com sucesso!');
-        
-    } catch (error) {
-        alert('❌ Erro ao tornar cliente ativo: ' + error.message);
-    }
-}
-
-// Excluir cliente dos ativos
-async function excluirAtivo() {
-    if (!window.clientManager.currentItem) return;
-
-    if (confirm('Tem certeza que deseja excluir este cliente dos ativos?')) {
-        try {
-            await window.clientManager.excluirAtivo(window.clientManager.currentItem);
-            
-            renderAtivos();
-            
-            // Atualizar mapa se necessário
-            if (typeof window.updateMapOnClientStatusChange === 'function') {
-                window.updateMapOnClientStatusChange();
-            }
-            
-            document.getElementById('modal').style.display = 'none';
-            alert('✅ Cliente removido dos ativos com sucesso!');
-            
-        } catch (error) {
-            alert('❌ Erro ao remover cliente: ' + error.message);
-        }
-    }
 }
 
 // Salvar observações
 function salvarObservacoes() {
-    if (!window.clientManager.currentItem) return;
-
     const observacoes = document.getElementById('observacoes').value;
-    window.dbManager.saveObservation(window.clientManager.currentItem.id, observacoes);
-    alert('✅ Observações salvas com sucesso!');
+    const clienteId = window.clientManager.currentItem?.id;
+    
+    if (clienteId) {
+        window.dbManager.saveObservation(clienteId, observacoes);
+        alert('✅ Observações salvas com sucesso!');
+    }
 }
 
-// Fechar modal ao clicar fora
-window.addEventListener('click', (event) => {
-    const modal = document.getElementById('modal');
-    const modalCadastro = document.getElementById('modal-cadastro');
+// Salvar agendamento
+function salvarAgendamento() {
+    const diaSemana = document.getElementById('diaSemana').value;
+    const horario = document.getElementById('horario').value;
+    const tipo = document.getElementById('tipoAgendamento').value;
+    const repeticao = document.getElementById('repeticao').value;
     
-    if (event.target === modal) {
-        modal.style.display = 'none';
+    if (!diaSemana || !horario || !tipo) {
+        alert('❌ Preencha todos os campos do agendamento!');
+        return;
     }
     
-    if (event.target === modalCadastro) {
-        modalCadastro.style.display = 'none';
+    const clienteId = window.clientManager.currentItem?.id;
+    const cliente = window.clientManager.currentItem?.['Nome Fantasia'];
+    
+    if (clienteId) {
+        window.clientManager.schedules[clienteId] = {
+            cliente,
+            diaSemana,
+            horario,
+            tipo,
+            repeticao
+        };
+        
+        window.dbManager.saveData('schedules', window.clientManager.schedules);
+        alert('✅ Agendamento salvo com sucesso!');
+        
+        // Limpar campos
+        document.getElementById('diaSemana').value = '';
+        document.getElementById('horario').value = '';
+        document.getElementById('tipoAgendamento').value = '';
+        document.getElementById('repeticao').value = 'Semanal';
     }
-});
+}
 
-// Disponibilizar funções globalmente
-window.openTab = openTab;
-window.salvarAgendamento = salvarAgendamento;
-window.removeAgendamento = removeAgendamento;
-window.tornarAtivo = tornarAtivo;
-window.confirmarAtivo = confirmarAtivo;
-window.excluirAtivo = excluirAtivo;
-window.salvarObservacoes = salvarObservacoes;
-window.abrirModalCadastro = abrirModalCadastro;
-window.fecharModalCadastro = fecharModalCadastro;
+// Remover agendamento
+function removerAgendamento(clientId) {
+    if (confirm('Tem certeza que deseja remover este agendamento?')) {
+        delete window.clientManager.schedules[clientId];
+        window.dbManager.saveData('schedules', window.clientManager.schedules);
+        renderAgenda();
+    }
+}

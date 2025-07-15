@@ -1,5 +1,4 @@
 // client-manager.js - Gerenciamento de clientes e formulários
-
 class ClientManager {
     constructor() {
         this.data = [];
@@ -21,12 +20,12 @@ class ClientManager {
             this.ativos = await window.dbManager.loadData('ativos') || [];
             this.schedules = await window.dbManager.loadData('schedules') || {};
             this.savedFilters = window.dbManager.loadFilters();
-            
+
             // Disponibilizar globalmente
             window.data = this.data;
             window.ativos = this.ativos;
             window.filteredData = this.filteredData;
-            
+
             console.log('✅ ClientManager inicializado');
         } catch (error) {
             console.error('❌ Erro ao inicializar ClientManager:', error);
@@ -41,23 +40,23 @@ class ClientManager {
     // Validar dados do cliente
     validateClientData(clientData) {
         const errors = [];
-        
+
         if (!clientData['Nome Fantasia'] || clientData['Nome Fantasia'].trim() === '') {
             errors.push('Nome Fantasia é obrigatório');
         }
-        
+
         if (clientData['CNPJ / CPF'] && !this.validateCNPJCPF(clientData['CNPJ / CPF'])) {
             errors.push('CNPJ/CPF inválido');
         }
-        
+
         if (clientData.Email && !this.validateEmail(clientData.Email)) {
             errors.push('Email inválido');
         }
-        
+
         if (clientData.CEP && !this.validateCEP(clientData.CEP)) {
             errors.push('CEP inválido');
         }
-        
+
         return errors;
     }
 
@@ -117,6 +116,7 @@ class ClientManager {
 
             console.log('✅ Cliente cadastrado:', clientData['Nome Fantasia']);
             return clientData;
+
         } catch (error) {
             console.error('❌ Erro ao cadastrar cliente:', error);
             throw error;
@@ -149,6 +149,7 @@ class ClientManager {
 
             console.log('✅ Cliente tornado ativo:', cliente['Nome Fantasia']);
             return cliente;
+
         } catch (error) {
             console.error('❌ Erro ao tornar cliente ativo:', error);
             throw error;
@@ -187,7 +188,6 @@ class ClientManager {
 
                 // Aplicar ordenação
                 this.applySorting(sort);
-                
                 window.filteredData = this.filteredData;
                 this.renderList();
             } else if (this.currentTab === 'ativos') {
@@ -282,27 +282,30 @@ class ClientManager {
             return;
         }
 
-        this.filteredData.forEach((item, index) => {
+        this.filteredData.forEach(item => {
             const li = document.createElement('li');
-            const daysSinceOrder = this.daysSince(item['Data Ultimo Pedido']);
+            const daysSince = this.daysSince(item['Data Ultimo Pedido']);
             
             li.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>${index + 1}. ${item['Nome Fantasia'] || 'Sem Nome'}</span>
-                    <span class="days-since">${daysSinceOrder} dias sem pedir</span>
+                <div>
+                    <strong>${item['Nome Fantasia'] || 'Sem Nome'}</strong>
+                    <span class="days-since">${daysSince} dias sem pedido</span>
+                </div>
+                <div style="font-size: 0.9em; color: #666;">
+                    ${item['Cidade'] || ''} - Saldo: R$ ${item['Saldo de Credito'] || '0'}
                 </div>
             `;
-            
-            li.addEventListener('click', () => this.showDetails(item, this.currentTab));
+            li.onclick = () => this.openModal(item, this.currentTab);
             listElement.appendChild(li);
         });
     }
 
-    // Mostrar detalhes do cliente
-    showDetails(item, tab) {
+    // Abrir modal de detalhes
+    openModal(item, tab) {
         this.currentItem = item;
         
-        document.getElementById('client-details').innerHTML = `
+        const modalBody = document.getElementById('modal-body');
+        modalBody.innerHTML = `
             <h2>${item['Nome Fantasia'] || 'Sem Nome'}</h2>
             <p><strong>Cliente:</strong> ${item.Cliente || ''}</p>
             <p><strong>CNPJ/CPF:</strong> ${item['CNPJ / CPF'] || ''}</p>
@@ -319,7 +322,7 @@ class ClientManager {
         // Configurar botões
         const whatsappBtn = document.getElementById('whatsapp-btn');
         const mapsBtn = document.getElementById('maps-btn');
-        
+
         if (whatsappBtn) {
             const phone = item['Telefone Comercial'] || item.Celular || '';
             const message = `Olá ${item['Nome Fantasia'] || 'cliente'}! Estou entrando em contato para verificar se podemos retomar nosso relacionamento comercial.`;
@@ -360,6 +363,7 @@ class ClientManager {
             item.UF || '',
             item.CEP || ''
         ].filter(part => part.trim());
+        
         return parts.join(', ');
     }
 
