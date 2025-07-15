@@ -1,13 +1,14 @@
-// map.js - Versão com precisão de localização aprimorada
+// map.js - Versão completa com funcionalidade "Incluir Inativos"
 
 let map = null;
 let markers = [];
 let addressCache = {};
 let manualCorrections = {};
 let isEditMode = false;
+let includeInativos = false; // Estado do checkbox
 let precisaoStats = { total: 0, alta: 0, media: 0, baixa: 0 };
 
-// Coordenadas precisas dos centros das cidades (atualizadas)
+// Coordenadas precisas das principais cidades brasileiras
 const COORDENADAS_PRECISAS = {
     'SAO PAULO': { lat: -23.5505, lng: -46.6333, precision: 'centro' },
     'RIO DE JANEIRO': { lat: -22.9068, lng: -43.1729, precision: 'centro' },
@@ -47,50 +48,17 @@ const COORDENADAS_PRECISAS = {
     'PORTO VELHO': { lat: -8.7619, lng: -63.9039, precision: 'centro' }
 };
 
-// Padrões de CEP por região para validação
-const PADROES_CEP = {
-    'SP': { inicio: '01000', fim: '19999' },
-    'RJ': { inicio: '20000', fim: '28999' },
-    'MG': { inicio: '30000', fim: '39999' },
-    'BA': { inicio: '40000', fim: '48999' },
-    'PR': { inicio: '80000', fim: '87999' },
-    'RS': { inicio: '90000', fim: '99999' },
-    'SC': { inicio: '88000', fim: '89999' },
-    'GO': { inicio: '72800', fim: '76999' },
-    'MT': { inicio: '78000', fim: '78899' },
-    'MS': { inicio: '79000', fim: '79999' },
-    'DF': { inicio: '70000', fim: '72799' },
-    'PE': { inicio: '50000', fim: '56999' },
-    'CE': { inicio: '60000', fim: '63999' },
-    'PB': { inicio: '58000', fim: '58999' },
-    'RN': { inicio: '59000', fim: '59999' },
-    'AL': { inicio: '57000', fim: '57999' },
-    'SE': { inicio: '49000', fim: '49999' },
-    'PI': { inicio: '64000', fim: '64999' },
-    'MA': { inicio: '65000', fim: '65999' },
-    'PA': { inicio: '66000', fim: '68999' },
-    'AM': { inicio: '69000', fim: '69999' },
-    'RR': { inicio: '69300', fim: '69399' },
-    'AP': { inicio: '68900', fim: '68999' },
-    'TO': { inicio: '77000', fim: '77999' },
-    'AC': { inicio: '69900', fim: '69999' },
-    'RO': { inicio: '76800', fim: '76999' },
-    'ES': { inicio: '29000', fim: '29999' }
-};
-
-// Inicializar mapa com precisão melhorada
+// Inicializar mapa
 function initMap() {
-    console.log('🗺️ Inicializando mapa com precisão aprimorada...');
+    console.log('🗺️ Inicializando mapa com opção de incluir inativos...');
     
     if (map) return;
     
-    map = L.map('map').setView([-23.2237, -45.9009], 12);
+    map = L.map('map').setView([-23.2237, -45.9009], 11);
     
-    // Usar tile layer de alta qualidade
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors',
-        maxZoom: 19,
-        minZoom: 8
+        maxZoom: 19
     }).addTo(map);
     
     loadCaches();
@@ -98,10 +66,28 @@ function initMap() {
     
     setTimeout(() => {
         setupEditButton();
+        setupIncludeInativosCheckbox();
         obterLocalizacaoUsuario();
     }, 500);
     
-    console.log('✅ Mapa inicializado com sistema de precisão aprimorado');
+    console.log('✅ Mapa inicializado com opção de incluir inativos');
+}
+
+// Configurar checkbox "Incluir inativos"
+function setupIncludeInativosCheckbox() {
+    const checkbox = document.getElementById('include-inativos-checkbox');
+    if (!checkbox) {
+        console.warn('⚠️ Checkbox "Incluir inativos" não encontrado');
+        return;
+    }
+    
+    checkbox.addEventListener('change', (event) => {
+        includeInativos = event.target.checked;
+        console.log('🔄 Checkbox alterado:', includeInativos ? 'Incluir inativos' : 'Apenas ativos');
+        loadMapData();
+    });
+    
+    console.log('✅ Checkbox "Incluir inativos" configurado');
 }
 
 // Obter localização do usuário
@@ -113,7 +99,7 @@ function obterLocalizacaoUsuario() {
                 console.log('📍 Localização do usuário:', latitude, longitude);
                 
                 if (map) {
-                    map.setView([latitude, longitude], 14);
+                    map.setView([latitude, longitude], 13);
                     
                     const userMarker = L.marker([latitude, longitude], {
                         icon: createUserLocationIcon()
@@ -124,13 +110,13 @@ function obterLocalizacaoUsuario() {
                 }
             },
             error => {
-                console.log('⚠️ Geolocalização não disponível:', error.message);
+                console.log('⚠️ Erro ao obter localização:', error.message);
                 updateMapStatus('Usando localização padrão');
             },
             {
                 enableHighAccuracy: true,
                 timeout: 10000,
-                maximumAge: 60000
+                maximumAge: 300000
             }
         );
     }
@@ -142,12 +128,12 @@ function createUserLocationIcon() {
         className: 'user-location-marker',
         html: `
             <div style="
-                background: linear-gradient(45deg, #4285f4, #34a853);
-                width: 18px; 
-                height: 18px; 
+                background: #4285f4; 
+                width: 16px; 
+                height: 16px; 
                 border-radius: 50%; 
                 border: 3px solid white; 
-                box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.3);
+                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
                 animation: pulse 2s infinite;
             "></div>
             <style>
@@ -158,8 +144,8 @@ function createUserLocationIcon() {
                 }
             </style>
         `,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12]
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
     });
 }
 
@@ -235,7 +221,7 @@ function handleMarkerDragEnd(event) {
     const address = getFullAddress(client);
     const clientName = client['Nome Fantasia'] || 'Cliente';
     
-    if (confirm(`Confirmar correção para "${clientName}"?\n\nNova posição:\nLat: ${newLatLng.lat.toFixed(6)}\nLng: ${newLatLng.lng.toFixed(6)}`)) {
+    if (confirm(`Confirmar nova posição para "${clientName}"?\n\nLat: ${newLatLng.lat.toFixed(6)}\nLng: ${newLatLng.lng.toFixed(6)}`)) {
         manualCorrections[address] = {
             lat: newLatLng.lat,
             lng: newLatLng.lng,
@@ -267,26 +253,34 @@ function handleMarkerDragEnd(event) {
     }
 }
 
-// Carregar dados do mapa com precisão aprimorada
+// Carregar dados do mapa - MODIFICADO PARA INCLUIR INATIVOS
 async function loadMapData() {
     if (!map) return;
     
     clearMarkers();
     
     const ativos = window.ativos || [];
-    if (ativos.length === 0) {
-        updateMapStatus('Nenhum cliente ativo encontrado');
+    const inativos = window.data || [];
+    
+    // Determinar quais clientes mostrar baseado no checkbox
+    let clientsToShow = ativos.slice();
+    if (includeInativos) {
+        clientsToShow = clientsToShow.concat(inativos);
+    }
+    
+    if (clientsToShow.length === 0) {
+        updateMapStatus('Nenhum cliente encontrado para exibir');
         return;
     }
     
-    updateMapStatus(`Geocodificando ${ativos.length} clientes com alta precisão...`);
-    precisaoStats = { total: 0, alta: 0, media: 0, baixa: 0 };
+    const statusPrefix = includeInativos ? 'Carregando ativos + inativos' : 'Carregando apenas ativos';
+    updateMapStatus(`${statusPrefix}: ${clientsToShow.length} clientes...`);
     
     let loaded = 0;
-    let batchSize = 5; // Processar em lotes para melhor performance
+    let batchSize = 5;
     
-    for (let i = 0; i < ativos.length; i += batchSize) {
-        const batch = ativos.slice(i, i + batchSize);
+    for (let i = 0; i < clientsToShow.length; i += batchSize) {
+        const batch = clientsToShow.slice(i, i + batchSize);
         
         const promises = batch.map(async client => {
             try {
@@ -296,7 +290,7 @@ async function loadMapData() {
                     markers.push(marker);
                     loaded++;
                     
-                    // Atualizar estatísticas de precisão
+                    // Atualizar estatísticas
                     precisaoStats.total++;
                     if (coords.confidence >= 0.8) precisaoStats.alta++;
                     else if (coords.confidence >= 0.6) precisaoStats.media++;
@@ -310,18 +304,19 @@ async function loadMapData() {
         await Promise.all(promises);
         
         // Atualizar progresso
-        const progress = Math.round((loaded / ativos.length) * 100);
-        updateMapStatus(`Carregando... ${progress}% (${loaded}/${ativos.length})`);
+        const progress = Math.round((loaded / clientsToShow.length) * 100);
+        updateMapStatus(`${statusPrefix}... ${progress}% (${loaded}/${clientsToShow.length})`);
         
-        // Pausa pequena entre lotes
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 100));
     }
     
-    // Estatísticas finais
-    const altaPrecisao = Math.round((precisaoStats.alta / precisaoStats.total) * 100);
-    updateMapStatus(`${loaded} clientes carregados | ${altaPrecisao}% alta precisão`);
+    const ativosCount = ativos.length;
+    const inativosCount = includeInativos ? inativos.length : 0;
+    const totalCount = ativosCount + inativosCount;
     
-    console.log('📊 Estatísticas de precisão:', precisaoStats);
+    updateMapStatus(`${loaded}/${totalCount} clientes carregados (${ativosCount} ativos${includeInativos ? `, ${inativosCount} inativos` : ''})`);
+    
+    console.log(`📊 Mapa carregado: ${loaded} marcadores (${ativosCount} ativos, ${inativosCount} inativos)`);
 }
 
 // Geocodificar cliente com precisão aprimorada
@@ -329,49 +324,35 @@ async function geocodificarClienteComPrecisao(client) {
     const address = getFullAddress(client);
     if (!address) return null;
     
-    // 1. Verificar correções manuais (prioridade máxima)
+    // 1. Verificar correções manuais
     if (manualCorrections[address]) {
-        console.log('📍 Correção manual:', address);
         return manualCorrections[address];
     }
     
     // 2. Verificar cache
     if (addressCache[address]) {
-        console.log('💾 Cache:', address);
         return addressCache[address];
     }
     
-    // 3. Tentar geocodificação por CEP (mais precisa)
-    const coordsPorCEP = await geocodificarPorCEP(client);
-    if (coordsPorCEP && coordsPorCEP.confidence >= 0.8) {
-        console.log('🏢 CEP preciso:', client.CEP);
-        addressCache[address] = coordsPorCEP;
-        salvarCache();
-        return coordsPorCEP;
-    }
-    
-    // 4. Geocodificação por endereço completo melhorada
-    const coordsEndereco = await geocodificarEnderecoMelhorado(client);
-    if (coordsEndereco && coordsEndereco.confidence >= 0.7) {
-        console.log('🏠 Endereço preciso:', address);
-        addressCache[address] = coordsEndereco;
-        salvarCache();
-        return coordsEndereco;
-    }
-    
-    // 5. Coordenadas precisas da cidade
+    // 3. Coordenadas precisas da cidade
     const coordsCidade = obterCoordenadasCidadePrecisa(client);
     if (coordsCidade) {
-        console.log('🏙️ Cidade precisa:', client.Cidade);
         addressCache[address] = coordsCidade;
         salvarCache();
         return coordsCidade;
     }
     
-    // 6. Fallback com correção por região
+    // 4. Geocodificação básica
+    const coords = await geocodeBasic(address);
+    if (coords) {
+        addressCache[address] = coords;
+        salvarCache();
+        return coords;
+    }
+    
+    // 5. Fallback
     const fallback = obterFallbackCorrigido(client);
     if (fallback) {
-        console.log('🎯 Fallback corrigido:', client.UF);
         addressCache[address] = fallback;
         salvarCache();
         return fallback;
@@ -380,241 +361,12 @@ async function geocodificarClienteComPrecisao(client) {
     return null;
 }
 
-// Geocodificar por CEP usando API ViaCEP (gratuita)
-async function geocodificarPorCEP(client) {
-    const cep = (client.CEP || '').replace(/\D/g, '');
-    if (cep.length !== 8) return null;
-    
-    // Validar CEP por estado
-    const estado = (client.UF || '').toUpperCase();
-    if (!validarCEPPorEstado(cep, estado)) {
-        console.log('⚠️ CEP inválido para o estado:', cep, estado);
-        return null;
-    }
-    
-    try {
-        const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
-        if (!response.ok) throw new Error('CEP não encontrado');
-        
-        const data = await response.json();
-        if (data.erro) throw new Error('CEP inválido');
-        
-        // Usar coordenadas aproximadas baseadas no CEP
-        const coordsEstimadas = estimarCoordenadasPorCEP(data);
-        if (coordsEstimadas) {
-            return {
-                lat: coordsEstimadas.lat,
-                lng: coordsEstimadas.lng,
-                confidence: 0.85,
-                provider: 'CEP-Estimado',
-                manuallyEdited: false,
-                cepData: data
-            };
-        }
-    } catch (error) {
-        console.log('Erro ao geocodificar CEP:', error.message);
-    }
-    
-    return null;
-}
-
-// Validar CEP por estado
-function validarCEPPorEstado(cep, estado) {
-    const padrao = PADROES_CEP[estado];
-    if (!padrao) return true; // Se não temos o padrão, aceita
-    
-    const cepNum = parseInt(cep);
-    const inicioNum = parseInt(padrao.inicio);
-    const fimNum = parseInt(padrao.fim);
-    
-    return cepNum >= inicioNum && cepNum <= fimNum;
-}
-
-// Estimar coordenadas por CEP
-function estimarCoordenadasPorCEP(cepData) {
-    const cidade = cepData.localidade?.toUpperCase();
-    const bairro = cepData.bairro;
-    const logradouro = cepData.logradouro;
-    
-    // Usar coordenadas da cidade como base
-    const coordsCidade = COORDENADAS_PRECISAS[cidade];
-    if (!coordsCidade) return null;
-    
-    // Adicionar variação pequena baseada no bairro/logradouro
-    const variacao = calcularVariacaoPorBairro(bairro, logradouro);
-    
-    return {
-        lat: coordsCidade.lat + variacao.lat,
-        lng: coordsCidade.lng + variacao.lng
-    };
-}
-
-// Calcular variação por bairro
-function calcularVariacaoPorBairro(bairro, logradouro) {
-    // Criar variação determinística baseada no nome
-    const seed = (bairro + logradouro).toLowerCase().replace(/\s/g, '');
-    let hash = 0;
-    for (let i = 0; i < seed.length; i++) {
-        hash = ((hash << 5) - hash + seed.charCodeAt(i)) & 0xffffffff;
-    }
-    
-    // Variação pequena (até 2km do centro)
-    const variacao = {
-        lat: ((hash % 400) - 200) * 0.0001, // ±0.02 grau ≈ 2km
-        lng: ((hash % 600) - 300) * 0.0001  // ±0.03 grau ≈ 2km
-    };
-    
-    return variacao;
-}
-
-// Geocodificar endereço com melhorias
-async function geocodificarEnderecoMelhorado(client) {
-    const enderecoLimpo = limparEProcessarEndereco(client);
-    if (!enderecoLimpo) return null;
-    
-    // Tentar com diferentes níveis de detalhamento
-    const variacoes = [
-        enderecoLimpo.completo,
-        enderecoLimpo.semNumero,
-        enderecoLimpo.soCidade,
-        enderecoLimpo.cidadeEstado
-    ];
-    
-    for (const endereco of variacoes) {
-        try {
-            const coords = await geocodificarNominatimMelhorado(endereco);
-            if (coords && validarCoordenadas(coords, client)) {
-                return coords;
-            }
-        } catch (error) {
-            console.log('Tentando próxima variação...');
-        }
-    }
-    
-    return null;
-}
-
-// Limpar e processar endereço
-function limparEProcessarEndereco(client) {
-    const endereco = (client.Endereco || '').trim();
-    const numero = (client.Numero || '').trim();
-    const bairro = (client.Bairro || '').trim();
-    const cidade = (client.Cidade || '').trim();
-    const uf = (client.UF || '').trim().toUpperCase();
-    const cep = (client.CEP || '').replace(/\D/g, '');
-    
-    if (!cidade) return null;
-    
-    return {
-        completo: `${endereco}, ${numero}, ${bairro}, ${cidade}, ${uf}, ${cep}`,
-        semNumero: `${endereco}, ${bairro}, ${cidade}, ${uf}`,
-        soCidade: `${cidade}, ${uf}`,
-        cidadeEstado: `${cidade}, ${uf}, Brasil`
-    };
-}
-
-// Geocodificar com Nominatim melhorado
-async function geocodificarNominatimMelhorado(endereco) {
-    try {
-        const encodedAddress = encodeURIComponent(endereco);
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1&countrycodes=br&addressdetails=1`;
-        
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'ClienteManager/2.0'
-            }
-        });
-        
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        
-        const data = await response.json();
-        
-        if (data && data.length > 0) {
-            const result = data[0];
-            const confidence = calcularConfiancaGeocodificacao(result, endereco);
-            
-            return {
-                lat: parseFloat(result.lat),
-                lng: parseFloat(result.lon),
-                confidence: confidence,
-                provider: 'Nominatim-Melhorado',
-                manuallyEdited: false,
-                details: result.address
-            };
-        }
-    } catch (error) {
-        console.error('Erro Nominatim melhorado:', error);
-    }
-    
-    return null;
-}
-
-// Calcular confiança da geocodificação
-function calcularConfiancaGeocodificacao(result, endereco) {
-    let confidence = 0.6; // Base
-    
-    // Verificar tipo de lugar
-    const placeType = result.type;
-    if (placeType === 'house' || placeType === 'building') confidence += 0.3;
-    else if (placeType === 'street') confidence += 0.2;
-    else if (placeType === 'city') confidence += 0.1;
-    
-    // Verificar importância
-    const importance = parseFloat(result.importance) || 0;
-    confidence += importance * 0.2;
-    
-    // Verificar detalhes do endereço
-    const address = result.address || {};
-    if (address.house_number) confidence += 0.1;
-    if (address.road) confidence += 0.1;
-    if (address.neighbourhood) confidence += 0.05;
-    
-    return Math.min(confidence, 1.0);
-}
-
-// Validar coordenadas
-function validarCoordenadas(coords, client) {
-    // Verificar se está no Brasil
-    if (coords.lat < -35 || coords.lat > 5 || coords.lng < -75 || coords.lng > -30) {
-        console.log('⚠️ Coordenadas fora do Brasil:', coords);
-        return false;
-    }
-    
-    // Verificar se está no estado correto (aproximadamente)
-    const estado = (client.UF || '').toUpperCase();
-    if (!validarCoordenadasPorEstado(coords, estado)) {
-        console.log('⚠️ Coordenadas não condizem com o estado:', coords, estado);
-        return false;
-    }
-    
-    return true;
-}
-
-// Validar coordenadas por estado (aproximado)
-function validarCoordenadasPorEstado(coords, estado) {
-    const boundingBoxes = {
-        'SP': { minLat: -25.3, maxLat: -19.8, minLng: -53.1, maxLng: -44.2 },
-        'RJ': { minLat: -23.4, maxLat: -20.8, minLng: -45.1, maxLng: -40.9 },
-        'MG': { minLat: -22.9, maxLat: -14.2, minLng: -51.0, maxLng: -39.9 },
-        'BA': { minLat: -18.3, maxLat: -8.5, minLng: -46.6, maxLng: -37.3 }
-        // Adicionar mais estados conforme necessário
-    };
-    
-    const box = boundingBoxes[estado];
-    if (!box) return true; // Se não temos o box, aceita
-    
-    return coords.lat >= box.minLat && coords.lat <= box.maxLat &&
-           coords.lng >= box.minLng && coords.lng <= box.maxLng;
-}
-
 // Obter coordenadas precisas da cidade
 function obterCoordenadasCidadePrecisa(client) {
     const cidade = (client.Cidade || '').toUpperCase().trim();
     
     if (COORDENADAS_PRECISAS[cidade]) {
         const coords = COORDENADAS_PRECISAS[cidade];
-        
-        // Adicionar variação pequena para não sobrepor marcadores
         const variacao = obterVariacaoParaCliente(client);
         
         return {
@@ -624,22 +376,6 @@ function obterCoordenadasCidadePrecisa(client) {
             provider: 'Cidade-Precisa',
             manuallyEdited: false
         };
-    }
-    
-    // Buscar por similaridade
-    for (const cidadeKey in COORDENADAS_PRECISAS) {
-        if (cidadeKey.includes(cidade) || cidade.includes(cidadeKey.substring(0, 5))) {
-            const coords = COORDENADAS_PRECISAS[cidadeKey];
-            const variacao = obterVariacaoParaCliente(client);
-            
-            return {
-                lat: coords.lat + variacao.lat,
-                lng: coords.lng + variacao.lng,
-                confidence: 0.65,
-                provider: 'Cidade-Aproximada',
-                manuallyEdited: false
-            };
-        }
     }
     
     return null;
@@ -653,10 +389,9 @@ function obterVariacaoParaCliente(client) {
         hash = ((hash << 5) - hash + clientId.charCodeAt(i)) & 0xffffffff;
     }
     
-    // Variação pequena (até 1km)
     return {
-        lat: ((hash % 200) - 100) * 0.00005, // ±0.005 grau ≈ 500m
-        lng: ((hash % 300) - 150) * 0.00005  // ±0.0075 grau ≈ 500m
+        lat: ((hash % 200) - 100) * 0.00005,
+        lng: ((hash % 300) - 150) * 0.00005
     };
 }
 
@@ -664,7 +399,6 @@ function obterVariacaoParaCliente(client) {
 function obterFallbackCorrigido(client) {
     const estado = (client.UF || '').toUpperCase().trim();
     
-    // Coordenadas centrais dos estados (mais precisas)
     const coordenadasEstados = {
         'SP': { lat: -23.5505, lng: -46.6333 },
         'RJ': { lat: -22.9068, lng: -43.1729 },
@@ -676,23 +410,7 @@ function obterFallbackCorrigido(client) {
         'GO': { lat: -16.6864, lng: -49.2643 },
         'MT': { lat: -15.6014, lng: -56.0979 },
         'MS': { lat: -20.4697, lng: -54.6201 },
-        'DF': { lat: -15.7941, lng: -47.8825 },
-        'PE': { lat: -8.0476, lng: -34.8770 },
-        'CE': { lat: -3.7319, lng: -38.5267 },
-        'PB': { lat: -7.1195, lng: -34.8450 },
-        'RN': { lat: -5.7945, lng: -35.2110 },
-        'AL': { lat: -9.6476, lng: -35.7175 },
-        'SE': { lat: -10.9472, lng: -37.0731 },
-        'PI': { lat: -5.0892, lng: -42.8019 },
-        'MA': { lat: -2.5307, lng: -44.3068 },
-        'PA': { lat: -1.4558, lng: -48.4902 },
-        'AM': { lat: -3.1190, lng: -60.0217 },
-        'RR': { lat: 2.8235, lng: -60.6758 },
-        'AP': { lat: 0.0389, lng: -51.0664 },
-        'TO': { lat: -10.1689, lng: -48.3317 },
-        'AC': { lat: -9.9754, lng: -67.8249 },
-        'RO': { lat: -8.7619, lng: -63.9039 },
-        'ES': { lat: -20.2976, lng: -40.2958 }
+        'DF': { lat: -15.7941, lng: -47.8825 }
     };
     
     if (coordenadasEstados[estado]) {
@@ -708,7 +426,6 @@ function obterFallbackCorrigido(client) {
         };
     }
     
-    // Fallback final - São Paulo
     return {
         lat: -23.5505,
         lng: -46.6333,
@@ -718,18 +435,28 @@ function obterFallbackCorrigido(client) {
     };
 }
 
-// Criar marcador editável
+// Criar marcador editável - MODIFICADO PARA DIFERENCIAR ATIVOS/INATIVOS
 function createEditableMarker(coords, client) {
     const isManuallyEdited = coords.manuallyEdited || false;
-    const color = isManuallyEdited ? 'blue' : getColorByConfidence(coords.confidence);
+    const isAtivo = (window.ativos || []).some(c => c.id === client.id);
+    
+    // Cores diferentes para ativos e inativos
+    let color;
+    if (isManuallyEdited) {
+        color = 'blue';
+    } else if (isAtivo) {
+        color = 'green'; // Ativos em verde
+    } else {
+        color = 'gray'; // Inativos em cinza
+    }
     
     const marker = L.marker([coords.lat, coords.lng], {
-        icon: createMarkerIcon(color, coords.confidence, isManuallyEdited),
+        icon: createMarkerIcon(color, coords.confidence, isManuallyEdited, isAtivo),
         draggable: true
     }).addTo(map);
     
     marker.clientData = client;
-    marker.bindPopup(createPopupContent(client, coords, isManuallyEdited));
+    marker.bindPopup(createPopupContent(client, coords, isManuallyEdited, isAtivo));
     
     marker.on('click', function(e) {
         if (!isEditMode) {
@@ -741,7 +468,7 @@ function createEditableMarker(coords, client) {
                     popupElement.onclick = function() {
                         marker.closePopup();
                         if (window.clientManager && window.clientManager.openModal) {
-                            window.clientManager.openModal(client, 'ativos');
+                            window.clientManager.openModal(client, isAtivo ? 'ativos' : 'inativos');
                         }
                     };
                 }
@@ -756,18 +483,9 @@ function createEditableMarker(coords, client) {
     return marker;
 }
 
-// Obter cor baseada na confiança
-function getColorByConfidence(confidence) {
-    if (confidence >= 0.8) return 'green';
-    if (confidence >= 0.6) return 'orange';
-    return 'red';
-}
-
-// Criar ícone do marcador
-function createMarkerIcon(color, confidence, isManual) {
-    const symbol = isManual ? '📍' : 
-                   confidence >= 0.8 ? '✓' : 
-                   confidence >= 0.6 ? '~' : '?';
+// Criar ícone do marcador - MODIFICADO PARA INCLUIR STATUS
+function createMarkerIcon(color, confidence, isManual, isAtivo) {
+    const symbol = isManual ? '📍' : '';
     
     return L.divIcon({
         className: 'custom-marker',
@@ -783,10 +501,10 @@ function createMarkerIcon(color, confidence, isManual) {
                 align-items: center;
                 justify-content: center;
                 color: white;
-                font-size: 11px;
+                font-size: 10px;
                 font-weight: bold;
                 cursor: pointer;
-                position: relative;
+                opacity: ${isAtivo ? '1' : '0.8'};
             ">
                 ${symbol}
             </div>
@@ -796,18 +514,23 @@ function createMarkerIcon(color, confidence, isManual) {
     });
 }
 
-// Criar conteúdo do popup
-function createPopupContent(client, coords, isManuallyEdited) {
+// Criar conteúdo do popup - MODIFICADO PARA MOSTRAR STATUS
+function createPopupContent(client, coords, isManuallyEdited, isAtivo) {
     const address = getFullAddress(client);
     const providerText = coords.provider || 'Desconhecido';
     const confidenceText = Math.round(coords.confidence * 100);
+    const statusText = isAtivo ? 'Ativo' : 'Inativo';
+    const statusColor = isAtivo ? '#28a745' : '#6c757d';
     
     return `
         <div style="max-width: 260px; font-family: Arial, sans-serif; line-height: 1.4;">
             <h4 style="margin: 0 0 8px 0; color: #333; font-size: 15px;">
                 ${client['Nome Fantasia'] || 'Sem Nome'}
             </h4>
-            <p style="margin: 4px 0; font-size: 12px;"><strong>Status:</strong> Cliente Ativo</p>
+            <p style="margin: 4px 0; font-size: 12px;">
+                <strong>Status:</strong> 
+                <span style="color: ${statusColor}; font-weight: bold;">${statusText}</span>
+            </p>
             <p style="margin: 4px 0; font-size: 12px;"><strong>Cidade:</strong> ${client.Cidade || 'N/A'}</p>
             <p style="margin: 4px 0; font-size: 12px;"><strong>CEP:</strong> ${client.CEP || 'N/A'}</p>
             <p style="margin: 4px 0; font-size: 12px;"><strong>Endereço:</strong> ${address}</p>
@@ -822,6 +545,39 @@ function createPopupContent(client, coords, isManuallyEdited) {
             </div>
         </div>
     `;
+}
+
+// Geocodificação básica
+async function geocodeBasic(address) {
+    try {
+        const encodedAddress = encodeURIComponent(address);
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1&countrycodes=br`;
+        
+        const response = await fetch(url, {
+            headers: {
+                'User-Agent': 'ClienteManager/1.0'
+            }
+        });
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        const data = await response.json();
+        
+        if (data && data.length > 0) {
+            const result = data[0];
+            return {
+                lat: parseFloat(result.lat),
+                lng: parseFloat(result.lon),
+                confidence: 0.8,
+                provider: 'Nominatim',
+                manuallyEdited: false
+            };
+        }
+    } catch (error) {
+        console.error('Erro na geocodificação básica:', error);
+    }
+    
+    return null;
 }
 
 // Funções auxiliares
@@ -887,4 +643,4 @@ window.toggleEditMode = handleEditButtonClick;
 window.setupEditButton = setupEditButton;
 window.obterLocalizacaoUsuario = obterLocalizacaoUsuario;
 
-console.log('✅ map.js carregado - Versão com alta precisão implementada');
+console.log('✅ map.js carregado - Versão com opção "Incluir inativos"');

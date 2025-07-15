@@ -1,4 +1,4 @@
-const CACHE_NAME = 'agenda-inativos-v1.0.0.3'; // Troque o nome a cada deploy
+const CACHE_NAME = 'agenda-inativos-v1.0.0.2'; // Troque o nome a cada deploy
 const urlsToCache = [
   '/pmgagendainativos/',
   '/pmgagendainativos/index.html',
