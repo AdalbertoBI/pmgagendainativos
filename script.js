@@ -749,7 +749,10 @@ function openTab(tab) {
                     if (typeof window.loadMapData === 'function') {
                         window.loadMapData();
                     }
-                }, 500);
+                    if (typeof window.setupEditButton === 'function') {
+                        window.setupEditButton();
+                    }
+                }, 1000);
             }
         }, 100);
     }
