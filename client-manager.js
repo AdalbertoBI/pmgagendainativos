@@ -1,4 +1,5 @@
-// client-manager.js - Gerenciamento de clientes e formulários
+// client-manager.js - Gerenciamento de clientes com exclusão robusta
+
 class ClientManager {
     constructor() {
         this.data = [];
@@ -27,6 +28,7 @@ class ClientManager {
             window.filteredData = this.filteredData;
 
             console.log('✅ ClientManager inicializado');
+            console.log(`📊 Dados carregados: ${this.data.length} inativos, ${this.ativos.length} ativos`);
         } catch (error) {
             console.error('❌ Erro ao inicializar ClientManager:', error);
         }
@@ -111,8 +113,8 @@ class ClientManager {
             this.data.push(clientData);
             window.data = this.data;
 
-            // Salvar no banco
-            await window.dbManager.saveData('clients', this.data);
+            // Salvar no banco usando método robusto
+            await window.dbManager.saveArrayData('clients', this.data);
 
             console.log('✅ Cliente cadastrado:', clientData['Nome Fantasia']);
             return clientData;
@@ -123,7 +125,7 @@ class ClientManager {
         }
     }
 
-    // Editar cliente - NOVA FUNÇÃO
+    // Editar cliente - FUNÇÃO CORRIGIDA
     async editarCliente(clienteId, dadosEditados) {
         try {
             // Validar dados
@@ -131,6 +133,8 @@ class ClientManager {
             if (errors.length > 0) {
                 throw new Error(errors.join('\n'));
             }
+
+            let clienteEditado = false;
 
             // Encontrar cliente na lista de inativos
             const indexInativo = this.data.findIndex(c => c.id === clienteId);
@@ -140,10 +144,10 @@ class ClientManager {
                     ...this.data[indexInativo],
                     ...dadosEditados
                 };
-                await window.dbManager.saveData('clients', this.data);
+                await window.dbManager.saveArrayData('clients', this.data);
                 window.data = this.data;
+                clienteEditado = true;
                 console.log('✅ Cliente inativo editado:', dadosEditados['Nome Fantasia']);
-                return;
             }
 
             // Encontrar cliente na lista de ativos
@@ -154,13 +158,15 @@ class ClientManager {
                     ...this.ativos[indexAtivo],
                     ...dadosEditados
                 };
-                await window.dbManager.saveData('ativos', this.ativos);
+                await window.dbManager.saveArrayData('ativos', this.ativos);
                 window.ativos = this.ativos;
+                clienteEditado = true;
                 console.log('✅ Cliente ativo editado:', dadosEditados['Nome Fantasia']);
-                return;
             }
 
-            throw new Error('Cliente não encontrado');
+            if (!clienteEditado) {
+                throw new Error('Cliente não encontrado');
+            }
 
         } catch (error) {
             console.error('❌ Erro ao editar cliente:', error);
@@ -171,10 +177,13 @@ class ClientManager {
     // Tornar cliente ativo - CORRIGIDA
     async tornarAtivo(cliente, novaData = null) {
         try {
+            console.log('🔄 Tornando cliente ativo:', cliente['Nome Fantasia']);
+
             // Remover da lista de inativos
             const index = this.data.findIndex(c => c.id === cliente.id);
             if (index !== -1) {
                 this.data.splice(index, 1);
+                console.log('✅ Cliente removido dos inativos');
             }
 
             // Adicionar à lista de ativos
@@ -187,17 +196,20 @@ class ClientManager {
             const existeAtivo = this.ativos.findIndex(c => c.id === cliente.id);
             if (existeAtivo === -1) {
                 this.ativos.push(cliente);
+                console.log('✅ Cliente adicionado aos ativos');
             }
 
-            // Salvar no banco
-            await window.dbManager.saveData('clients', this.data);
-            await window.dbManager.saveData('ativos', this.ativos);
+            // Salvar ambas as listas usando método robusto
+            await window.dbManager.saveArrayData('clients', this.data);
+            await window.dbManager.saveArrayData('ativos', this.ativos);
 
             // Atualizar variáveis globais
             window.data = this.data;
             window.ativos = this.ativos;
 
-            console.log('✅ Cliente tornado ativo:', cliente['Nome Fantasia']);
+            console.log(`✅ Cliente "${cliente['Nome Fantasia']}" tornado ativo com sucesso`);
+            console.log(`📊 Estado atual: ${this.data.length} inativos, ${this.ativos.length} ativos`);
+            
             return cliente;
 
         } catch (error) {
@@ -206,19 +218,87 @@ class ClientManager {
         }
     }
 
-    // Excluir cliente dos ativos
+    // Excluir cliente dos ativos - MÉTODO ROBUSTO CORRIGIDO
     async excluirAtivo(cliente) {
         try {
+            const clienteNome = cliente['Nome Fantasia'] || 'Cliente sem nome';
+            console.log('🗑️ Excluindo cliente ativo:', clienteNome);
+            console.log('📊 Estado antes da exclusão:', {
+                totalAtivos: this.ativos.length,
+                clienteId: cliente.id
+            });
+
+            // Encontrar e remover o cliente
             const index = this.ativos.findIndex(c => c.id === cliente.id);
             if (index !== -1) {
+                // Remover do array
                 this.ativos.splice(index, 1);
-                await window.dbManager.saveData('ativos', this.ativos);
+                console.log(`✅ Cliente removido do array (posição ${index})`);
+                
+                // Salvar usando método robusto que limpa e reinsere todos os dados
+                await window.dbManager.saveArrayData('ativos', this.ativos);
+                
+                // Atualizar variável global
                 window.ativos = this.ativos;
-                console.log('✅ Cliente removido dos ativos:', cliente['Nome Fantasia']);
+                
+                console.log('✅ Dados salvos no IndexedDB');
+                console.log('📊 Estado após exclusão:', {
+                    totalAtivos: this.ativos.length,
+                    idsRestantes: this.ativos.map(c => c.id).slice(0, 3)
+                });
+                
+                // Verificar se a exclusão foi salva corretamente
+                const verificacao = await window.dbManager.verifyDataIntegrity('ativos');
+                console.log('🔍 Verificação de integridade:', {
+                    totalCarregado: verificacao.length,
+                    clienteAindaExiste: verificacao.some(c => c.id === cliente.id)
+                });
+                
+                return true;
+            } else {
+                console.warn('⚠️ Cliente não encontrado na lista de ativos');
+                return false;
             }
         } catch (error) {
             console.error('❌ Erro ao excluir cliente ativo:', error);
             throw error;
+        }
+    }
+
+    // Excluir cliente ativo por ID - NOVA FUNÇÃO ESPECÍFICA
+    async excluirAtivoPorId(clienteId) {
+        try {
+            console.log('🗑️ Excluindo cliente ativo por ID:', clienteId);
+
+            // Encontrar o cliente
+            const cliente = this.ativos.find(c => c.id === clienteId);
+            if (!cliente) {
+                console.warn('⚠️ Cliente não encontrado:', clienteId);
+                return false;
+            }
+
+            // Usar a função robusta de exclusão
+            return await this.excluirAtivo(cliente);
+
+        } catch (error) {
+            console.error('❌ Erro ao excluir cliente por ID:', error);
+            throw error;
+        }
+    }
+
+    // Recarregar dados dos ativos - NOVA FUNÇÃO
+    async recarregarAtivos() {
+        try {
+            console.log('🔄 Recarregando dados dos ativos...');
+            
+            this.ativos = await window.dbManager.loadData('ativos') || [];
+            window.ativos = this.ativos;
+            
+            console.log(`✅ Ativos recarregados: ${this.ativos.length} clientes`);
+            return this.ativos;
+        } catch (error) {
+            console.error('❌ Erro ao recarregar ativos:', error);
+            return [];
         }
     }
 
@@ -350,247 +430,246 @@ class ClientManager {
         });
     }
 
-    // Abrir modal de detalhes - COMPLETO E CORRIGIDO
-openModal(item, tab) {
-    this.currentItem = item;
-    
-    const modalBody = document.getElementById('modal-body');
-    modalBody.innerHTML = `
-        <h2 id="modal-title">${item['Nome Fantasia'] || 'Sem Nome'}</h2>
+    // Abrir modal de detalhes - ATUALIZADO COM FUNÇÃO DE EXCLUSÃO ROBUSTA
+    openModal(item, tab) {
+        this.currentItem = item;
         
-        <!-- Campos de exibição -->
-        <div class="display-field" id="display-info">
-            <p><strong>Cliente:</strong> <span id="display-cliente">${item.Cliente || ''}</span></p>
-            <p><strong>CNPJ/CPF:</strong> <span id="display-cnpj">${item['CNPJ / CPF'] || ''}</span></p>
-            <p><strong>Contato:</strong> <span id="display-contato">${item.Contato || ''}</span></p>
-            <p><strong>Telefone Comercial:</strong> <span id="display-telefone">${item['Telefone Comercial'] || ''}</span></p>
-            <p><strong>Celular:</strong> <span id="display-celular">${item.Celular || ''}</span></p>
-            <p><strong>Email:</strong> <span id="display-email">${item.Email || ''}</span></p>
-            <p><strong>Endereço:</strong> <span id="display-endereco-completo">${item.Endereco || ''}</span></p>
-            <p><strong>Número:</strong> <span id="display-numero">${item.Numero || ''}</span></p>
-            <p><strong>Bairro:</strong> <span id="display-bairro">${item.Bairro || ''}</span></p>
-            <p><strong>Cidade:</strong> <span id="display-cidade">${item.Cidade || ''}</span></p>
-            <p><strong>UF:</strong> <span id="display-uf">${item.UF || ''}</span></p>
-            <p><strong>CEP:</strong> <span id="display-cep">${item.CEP || ''}</span></p>
-            <p><strong>Saldo de Crédito:</strong> <span id="display-saldo">R$ ${item['Saldo de Credito'] || '0'}</span></p>
-            <p><strong>Data Último Pedido:</strong> <span id="display-data">${this.formatDateUS2BR(item['Data Ultimo Pedido']) || ''}</span></p>
-        </div>
-        
-        <!-- Campos de edição (inicialmente ocultos) -->
-        <div class="edit-field" id="edit-form" style="display: none;">
-            <div class="edit-row">
-                <label><strong>Nome Fantasia:</strong></label>
-                <input type="text" id="edit-nome-fantasia" class="edit-input" value="${item['Nome Fantasia'] || ''}">
+        const modalBody = document.getElementById('modal-body');
+        modalBody.innerHTML = `
+            <h2 id="modal-title">${item['Nome Fantasia'] || 'Sem Nome'}</h2>
+            
+            <!-- Campos de exibição -->
+            <div class="display-field" id="display-info">
+                <p><strong>Cliente:</strong> <span id="display-cliente">${item.Cliente || ''}</span></p>
+                <p><strong>CNPJ/CPF:</strong> <span id="display-cnpj">${item['CNPJ / CPF'] || ''}</span></p>
+                <p><strong>Contato:</strong> <span id="display-contato">${item.Contato || ''}</span></p>
+                <p><strong>Telefone Comercial:</strong> <span id="display-telefone">${item['Telefone Comercial'] || ''}</span></p>
+                <p><strong>Celular:</strong> <span id="display-celular">${item.Celular || ''}</span></p>
+                <p><strong>Email:</strong> <span id="display-email">${item.Email || ''}</span></p>
+                <p><strong>Endereço:</strong> <span id="display-endereco-completo">${item.Endereco || ''}</span></p>
+                <p><strong>Número:</strong> <span id="display-numero">${item.Numero || ''}</span></p>
+                <p><strong>Bairro:</strong> <span id="display-bairro">${item.Bairro || ''}</span></p>
+                <p><strong>Cidade:</strong> <span id="display-cidade">${item.Cidade || ''}</span></p>
+                <p><strong>UF:</strong> <span id="display-uf">${item.UF || ''}</span></p>
+                <p><strong>CEP:</strong> <span id="display-cep">${item.CEP || ''}</span></p>
+                <p><strong>Saldo de Crédito:</strong> <span id="display-saldo">R$ ${item['Saldo de Credito'] || '0'}</span></p>
+                <p><strong>Data Último Pedido:</strong> <span id="display-data">${this.formatDateUS2BR(item['Data Ultimo Pedido']) || ''}</span></p>
             </div>
             
-            <div class="edit-row">
-                <label><strong>Cliente:</strong></label>
-                <input type="text" id="edit-cliente" class="edit-input" value="${item.Cliente || ''}">
+            <!-- Campos de edição (inicialmente ocultos) -->
+            <div class="edit-field" id="edit-form" style="display: none;">
+                <div class="edit-row">
+                    <label><strong>Nome Fantasia:</strong></label>
+                    <input type="text" id="edit-nome-fantasia" class="edit-input" value="${item['Nome Fantasia'] || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>Cliente:</strong></label>
+                    <input type="text" id="edit-cliente" class="edit-input" value="${item.Cliente || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>CNPJ/CPF:</strong></label>
+                    <input type="text" id="edit-cnpj-cpf" class="edit-input" value="${item['CNPJ / CPF'] || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>Contato:</strong></label>
+                    <input type="text" id="edit-contato" class="edit-input" value="${item.Contato || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>Telefone Comercial:</strong></label>
+                    <input type="tel" id="edit-telefone-comercial" class="edit-input" value="${item['Telefone Comercial'] || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>Celular:</strong></label>
+                    <input type="tel" id="edit-celular" class="edit-input" value="${item.Celular || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>Email:</strong></label>
+                    <input type="email" id="edit-email" class="edit-input" value="${item.Email || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>Endereço:</strong></label>
+                    <input type="text" id="edit-endereco" class="edit-input" value="${item.Endereco || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>Número:</strong></label>
+                    <input type="text" id="edit-numero" class="edit-input" value="${item.Numero || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>Bairro:</strong></label>
+                    <input type="text" id="edit-bairro" class="edit-input" value="${item.Bairro || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>Cidade:</strong></label>
+                    <input type="text" id="edit-cidade" class="edit-input" value="${item.Cidade || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>UF:</strong></label>
+                    <input type="text" id="edit-uf" class="edit-input" maxlength="2" value="${item.UF || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>CEP:</strong></label>
+                    <input type="text" id="edit-cep" class="edit-input" maxlength="9" value="${item.CEP || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>Saldo de Crédito:</strong></label>
+                    <input type="number" id="edit-saldo-credito" class="edit-input" min="0" step="0.01" value="${item['Saldo de Credito'] || ''}">
+                </div>
             </div>
             
-            <div class="edit-row">
-                <label><strong>CNPJ/CPF:</strong></label>
-                <input type="text" id="edit-cnpj-cpf" class="edit-input" value="${item['CNPJ / CPF'] || ''}">
+            <!-- Botões de ação -->
+            <div class="action-buttons" style="margin-top: 20px;">
+                <button id="editarCliente" class="action-btn edit-btn">✏️ Editar Cliente</button>
+                <button id="salvarEdicao" class="action-btn save-btn" style="display: none;">💾 Salvar</button>
+                <button id="cancelarEdicao" class="action-btn cancel-btn" style="display: none;">❌ Cancelar</button>
             </div>
-            
-            <div class="edit-row">
-                <label><strong>Contato:</strong></label>
-                <input type="text" id="edit-contato" class="edit-input" value="${item.Contato || ''}">
-            </div>
-            
-            <div class="edit-row">
-                <label><strong>Telefone Comercial:</strong></label>
-                <input type="tel" id="edit-telefone-comercial" class="edit-input" value="${item['Telefone Comercial'] || ''}">
-            </div>
-            
-            <div class="edit-row">
-                <label><strong>Celular:</strong></label>
-                <input type="tel" id="edit-celular" class="edit-input" value="${item.Celular || ''}">
-            </div>
-            
-            <div class="edit-row">
-                <label><strong>Email:</strong></label>
-                <input type="email" id="edit-email" class="edit-input" value="${item.Email || ''}">
-            </div>
-            
-            <div class="edit-row">
-                <label><strong>Endereço:</strong></label>
-                <input type="text" id="edit-endereco" class="edit-input" value="${item.Endereco || ''}">
-            </div>
-            
-            <div class="edit-row">
-                <label><strong>Número:</strong></label>
-                <input type="text" id="edit-numero" class="edit-input" value="${item.Numero || ''}">
-            </div>
-            
-            <div class="edit-row">
-                <label><strong>Bairro:</strong></label>
-                <input type="text" id="edit-bairro" class="edit-input" value="${item.Bairro || ''}">
-            </div>
-            
-            <div class="edit-row">
-                <label><strong>Cidade:</strong></label>
-                <input type="text" id="edit-cidade" class="edit-input" value="${item.Cidade || ''}">
-            </div>
-            
-            <div class="edit-row">
-                <label><strong>UF:</strong></label>
-                <input type="text" id="edit-uf" class="edit-input" maxlength="2" value="${item.UF || ''}">
-            </div>
-            
-            <div class="edit-row">
-                <label><strong>CEP:</strong></label>
-                <input type="text" id="edit-cep" class="edit-input" maxlength="9" value="${item.CEP || ''}">
-            </div>
-            
-            <div class="edit-row">
-                <label><strong>Saldo de Crédito:</strong></label>
-                <input type="number" id="edit-saldo-credito" class="edit-input" min="0" step="0.01" value="${item['Saldo de Credito'] || ''}">
-            </div>
-        </div>
-        
-        <!-- Botões de ação -->
-        <div class="action-buttons" style="margin-top: 20px;">
-            <button id="editarCliente" class="action-btn edit-btn">✏️ Editar Cliente</button>
-            <button id="salvarEdicao" class="action-btn save-btn" style="display: none;">💾 Salvar</button>
-            <button id="cancelarEdicao" class="action-btn cancel-btn" style="display: none;">❌ Cancelar</button>
-        </div>
-    `;
+        `;
 
-    // Configurar event listeners para os botões de edição
-    setTimeout(() => {
+        // Configurar event listeners para os botões de edição
+        setTimeout(() => {
+            const editBtn = document.getElementById('editarCliente');
+            const saveBtn = document.getElementById('salvarEdicao');
+            const cancelBtn = document.getElementById('cancelarEdicao');
+            
+            if (editBtn) {
+                editBtn.addEventListener('click', () => this.toggleEditMode());
+            }
+            
+            if (saveBtn) {
+                saveBtn.addEventListener('click', () => this.salvarEdicaoCliente());
+            }
+            
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', () => this.cancelarEdicaoCliente());
+            }
+        }, 100);
+
+        // Configurar botões WhatsApp e Maps
+        const whatsappBtn = document.getElementById('whatsapp-btn');
+        const mapsBtn = document.getElementById('maps-btn');
+
+        if (whatsappBtn) {
+            const phone = item['Telefone Comercial'] || item.Celular || '';
+            const message = `Olá ${item['Nome Fantasia'] || 'cliente'}! Estou entrando em contato para verificar se podemos retomar nosso relacionamento comercial.`;
+            whatsappBtn.href = this.generateWhatsAppLink(phone, message);
+            whatsappBtn.style.display = phone ? 'inline-block' : 'none';
+        }
+
+        if (mapsBtn) {
+            const address = this.getFullAddress(item);
+            mapsBtn.href = this.generateMapsLink(address);
+            mapsBtn.style.display = address ? 'inline-block' : 'none';
+        }
+
+        // Configurar botões de status
+        document.getElementById('tornarAtivo').style.display = (tab === 'inativos') ? 'inline-block' : 'none';
+        document.getElementById('excluirAtivo').style.display = (tab === 'ativos') ? 'inline-block' : 'none';
+        document.getElementById('editDataPedido').style.display = 'none';
+        document.getElementById('labelEditDataPedido').style.display = 'none';
+        document.getElementById('confirmarAtivo').style.display = 'none';
+
+        // Carregar observações
+        const obsTextarea = document.getElementById('observacoes');
+        if (obsTextarea) {
+            obsTextarea.value = window.dbManager.loadObservation(item.id);
+            document.getElementById('observacoes-contador').textContent = obsTextarea.value.length + '/2000';
+        }
+
+        document.getElementById('modal').style.display = 'flex';
+    }
+
+    // Alternar modo de edição
+    toggleEditMode() {
+        const displayField = document.getElementById('display-info');
+        const editField = document.getElementById('edit-form');
         const editBtn = document.getElementById('editarCliente');
         const saveBtn = document.getElementById('salvarEdicao');
         const cancelBtn = document.getElementById('cancelarEdicao');
         
-        if (editBtn) {
-            editBtn.addEventListener('click', () => this.toggleEditMode());
+        if (displayField && editField && editBtn && saveBtn && cancelBtn) {
+            displayField.style.display = 'none';
+            editField.style.display = 'block';
+            editBtn.style.display = 'none';
+            saveBtn.style.display = 'inline-block';
+            cancelBtn.style.display = 'inline-block';
         }
+    }
+
+    // Cancelar edição
+    cancelarEdicaoCliente() {
+        const displayField = document.getElementById('display-info');
+        const editField = document.getElementById('edit-form');
+        const editBtn = document.getElementById('editarCliente');
+        const saveBtn = document.getElementById('salvarEdicao');
+        const cancelBtn = document.getElementById('cancelarEdicao');
         
-        if (saveBtn) {
-            saveBtn.addEventListener('click', () => this.salvarEdicaoCliente());
+        if (displayField && editField && editBtn && saveBtn && cancelBtn) {
+            displayField.style.display = 'block';
+            editField.style.display = 'none';
+            editBtn.style.display = 'inline-block';
+            saveBtn.style.display = 'none';
+            cancelBtn.style.display = 'none';
         }
+    }
+
+    // Salvar edição do cliente
+    async salvarEdicaoCliente() {
+        const cliente = this.currentItem;
+        if (!cliente) return;
         
-        if (cancelBtn) {
-            cancelBtn.addEventListener('click', () => this.cancelarEdicaoCliente());
+        try {
+            // Coletar dados editados
+            const dadosEditados = {
+                'Nome Fantasia': document.getElementById('edit-nome-fantasia')?.value?.trim() || '',
+                'Cliente': document.getElementById('edit-cliente')?.value?.trim() || '',
+                'CNPJ / CPF': document.getElementById('edit-cnpj-cpf')?.value?.trim() || '',
+                'Contato': document.getElementById('edit-contato')?.value?.trim() || '',
+                'Telefone Comercial': document.getElementById('edit-telefone-comercial')?.value?.trim() || '',
+                'Celular': document.getElementById('edit-celular')?.value?.trim() || '',
+                'Email': document.getElementById('edit-email')?.value?.trim() || '',
+                'Endereco': document.getElementById('edit-endereco')?.value?.trim() || '',
+                'Numero': document.getElementById('edit-numero')?.value?.trim() || '',
+                'Bairro': document.getElementById('edit-bairro')?.value?.trim() || '',
+                'Cidade': document.getElementById('edit-cidade')?.value?.trim() || '',
+                'UF': document.getElementById('edit-uf')?.value?.trim()?.toUpperCase() || '',
+                'CEP': document.getElementById('edit-cep')?.value?.trim() || '',
+                'Saldo de Credito': document.getElementById('edit-saldo-credito')?.value || '0'
+            };
+            
+            // Validação básica
+            if (!dadosEditados['Nome Fantasia']) {
+                alert('❌ Nome Fantasia é obrigatório!');
+                return;
+            }
+            
+            // Salvar alterações
+            await this.editarCliente(cliente.id, dadosEditados);
+            
+            // Fechar modal
+            document.getElementById('modal').style.display = 'none';
+            
+            // Atualizar interface
+            this.applyFiltersAndSort();
+            
+            alert('✅ Cliente editado com sucesso!');
+            
+        } catch (error) {
+            console.error('❌ Erro ao editar cliente:', error);
+            alert('❌ Erro ao editar cliente: ' + error.message);
         }
-    }, 100);
-
-    // Configurar botões WhatsApp e Maps
-    const whatsappBtn = document.getElementById('whatsapp-btn');
-    const mapsBtn = document.getElementById('maps-btn');
-
-    if (whatsappBtn) {
-        const phone = item['Telefone Comercial'] || item.Celular || '';
-        const message = `Olá ${item['Nome Fantasia'] || 'cliente'}! Estou entrando em contato para verificar se podemos retomar nosso relacionamento comercial.`;
-        whatsappBtn.href = this.generateWhatsAppLink(phone, message);
-        whatsappBtn.style.display = phone ? 'inline-block' : 'none';
     }
-
-    if (mapsBtn) {
-        const address = this.getFullAddress(item);
-        mapsBtn.href = this.generateMapsLink(address);
-        mapsBtn.style.display = address ? 'inline-block' : 'none';
-    }
-
-    // Configurar botões de status
-    document.getElementById('tornarAtivo').style.display = (tab === 'inativos') ? 'inline-block' : 'none';
-    document.getElementById('excluirAtivo').style.display = (tab === 'ativos') ? 'inline-block' : 'none';
-    document.getElementById('editDataPedido').style.display = 'none';
-    document.getElementById('labelEditDataPedido').style.display = 'none';
-    document.getElementById('confirmarAtivo').style.display = 'none';
-
-    // Carregar observações
-    const obsTextarea = document.getElementById('observacoes');
-    if (obsTextarea) {
-        obsTextarea.value = window.dbManager.loadObservation(item.id);
-        document.getElementById('observacoes-contador').textContent = obsTextarea.value.length + '/2000';
-    }
-
-    document.getElementById('modal').style.display = 'flex';
-}
-
-// Alternar modo de edição
-toggleEditMode() {
-    const displayField = document.getElementById('display-info');
-    const editField = document.getElementById('edit-form');
-    const editBtn = document.getElementById('editarCliente');
-    const saveBtn = document.getElementById('salvarEdicao');
-    const cancelBtn = document.getElementById('cancelarEdicao');
-    
-    if (displayField && editField && editBtn && saveBtn && cancelBtn) {
-        displayField.style.display = 'none';
-        editField.style.display = 'block';
-        editBtn.style.display = 'none';
-        saveBtn.style.display = 'inline-block';
-        cancelBtn.style.display = 'inline-block';
-    }
-}
-
-// Cancelar edição
-cancelarEdicaoCliente() {
-    const displayField = document.getElementById('display-info');
-    const editField = document.getElementById('edit-form');
-    const editBtn = document.getElementById('editarCliente');
-    const saveBtn = document.getElementById('salvarEdicao');
-    const cancelBtn = document.getElementById('cancelarEdicao');
-    
-    if (displayField && editField && editBtn && saveBtn && cancelBtn) {
-        displayField.style.display = 'block';
-        editField.style.display = 'none';
-        editBtn.style.display = 'inline-block';
-        saveBtn.style.display = 'none';
-        cancelBtn.style.display = 'none';
-    }
-}
-
-// Salvar edição do cliente
-async salvarEdicaoCliente() {
-    const cliente = this.currentItem;
-    if (!cliente) return;
-    
-    try {
-        // Coletar dados editados
-        const dadosEditados = {
-            'Nome Fantasia': document.getElementById('edit-nome-fantasia')?.value?.trim() || '',
-            'Cliente': document.getElementById('edit-cliente')?.value?.trim() || '',
-            'CNPJ / CPF': document.getElementById('edit-cnpj-cpf')?.value?.trim() || '',
-            'Contato': document.getElementById('edit-contato')?.value?.trim() || '',
-            'Telefone Comercial': document.getElementById('edit-telefone-comercial')?.value?.trim() || '',
-            'Celular': document.getElementById('edit-celular')?.value?.trim() || '',
-            'Email': document.getElementById('edit-email')?.value?.trim() || '',
-            'Endereco': document.getElementById('edit-endereco')?.value?.trim() || '',
-            'Numero': document.getElementById('edit-numero')?.value?.trim() || '',
-            'Bairro': document.getElementById('edit-bairro')?.value?.trim() || '',
-            'Cidade': document.getElementById('edit-cidade')?.value?.trim() || '',
-            'UF': document.getElementById('edit-uf')?.value?.trim()?.toUpperCase() || '',
-            'CEP': document.getElementById('edit-cep')?.value?.trim() || '',
-            'Saldo de Credito': document.getElementById('edit-saldo-credito')?.value || '0'
-        };
-        
-        // Validação básica
-        if (!dadosEditados['Nome Fantasia']) {
-            alert('❌ Nome Fantasia é obrigatório!');
-            return;
-        }
-        
-        // Salvar alterações
-        await this.editarCliente(cliente.id, dadosEditados);
-        
-        // Fechar modal
-        document.getElementById('modal').style.display = 'none';
-        
-        // Atualizar interface
-        this.applyFiltersAndSort();
-        
-        alert('✅ Cliente editado com sucesso!');
-        
-    } catch (error) {
-        console.error('❌ Erro ao editar cliente:', error);
-        alert('❌ Erro ao editar cliente: ' + error.message);
-    }
-}
-
 
     // Utilitários
     getFullAddress(item) {
@@ -621,5 +700,60 @@ async salvarEdicaoCliente() {
     }
 }
 
+// Função global para exclusão robusta de ativos - NOVA
+window.excluirAtivoRobusto = async function(clienteId) {
+    try {
+        console.log('🗑️ Iniciando exclusão robusta do cliente:', clienteId);
+        
+        if (!window.clientManager) {
+            console.error('❌ ClientManager não encontrado');
+            return false;
+        }
+        
+        // Confirmar exclusão
+        const cliente = window.clientManager.ativos.find(c => c.id === clienteId);
+        if (!cliente) {
+            console.error('❌ Cliente não encontrado nos ativos');
+            return false;
+        }
+        
+        const nomeCliente = cliente['Nome Fantasia'] || 'Cliente sem nome';
+        if (!confirm(`Tem certeza que deseja excluir "${nomeCliente}" dos clientes ativos?`)) {
+            return false;
+        }
+        
+        // Executar exclusão
+        const sucesso = await window.clientManager.excluirAtivo(cliente);
+        
+        if (sucesso) {
+            console.log('✅ Exclusão robusta concluída com sucesso');
+            
+            // Atualizar interface imediatamente
+            if (typeof renderAtivos === 'function') {
+                renderAtivos();
+            }
+            
+            // Fechar modal se estiver aberto
+            const modal = document.getElementById('modal');
+            if (modal && modal.style.display === 'flex') {
+                modal.style.display = 'none';
+            }
+            
+            alert(`✅ Cliente "${nomeCliente}" excluído com sucesso!`);
+            return true;
+        } else {
+            alert('❌ Erro ao excluir cliente');
+            return false;
+        }
+        
+    } catch (error) {
+        console.error('❌ Erro na exclusão robusta:', error);
+        alert('❌ Erro ao excluir cliente: ' + error.message);
+        return false;
+    }
+};
+
 // Instância global do gerenciador de clientes
 window.clientManager = new ClientManager();
+
+console.log('✅ client-manager.js carregado - versão com exclusão robusta corrigida');
