@@ -1,309 +1,378 @@
-// script.js
+// script.js - Arquivo principal corrigido
 
-// Variáveis globais
-let data = [];
-let ativos = [];
-let schedules = {};
-let filteredData = [];
-let currentItem = null;
 let currentTab = 'inativos';
-const today = new Date();
-const BATCH_SIZE = 500; // Tamanho do lote para processamento
-const MAX_RECORDS = 10000; // Limite máximo de registros
-let savedFilters = JSON.parse(localStorage.getItem('savedFilters')) || { saldoMin: 0, cidadesSelecionadas: [], sort: 'nome-az' };
 
-// Disponibilizar dados globalmente para o mapa
-window.data = data;
-window.ativos = ativos;
-window.filteredData = filteredData;
-
-// Função para inicializar IndexedDB
-function initIndexedDB() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open('ClientDatabase', 1);
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            db.createObjectStore('clients', { keyPath: 'id' });
-            db.createObjectStore('ativos', { keyPath: 'id' });
-            db.createObjectStore('schedules', { keyPath: 'id' });
-        };
-        request.onsuccess = (event) => { resolve(event.target.result); };
-        request.onerror = (event) => { reject(new Error('Erro ao abrir IndexedDB: ' + event.target.error)); };
-    });
-}
-
-// Função para salvar dados no IndexedDB
-async function saveToIndexedDB(storeName, data) {
-    const db = await initIndexedDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction([storeName], 'readwrite');
-        const store = transaction.objectStore(storeName);
-        data.forEach(item => { store.put(item); });
-        transaction.oncomplete = () => resolve();
-        transaction.onerror = () => reject(new Error(`Erro ao salvar em ${storeName}`));
-    });
-}
-
-// Função para carregar dados do IndexedDB
-async function loadFromIndexedDB(storeName) {
-    const db = await initIndexedDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction([storeName], 'readonly');
-        const store = transaction.objectStore(storeName);
-        const request = store.getAll();
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(new Error(`Erro ao carregar ${storeName}`));
-    });
-}
-
-// Função para salvar filtros no localStorage
-function saveFilters() {
-    const saldoMin = parseFloat(document.getElementById('saldoFilter')?.value) || 0;
-    const cidadesSelecionadas = Array.from(document.querySelectorAll('#cidadeList input:checked')).map(input => input.value);
-    const sort = document.getElementById('sortOption')?.value || 'nome-az';
-    savedFilters = { saldoMin, cidadesSelecionadas, sort };
-    localStorage.setItem('savedFilters', JSON.stringify(savedFilters));
-    console.log('💾 Filtros salvos:', savedFilters);
-}
-
-// Função para aplicar filtros salvos
-function applySavedFilters() {
-    if (savedFilters) {
-        const saldoFilter = document.getElementById('saldoFilter');
-        if (saldoFilter) {
-            saldoFilter.value = savedFilters.saldoMin || 0;
-        }
-        const cidadeList = document.getElementById('cidadeList');
-        if (cidadeList) {
-            const checkboxes = cidadeList.querySelectorAll('input[type="checkbox"]');
-            checkboxes.forEach(checkbox => {
-                checkbox.checked = savedFilters.cidadesSelecionadas.includes(checkbox.value);
-            });
-        }
-        const sortOption = document.getElementById('sortOption');
-        if (sortOption) {
-            sortOption.value = savedFilters.sort || 'nome-az';
-        }
-        console.log('🔄 Filtros salvos aplicados:', savedFilters);
-        applyFiltersAndSort(); // <-- ESSA LINHA GARANTE QUE A LISTA É ATUALIZADA
-    }
-}
-
-function parseDate(dateStr) {
-    if (!dateStr) return 0;
-    const regex = /^\d{2}\/\d{2}\/\d{4}$/;
-    if (!regex.test(dateStr)) return 0;
-    const [dayStr, monthStr, yearStr] = dateStr.split('/');
-    const day = parseInt(dayStr, 10);
-    const month = parseInt(monthStr, 10);
-    const year = parseInt(yearStr, 10);
-    if (month < 1 || month > 12 || day < 1 || day > 31) return 0;
-    const date = new Date(year, month - 1, day);
-    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return 0;
-    return date.getTime();
-}
-
-function formatDateUS2BR(dateStr) {
-    if (!dateStr) return '';
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) return dateStr;
-    const parts = dateStr.split('/');
-    if (parts.length !== 3) return dateStr;
-    let [month, day, year] = parts;
-    if (year.length === 2) year = '20' + year;
-    return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
-}
-
-function daysSince(dateStr) {
-    const lastDate = new Date(parseDate(formatDateUS2BR(dateStr)));
-    const diff = Math.floor((today - lastDate) / (1000 * 60 * 60 * 24));
-    return isNaN(diff) ? 'N/A' : diff;
-}
-
-// Função de progresso para feedback
-function updateProgress(message, progress = null) {
-    const statusElement = document.createElement('div');
-    statusElement.id = 'upload-progress';
-    statusElement.style.cssText = 'position: fixed; top: 10px; right: 10px; background: #fff; padding: 10px; border: 1px solid #ccc; border-radius: 5px; z-index: 1000;';
-    if (progress !== null) {
-        statusElement.innerText = `${message} (${progress.toFixed(0)}%)`;
-    } else {
-        statusElement.innerText = message;
-    }
-    document.body.appendChild(statusElement);
-    setTimeout(() => statusElement.remove(), 3000);
-}
-
-// Limpa apenas os dados de clientes inativos
-async function resetInativosOnly() {
-  console.log('🔄 Resetando apenas dados de inativos...');
-  data = [];
-  window.data = data;
-  const db = await initIndexedDB();
-  const transaction = db.transaction(['clients'], 'readwrite');
-  transaction.objectStore('clients').clear();
-  await new Promise((resolve, reject) => {
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(new Error('Erro ao limpar clients'));
-  });
-  console.log('✅ Dados de inativos resetados');
-}
-
-
-// Carrega dados do arquivo Excel
-async function loadFileData(fileData) {
-    try {
-        data = fileData;
-        ativos = await loadFromIndexedDB('ativos');
-        await saveToIndexedDB('clients', data);
-        await saveToIndexedDB('ativos', ativos);
-        window.data = data;
-        window.ativos = ativos;
-        window.filteredData = filteredData;
-        applyFiltersAndSort();
-        if (typeof window.loadMapData === 'function') {
-            window.loadMapData();
-        }
-        updateProgress('Dados carregados com sucesso');
-    } catch (error) {
-        console.error('❌ Erro ao carregar dados:', error);
-        updateProgress('Erro ao carregar dados');
-    }
-}
-
-// Aplica filtros e ordenação
-function applyFiltersAndSort() {
-    try {
-        const saldoMin = parseFloat(document.getElementById('saldoFilter')?.value) || savedFilters.saldoMin || 0;
-        const cidadesSelecionadas = Array.from(document.querySelectorAll('#cidadeList input:checked')).map(input => input.value) || savedFilters.cidadesSelecionadas;
-        const sort = document.getElementById('sortOption')?.value || savedFilters.sort || 'nome-az';
-        
-        if (currentTab === 'inativos') {
-            filteredData = data.filter(item => {
-                const saldo = parseFloat(item['Saldo de Credito']) || 0;
-                const itemCidade = item['Cidade'] || '';
-                return saldo >= saldoMin && (cidadesSelecionadas.length === 0 || cidadesSelecionadas.includes(itemCidade));
-            });
-            
-            if (sort === 'nome-az') filteredData.sort((a, b) => (a['Nome Fantasia'] || '').localeCompare(b['Nome Fantasia'] || ''));
-            else if (sort === 'nome-za') filteredData.sort((a, b) => (b['Nome Fantasia'] || '').localeCompare(a['Nome Fantasia'] || ''));
-            else if (sort === 'saldo-desc') filteredData.sort((a, b) => parseFloat(b['Saldo de Credito']) - parseFloat(a['Saldo de Credito']));
-            else if (sort === 'saldo-asc') filteredData.sort((a, b) => parseFloat(a['Saldo de Credito']) - parseFloat(b['Saldo de Credito']));
-            else if (sort === 'data-asc') filteredData.sort((a, b) => parseDate(formatDateUS2BR(a['Data Ultimo Pedido'])) - parseDate(formatDateUS2BR(b['Data Ultimo Pedido'])));
-            else if (sort === 'data-desc') filteredData.sort((a, b) => parseDate(formatDateUS2BR(b['Data Ultimo Pedido'])) - parseDate(formatDateUS2BR(a['Data Ultimo Pedido'])));
-            
-            window.filteredData = filteredData;
-            renderList();
-            
-            if (currentTab === 'mapa' && typeof window.loadMapData === 'function') {
-                setTimeout(() => window.loadMapData(), 300);
-            }
-        } else if (currentTab === 'ativos') {
-            filteredData = ativos.slice();
-            renderList();
-        }
-        
-        console.log(`🔍 Filtros aplicados: ${filteredData.length}/${data.length} clientes exibidos`);
-    } catch (error) {
-        console.error('❌ Erro ao aplicar filtros:', error);
-        updateProgress('Erro ao aplicar filtros');
-    }
-}
-
-// Renderiza a lista de clientes
-function renderList() {
-    const listElement = document.getElementById(currentTab === 'inativos' ? 'list' : 'ativos-list');
-    if (!listElement) return;
-    listElement.innerHTML = '';
+// Inicialização da aplicação
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🚀 Inicializando aplicação...');
     
-    if (filteredData.length === 0) {
-        listElement.innerHTML = '<li style="text-align: center; color: #666;">Nenhum cliente encontrado</li>';
+    // Inicializar gerenciadores
+    try {
+        await window.dbManager.init();
+        await window.clientManager.init();
+        
+        // Configurar eventos
+        setupEventListeners();
+        
+        // Configurar PWA
+        setupPWA();
+        
+        // Configurar upload inicial
+        setupUploadHandler();
+        
+        // Aplicar filtros salvos
+        applySavedFilters();
+        
+        // Renderizar interface
+        populateCidades();
+        renderAtivos();
+        renderAgenda();
+        
+        console.log('✅ Aplicação inicializada com sucesso');
+    } catch (error) {
+        console.error('❌ Erro ao inicializar aplicação:', error);
+    }
+});
+
+// Aplicar filtros salvos
+function applySavedFilters() {
+    const savedFilters = window.dbManager.loadFilters();
+    
+    if (savedFilters.saldoMin) {
+        const saldoFilter = document.getElementById('saldoFilter');
+        if (saldoFilter) saldoFilter.value = savedFilters.saldoMin;
+    }
+    
+    if (savedFilters.sort) {
+        const sortOption = document.getElementById('sortOption');
+        if (sortOption) sortOption.value = savedFilters.sort;
+    }
+    
+    // Aplicar filtros
+    window.clientManager.applyFiltersAndSort();
+}
+
+// Configurar eventos da interface
+function setupEventListeners() {
+    // Modal de detalhes
+    const closeBtn = document.getElementById('close');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            document.getElementById('modal').style.display = 'none';
+        });
+    }
+
+    // Filtros
+    const saldoFilter = document.getElementById('saldoFilter');
+    if (saldoFilter) {
+        saldoFilter.addEventListener('input', () => {
+            window.clientManager.applyFiltersAndSort();
+            saveFilters();
+        });
+    }
+
+    const sortOption = document.getElementById('sortOption');
+    if (sortOption) {
+        sortOption.addEventListener('change', () => {
+            window.clientManager.applyFiltersAndSort();
+            saveFilters();
+        });
+    }
+
+    // Seletor de cidades
+    const cidadeSelector = document.getElementById('cidadeSelector');
+    if (cidadeSelector) {
+        cidadeSelector.addEventListener('click', toggleCidades);
+    }
+
+    const cidadeList = document.getElementById('cidadeList');
+    if (cidadeList) {
+        cidadeList.addEventListener('change', () => {
+            window.clientManager.applyFiltersAndSort();
+            saveFilters();
+        });
+    }
+
+    // Botão de cadastro
+    const cadastrarBtn = document.getElementById('cadastrar-cliente-btn');
+    if (cadastrarBtn) {
+        cadastrarBtn.addEventListener('click', abrirModalCadastro);
+    }
+
+    // Modal de cadastro
+    const closeCadastroBtn = document.getElementById('close-cadastro');
+    if (closeCadastroBtn) {
+        closeCadastroBtn.addEventListener('click', fecharModalCadastro);
+    }
+
+    const formCadastro = document.getElementById('form-cadastro');
+    if (formCadastro) {
+        formCadastro.addEventListener('submit', handleCadastroSubmit);
+    }
+
+    // Observações
+    const observacoes = document.getElementById('observacoes');
+    if (observacoes) {
+        observacoes.addEventListener('input', function() {
+            const contador = document.getElementById('observacoes-contador');
+            if (contador) {
+                contador.textContent = this.value.length + '/2000';
+            }
+        });
+    }
+
+    const salvarObsBtn = document.getElementById('salvarObservacoes');
+    if (salvarObsBtn) {
+        salvarObsBtn.addEventListener('click', salvarObservacoes);
+    }
+
+    // Formatação de data
+    const editDataPedido = document.getElementById('editDataPedido');
+    if (editDataPedido) {
+        editDataPedido.addEventListener('input', function(e) {
+            let value = this.value.replace(/\D/g, '').slice(0, 8);
+            if (value.length > 4) {
+                value = value.slice(0, 2) + '/' + value.slice(2, 4) + '/' + value.slice(4, 8);
+            } else if (value.length > 2) {
+                value = value.slice(0, 2) + '/' + value.slice(2, 4);
+            }
+            this.value = value;
+        });
+    }
+}
+
+// Configurar PWA
+function setupPWA() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/pmgagendainativos/service-worker.js')
+            .then(registration => {
+                console.log('✅ Service Worker registrado');
+                
+                registration.onupdatefound = () => {
+                    const installingWorker = registration.installing;
+                    installingWorker.onstatechange = () => {
+                        if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            alert('Nova versão disponível, a página será atualizada agora.');
+                            window.location.reload();
+                        }
+                    };
+                };
+            })
+            .catch(error => console.error('❌ Erro ao registrar Service Worker:', error));
+    }
+
+    // Botão de instalação
+    let deferredPrompt;
+    const installBtn = document.getElementById('install-btn');
+
+    function isPWAInstalled() {
+        return window.matchMedia('(display-mode: standalone)').matches ||
+               window.navigator.standalone === true ||
+               document.referrer.includes('android-app://');
+    }
+
+    function updateInstallButton() {
+        if (isPWAInstalled()) {
+            installBtn.style.display = 'none';
+        }
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        if (!isPWAInstalled()) {
+            installBtn.style.display = 'block';
+        }
+    });
+
+    installBtn.addEventListener('click', async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                installBtn.style.display = 'none';
+            }
+            deferredPrompt = null;
+        }
+    });
+
+    window.addEventListener('appinstalled', () => {
+        installBtn.style.display = 'none';
+        deferredPrompt = null;
+    });
+
+    updateInstallButton();
+}
+
+// Configurar upload de arquivos
+function setupUploadHandler() {
+    const xlsxFile = document.getElementById('xlsxFile');
+    if (xlsxFile) {
+        xlsxFile.addEventListener('change', handleFileUpload);
+    }
+}
+
+// Manipular upload de arquivo
+async function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+        alert('Arquivo muito grande! O limite é 10MB.');
         return;
     }
+
+    console.log('📁 Processando arquivo:', file.name);
     
-    filteredData.forEach((item, index) => {
-        const li = document.createElement('li');
-        li.innerHTML = `${index + 1}. ${item['Nome Fantasia'] || 'Sem Nome'} <span class="days-since">(${daysSince(item['Data Ultimo Pedido'])} dias sem pedir)</span>`;
-        li.onclick = () => showDetails(item, currentTab);
-        listElement.appendChild(li);
-    });
+    // Limpar dados de inativos
+    await window.dbManager.clearData('clients');
+    window.clientManager.data = [];
+    window.data = [];
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const bytes = e.target.result;
+            const workbook = XLSX.read(bytes, { type: 'binary' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
+
+            if (rawData.length <= 1) {
+                alert('❌ Arquivo inválido ou vazio!');
+                return;
+            }
+
+            const headers = rawData[0].map(h => 
+                h ? h.trim().replace(/\s+/g, ' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '') : ''
+            );
+            
+            const dataRows = rawData.slice(1);
+            const processedData = [];
+
+            dataRows.forEach((row, index) => {
+                const hasValidData = row.some(cell => cell && cell.toString().trim() !== '');
+                if (hasValidData) {
+                    let obj = {};
+                    headers.forEach((header, j) => {
+                        obj[header] = row[j] || '';
+                    });
+                    obj.id = `inactive-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`;
+                    processedData.push(obj);
+                }
+            });
+
+            if (processedData.length === 0) {
+                alert('❌ Nenhum cliente válido encontrado no arquivo!');
+                return;
+            }
+
+            // Salvar dados
+            window.clientManager.data = processedData;
+            window.data = processedData;
+            
+            await window.dbManager.saveData('clients', processedData);
+            
+            // Atualizar interface
+            populateCidades();
+            window.clientManager.applyFiltersAndSort();
+            
+            alert(`✅ Arquivo carregado com sucesso!\n📊 ${processedData.length} clientes inativos encontrados`);
+            
+        } catch (error) {
+            console.error('❌ Erro ao processar arquivo:', error);
+            alert('❌ Erro ao processar o arquivo: ' + error.message);
+        }
+    };
+
+    reader.readAsBinaryString(file);
 }
 
-// Exibe detalhes do cliente
-function showDetails(item, tab) {
-    currentItem = item;
-    currentTab = tab;
+// Abrir modal de cadastro - MODAL VAZIO
+function abrirModalCadastro() {
+    document.getElementById('modal-cadastro').style.display = 'flex';
+    // Limpar todos os campos do formulário
+    document.getElementById('form-cadastro').reset();
     
-    const details = document.getElementById('details');
-    if (!details) return;
+    // Garantir que todos os campos estão vazios
+    document.getElementById('nome-fantasia').value = '';
+    document.getElementById('cliente').value = '';
+    document.getElementById('cnpj-cpf').value = '';
+    document.getElementById('contato').value = '';
+    document.getElementById('telefone-comercial').value = '';
+    document.getElementById('celular').value = '';
+    document.getElementById('email').value = '';
+    document.getElementById('endereco').value = '';
+    document.getElementById('numero').value = '';
+    document.getElementById('bairro').value = '';
+    document.getElementById('cidade').value = '';
+    document.getElementById('uf').value = '';
+    document.getElementById('cep').value = '';
+    document.getElementById('saldo-credito').value = '';
+    document.getElementById('data-ultimo-pedido').value = '';
     
-    details.innerHTML = `
-        <p><strong>Cliente:</strong> ${item.Cliente || ''}</p>
-        <p><strong>CNPJ/CPF:</strong> ${item['CNPJ / CPF'] || ''}</p>
-        <p><strong>Contato:</strong> ${item.Contato || ''}</p>
-        <p><strong>Telefone Comercial:</strong> ${item['Telefone Comercial'] || ''}</p>
-        <p><strong>Celular:</strong> ${item.Celular || ''}</p>
-        <p><strong>Email:</strong> ${item.Email || ''}</p>
-        <p><strong>Saldo de Crédito:</strong> ${item['Saldo de Credito'] || ''}</p>
-        <p><strong>Data Último Pedido:</strong> ${formatDateUS2BR(item['Data Ultimo Pedido']) || ''}</p>
-        <p><strong>Cidade:</strong> ${item.Cidade || ''}</p>
-        <p><strong>Endereço Completo:</strong> ${getFullAddress(item)}</p>
-    `;
+    // Focar no primeiro campo
+    document.getElementById('nome-fantasia').focus();
+}
+
+// Fechar modal de cadastro
+function fecharModalCadastro() {
+    document.getElementById('modal-cadastro').style.display = 'none';
+}
+
+// Manipular submissão do formulário de cadastro
+async function handleCadastroSubmit(event) {
+    event.preventDefault();
     
-    const whatsappBtn = document.getElementById('whatsapp-btn');
-    const mapsBtn = document.getElementById('maps-btn');
-    
-    if (whatsappBtn) {
-        const phone = item['Telefone Comercial'] || item.Celular || '';
-        const message = `Olá ${item['Nome Fantasia'] || 'cliente'}! Estou entrando em contato para verificar se podemos retomar nosso relacionamento comercial.`;
-        whatsappBtn.href = generateWhatsAppLink(phone, message);
-        whatsappBtn.style.display = phone ? 'inline-block' : 'none';
+    const formData = {
+        nomeFantasia: document.getElementById('nome-fantasia').value.trim(),
+        cliente: document.getElementById('cliente').value.trim(),
+        cnpjCpf: document.getElementById('cnpj-cpf').value.trim(),
+        contato: document.getElementById('contato').value.trim(),
+        telefoneComercial: document.getElementById('telefone-comercial').value.trim(),
+        celular: document.getElementById('celular').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        endereco: document.getElementById('endereco').value.trim(),
+        numero: document.getElementById('numero').value.trim(),
+        bairro: document.getElementById('bairro').value.trim(),
+        cidade: document.getElementById('cidade').value.trim(),
+        uf: document.getElementById('uf').value.trim().toUpperCase(),
+        cep: document.getElementById('cep').value.trim(),
+        saldoCredito: document.getElementById('saldo-credito').value,
+        dataUltimoPedido: document.getElementById('data-ultimo-pedido').value
+    };
+
+    // Validação básica
+    if (!formData.nomeFantasia) {
+        alert('❌ Nome Fantasia é obrigatório!');
+        document.getElementById('nome-fantasia').focus();
+        return;
     }
-    
-    if (mapsBtn) {
-        const address = getFullAddress(item);
-        mapsBtn.href = generateMapsLink(address);
-        mapsBtn.style.display = address ? 'inline-block' : 'none';
-    }
-    
-    const sch = schedules[item.id] && schedules[item.id].length > 0 ? schedules[item.id][0] : {};
-    
-    if (document.getElementById('diaSemana')) document.getElementById('diaSemana').value = sch.dia || '';
-    if (document.getElementById('horario')) document.getElementById('horario').value = sch.horario || '';
-    if (document.getElementById('tipo')) document.getElementById('tipo').value = sch.tipo || '';
-    if (document.getElementById('repeticao')) document.getElementById('repeticao').value = sch.repeticao || '';
-    
-    if (document.getElementById('tornarAtivo')) document.getElementById('tornarAtivo').style.display = (tab === 'inativos') ? 'inline-block' : 'none';
-    if (document.getElementById('excluirAtivo')) document.getElementById('excluirAtivo').style.display = (tab === 'ativos') ? 'inline-block' : 'none';
-    if (document.getElementById('editDataPedido')) document.getElementById('editDataPedido').style.display = 'none';
-    if (document.getElementById('labelEditDataPedido')) document.getElementById('labelEditDataPedido').style.display = 'none';
-    if (document.getElementById('confirmarAtivo')) document.getElementById('confirmarAtivo').style.display = 'none';
-    if (document.getElementById('modal')) document.getElementById('modal').style.display = 'flex';
-    
-    const obsKey = 'observacoes_' + item.id;
-    const obsTextarea = document.getElementById('observacoes');
-    if (obsTextarea) {
-        obsTextarea.value = localStorage.getItem(obsKey) || '';
-        if (document.getElementById('observacoes-contador')) document.getElementById('observacoes-contador').textContent = obsTextarea.value.length + '/2000';
+
+    try {
+        await window.clientManager.cadastrarCliente(formData);
         
-        obsTextarea.oninput = function() {
-            if (document.getElementById('observacoes-contador')) document.getElementById('observacoes-contador').textContent = this.value.length + '/2000';
-        };
-    }
-    
-    if (document.getElementById('salvarObservacoes')) {
-        document.getElementById('salvarObservacoes').onclick = function() {
-            if (obsTextarea) localStorage.setItem(obsKey, obsTextarea.value);
-            alert('Observações salvas!');
-        };
+        // Atualizar interface
+        populateCidades();
+        window.clientManager.applyFiltersAndSort();
+        
+        fecharModalCadastro();
+        alert('✅ Cliente cadastrado com sucesso!');
+        
+    } catch (error) {
+        alert('❌ Erro ao cadastrar cliente:\n' + error.message);
     }
 }
 
+// Navegação entre abas - CORRIGIDO para mostrar/esconder botão cadastrar
 function openTab(tab) {
     console.log(`📂 Abrindo aba: ${tab}`);
     
+    // Remover classe active de todas as abas
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('#tabs button').forEach(el => el.classList.remove('active'));
     
+    // Ativar aba selecionada
     const tabContent = document.getElementById(tab + '-content');
     const tabButton = document.querySelector(`button[onclick="openTab('${tab}')"]`);
     
@@ -311,642 +380,350 @@ function openTab(tab) {
     if (tabButton) tabButton.classList.add('active');
     
     currentTab = tab;
+    window.clientManager.currentTab = tab;
     
+    // Controlar visibilidade do upload e botão cadastrar - APENAS NA ABA INATIVOS
     const uploadDiv = document.getElementById('upload');
     if (uploadDiv) {
-        uploadDiv.style.display = (tab === 'inativos' || tab === 'mapa') ? 'block' : 'none';
+        uploadDiv.style.display = (tab === 'inativos') ? 'block' : 'none';
     }
     
+    // Ações específicas por aba
     if (tab === 'inativos') {
-        applySavedFilters();
-        applyFiltersAndSort();
-    }
-    if (tab === 'ativos') renderAtivos();
-    if (tab === 'agenda') renderAgenda();
-    if (tab === 'mapa') {
+        window.clientManager.applyFiltersAndSort();
+    } else if (tab === 'ativos') {
+        renderAtivos();
+    } else if (tab === 'agenda') {
+        renderAgenda();
+    } else if (tab === 'mapa') {
         console.log('🗺️ Inicializando aba mapa...');
-        try {
+        setTimeout(() => {
             if (typeof window.initMap === 'function') {
                 window.initMap();
                 setTimeout(() => {
-                    if (data.length > 0 || ativos.length > 0) {
-                        if (typeof window.loadMapData === 'function') {
-                            window.loadMapData();
-                        }
-                    } else {
-                        console.log('📋 Nenhum dado disponível para o mapa');
+                    if (typeof window.loadMapData === 'function') {
+                        window.loadMapData();
                     }
-                }, 300);
-            } else {
-                console.error('❌ Função initMap não encontrada');
+                }, 500);
             }
-        } catch (error) {
-            console.error('❌ Erro ao inicializar mapa:', error);
-            updateProgress('Erro ao inicializar mapa');
-        }
+        }, 100);
     }
 }
 
-function generateWhatsAppLink(phone, message) {
-    if (!phone) return '#';
-    const cleanPhone = phone.replace(/\D/g, '');
-    const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone;
-    const encodedMessage = encodeURIComponent(message);
-    return `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
-}
-
-function generateMapsLink(address) {
-    if (!address) return '#';
-    const encodedAddress = encodeURIComponent(address);
-    return `https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`;
-}
-
-function getFullAddress(item) {
-    const parts = [
-        item.Endereco || '',
-        item.Numero || '',
-        item.Bairro || '',
-        item.Cidade || '',
-        item.UF || '',
-        item.CEP || ''
-    ].filter(part => part.trim());
-    
-    return parts.join(', ');
-}
-
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 Inicializando aplicação...');
-
-    // --- Instalação do PWA ---
-
-
-// Registro do Service Worker - Versão corrigida para mobile
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/pmgagendainativos/service-worker.js')
-  .then(registration => {
-    registration.onupdatefound = () => {
-      const installingWorker = registration.installing;
-      installingWorker.onstatechange = () => {
-        if (
-          installingWorker.state === 'installed' &&
-          navigator.serviceWorker.controller
-        ) {
-          // Nova versão disponível
-          alert('Nova versão disponível, a página será atualizada agora.');
-          window.location.reload();
-        }
-      };
+// Salvar filtros
+function saveFilters() {
+    const filters = {
+        saldoMin: parseFloat(document.getElementById('saldoFilter')?.value) || 0,
+        cidadesSelecionadas: Array.from(document.querySelectorAll('#cidadeList input:checked')).map(input => input.value),
+        sort: document.getElementById('sortOption')?.value || 'nome-az'
     };
-  });
-}
-
-// PWA Install - Versão corrigida para mobile
-let deferredPrompt;
-const installBtn = document.getElementById('install-btn');
-
-// Detecta se o app está rodando como PWA
-function isPWAInstalled() {
-    return window.matchMedia('(display-mode: standalone)').matches ||
-           window.navigator.standalone === true ||
-           document.referrer.includes('android-app://');
-}
-
-// Atualiza visibilidade do botão
-function updateInstallButton() {
-    if (isPWAInstalled()) {
-        installBtn.style.display = 'none';
-        console.log('📱 PWA já instalado');
-    } else {
-        console.log('⏳ Aguardando prompt de instalação...');
-    }
-}
-
-// Captura o evento de instalação
-window.addEventListener('beforeinstallprompt', (e) => {
-    console.log('📥 Prompt de instalação disponível');
-    e.preventDefault();
-    deferredPrompt = e;
     
-    if (!isPWAInstalled()) {
-        installBtn.style.display = 'block';
-    }
-});
-
-// Clique no botão de instalação
-installBtn.addEventListener('click', async () => {
-    if (deferredPrompt) {
-        console.log('🚀 Iniciando instalação...');
-        deferredPrompt.prompt();
-        
-        const { outcome } = await deferredPrompt.userChoice;
-        console.log(`👤 Usuário ${outcome === 'accepted' ? 'aceitou' : 'rejeitou'} a instalação`);
-        
-        if (outcome === 'accepted') {
-            installBtn.style.display = 'none';
-        }
-        
-        deferredPrompt = null;
-    }
-});
-
-// Evento pós-instalação
-window.addEventListener('appinstalled', () => {
-    console.log('✅ PWA instalado com sucesso');
-    installBtn.style.display = 'none';
-    deferredPrompt = null;
-});
-
-// Inicializa ao carregar
-document.addEventListener('DOMContentLoaded', updateInstallButton);
-
-
-// Detecta se o app está rodando como PWA (já instalado)
-function isPWAInstalled() {
-  return window.matchMedia('(display-mode: standalone)').matches ||
-         window.navigator.standalone === true;
+    window.dbManager.saveFilters(filters);
 }
 
-// Esconde o botão se já estiver instalado
-function updateInstallButton() {
-  if (isPWAInstalled()) {
-    installBtn.style.display = 'none';
-  }
-}
-
-// Captura o evento de oferta de instalação
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  if (!isPWAInstalled()) {
-    installBtn.style.display = 'block';
-  }
-});
-
-// Ao clicar no botão, dispara o prompt nativo
-installBtn.addEventListener('click', () => {
-  if (deferredPrompt) {
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.then(() => {
-      installBtn.style.display = 'none';
-      deferredPrompt = null;
-    });
-  }
-});
-
-// Esconde o botão se o app já estiver instalado ao carregar
-window.addEventListener('DOMContentLoaded', updateInstallButton);
-
-// Esconde o botão após a instalação
-window.addEventListener('appinstalled', () => {
-  installBtn.style.display = 'none';
-});
-
-
-    
-    try {
-        data = await loadFromIndexedDB('clients') || [];
-        ativos = await loadFromIndexedDB('ativos') || [];
-        schedules = await loadFromIndexedDB('schedules') || {};
-        window.data = data;
-        window.ativos = ativos;
-        window.filteredData = filteredData;
-        
-        if (currentTab === 'inativos') {
-            applySavedFilters();
-            applyFiltersAndSort();
-        }
-        
-        const uploadDiv = document.getElementById('upload');
-        if (uploadDiv) {
-            uploadDiv.style.display = 'block';
-        }
-        
-        if (document.getElementById('cidadeList')) {
-            document.getElementById('cidadeList').classList.add('escondido');
-        }
-        
-        populateCidades();
-        renderAtivos();
-        renderAgenda();
-        
-        if (document.getElementById('saldoFilter')) {
-            document.getElementById('saldoFilter').addEventListener('input', () => {
-                applyFiltersAndSort();
-                saveFilters();
-            });
-        }
-        
-        if (document.getElementById('sortOption')) {
-            document.getElementById('sortOption').addEventListener('change', () => {
-                applyFiltersAndSort();
-                saveFilters();
-            });
-        }
-        
-        if (document.getElementById('close')) {
-            document.getElementById('close').addEventListener('click', () => {
-                document.getElementById('modal').style.display = 'none';
-            });
-        }
-        
-        if (document.getElementById('xlsxFile')) {
-            document.getElementById('xlsxFile').addEventListener('change', async (event) => {
-                const file = event.target.files[0];
-                if (!file) return alert('Nenhum arquivo selecionado!');
-                
-                if (file.size > 10 * 1024 * 1024) { // Limite de 10MB
-                    alert('Arquivo muito grande! O limite é 10MB.');
-                    return;
-                }
-                
-                console.log('📁 Processando arquivo:', file.name);
-                await resetInativosOnly();
-                
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    try {
-                        const bytes = e.target.result;
-                        const workbook = XLSX.read(bytes, { type: 'binary' });
-                        const sheetName = workbook.SheetNames[0];
-                        const worksheet = workbook.Sheets[sheetName];
-                        
-                        const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
-                        
-                        if (rawData.length === 0) {
-                            alert('❌ Arquivo vazio ou inválido!');
-                            return;
-                        }
-                        
-                        if (rawData.length === 1) {
-                            alert('❌ Arquivo contém apenas cabeçalhos!');
-                            return;
-                        }
-                        
-                        if (rawData.length > MAX_RECORDS) {
-                            alert(`❌ Arquivo excede o limite de ${MAX_RECORDS} registros!`);
-                            return;
-                        }
-                        
-                        const headers = rawData[0].map(h => 
-                            h ? h.trim().replace(/\s+/g, ' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '') : ''
-                        );
-                        
-                        const dataRows = rawData.slice(1);
-                        data = [];
-                        const totalRows = dataRows.length;
-                        
-                        for (let i = 0; i < totalRows; i += BATCH_SIZE) {
-                            const batch = dataRows.slice(i, i + BATCH_SIZE);
-                            const batchData = batch.map((row, index) => {
-                                const hasValidData = row.some(cell => cell && cell.toString().trim() !== '');
-                                if (hasValidData) {
-                                    let obj = {};
-                                    headers.forEach((header, j) => {
-                                        obj[header] = row[j] || '';
-                                    });
-                                    obj.id = `inactive-${Date.now()}-${i + index}-${Math.random().toString(36).substr(2, 5)}`;
-                                    return obj;
-                                }
-                                return null;
-                            }).filter(row => row !== null);
-                            
-                            data.push(...batchData);
-                            updateProgress('Processando dados', (i + batch.length) / totalRows * 100);
-                            await new Promise(resolve => setTimeout(resolve, 100));
-                        }
-                        
-                        if (data.length === 0) {
-                            alert('❌ Nenhum cliente válido encontrado no arquivo!');
-                            return;
-                        }
-                        
-                        window.data = data;
-                        window.ativos = ativos;
-                        window.filteredData = filteredData;
-                        
-                        await saveToIndexedDB('clients', data);
-                        await saveToIndexedDB('ativos', ativos);
-                        
-                        populateCidades();
-                        applyFiltersAndSort();
-                        
-                        const message = `✅ Arquivo carregado com sucesso!\n\n📊 ${data.length} clientes inativos encontrados\n📁 Arquivo: ${file.name}`;
-                        alert(message);
-                        
-                        console.log('✅ Dados processados e disponibilizados globalmente');
-                        
-                        if (currentTab === 'mapa') {
-                            setTimeout(() => {
-                                if (typeof window.loadMapData === 'function') {
-                                    window.loadMapData();
-                                }
-                            }, 500);
-                        }
-                    } catch (error) {
-                        console.error('❌ Erro ao processar arquivo:', error);
-                        alert('❌ Erro ao processar o arquivo:\n' + error.message);
-                        await resetInativosOnly();
-                    }
-                };
-                
-                reader.onerror = () => {
-                    alert('❌ Erro ao ler o arquivo.');
-                    resetInativosOnly();
-                };
-                
-                reader.readAsBinaryString(file);
-            });
-        }
-        
-        const editDataPedido = document.getElementById('editDataPedido');
-        if (editDataPedido) {
-            editDataPedido.addEventListener('input', function(e) {
-                let value = this.value.replace(/\D/g, '').slice(0,8);
-                if (value.length > 4)
-                    value = value.slice(0,2) + '/' + value.slice(2,4) + '/' + value.slice(4,8);
-                else if (value.length > 2)
-                    value = value.slice(0,2) + '/' + value.slice(2,4);
-                this.value = value;
-            });
-        }
-        
-        // Adicionar evento para salvar filtros quando as cidades mudarem
-        if (document.getElementById('cidadeList')) {
-            document.getElementById('cidadeList').addEventListener('change', () => {
-                applyFiltersAndSort();
-                saveFilters();
-            });
-        }
-        
-        console.log('✅ Aplicação inicializada');
-    } catch (error) {
-        console.error('❌ Erro ao inicializar aplicação:', error);
-        updateProgress('Erro ao inicializar aplicação');
-    }
-});
-
+// Popular lista de cidades
 function populateCidades() {
-    const cidades = [...new Set(data.map(item => (item['Cidade'] || '').trim()))]
+    const cidades = [...new Set(window.clientManager.data.map(item => (item['Cidade'] || '').trim()))]
         .filter(c => c)
         .sort((a, b) => a.localeCompare(b, 'pt-BR', {sensitivity: 'base'}));
-    
+
     const list = document.getElementById('cidadeList');
     if (!list) return;
-    
+
     list.innerHTML = '';
     cidades.forEach(cidade => {
         const div = document.createElement('div');
-        div.innerHTML = `<input type="checkbox" value="${cidade}" id="cidade-${cidade}"><label for="cidade-${cidade}">${cidade}</label>`;
+        div.innerHTML = `
+            <input type="checkbox" id="cidade-${cidade}" value="${cidade}">
+            <label for="cidade-${cidade}">${cidade}</label>
+        `;
         list.appendChild(div);
     });
-    
-    // Aplicar filtros salvos após preencher a lista de cidades
-    applySavedFilters();
+
     console.log(`🏙️ ${cidades.length} cidades encontradas`);
 }
 
+// Alternar visibilidade da lista de cidades
 function toggleCidades() {
     const selector = document.getElementById('cidadeSelector');
     const list = document.getElementById('cidadeList');
     if (!selector || !list) return;
-    
+
     const aberto = list.classList.toggle('visivel');
     list.classList.toggle('escondido', !aberto);
     selector.classList.toggle('aberto', aberto);
-    document.getElementById('cidadeSelectorText').textContent = aberto ? 'Ocultar cidades' : 'Selecionar cidades';
+    
+    document.getElementById('cidadeSelectorText').textContent = 
+        aberto ? 'Ocultar cidades' : 'Selecionar cidades';
 }
 
+// Renderizar lista de ativos
 function renderAtivos() {
     const list = document.getElementById('ativos-list');
     if (!list) return;
-    
+
     list.innerHTML = '';
-    let sortedAtivos = [...ativos].sort((a, b) => (a['Nome Fantasia'] || '').localeCompare(b['Nome Fantasia'] || ''));
     
+    if (window.clientManager.ativos.length === 0) {
+        list.innerHTML = '<li style="text-align: center; color: #666;">Nenhum cliente ativo encontrado</li>';
+        return;
+    }
+
+    const sortedAtivos = [...window.clientManager.ativos].sort((a, b) => 
+        (a['Nome Fantasia'] || '').localeCompare(b['Nome Fantasia'] || '')
+    );
+
     sortedAtivos.forEach((item, index) => {
         const li = document.createElement('li');
-        li.innerHTML = `${index + 1}. ${item['Nome Fantasia'] || 'Sem Nome'} <span class="days-since">(${daysSince(item['Data Ultimo Pedido'])} dias sem pedir)</span>`;
-        li.addEventListener('click', () => showDetails(item, 'ativos'));
+        const daysSinceOrder = window.clientManager.daysSince(item['Data Ultimo Pedido']);
+        
+        li.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>${index + 1}. ${item['Nome Fantasia'] || 'Sem Nome'}</span>
+                <span class="days-since">${daysSinceOrder} dias sem pedir</span>
+            </div>
+        `;
+        
+        li.addEventListener('click', () => window.clientManager.showDetails(item, 'ativos'));
         list.appendChild(li);
     });
 }
 
+// Renderizar agenda
 function renderAgenda() {
     const agendaList = document.getElementById('agenda-list');
     if (!agendaList) return;
-    
+
     agendaList.innerHTML = '';
+    
+    const schedules = window.clientManager.schedules || {};
     let agendaItems = [];
-    
+
     Object.entries(schedules).forEach(([id, schArray]) => {
-        schArray.forEach((sch, schIndex) => {
-            const client = [...data, ...ativos].find(c => c.id === id);
-            if (client && sch.dateTime) {
-                agendaItems.push({
-                    dateTime: sch.dateTime,
-                    client: client['Nome Fantasia'],
-                    tipo: sch.tipo,
-                    id,
-                    schIndex,
-                    clientData: client
-                });
-            }
-        });
+        if (Array.isArray(schArray)) {
+            schArray.forEach((sch, schIndex) => {
+                const client = [...window.clientManager.data, ...window.clientManager.ativos]
+                    .find(c => c.id === id);
+                
+                if (client && sch.dateTime) {
+                    agendaItems.push({
+                        dateTime: sch.dateTime,
+                        client: client['Nome Fantasia'],
+                        tipo: sch.tipo,
+                        id,
+                        schIndex,
+                        clientData: client
+                    });
+                }
+            });
+        }
     });
-    
+
     agendaItems.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
-    
+
+    if (agendaItems.length === 0) {
+        agendaList.innerHTML = '<div style="text-align: center; color: #666;">Nenhum agendamento encontrado</div>';
+        return;
+    }
+
     agendaItems.forEach(item => {
-        let dt = new Date(item.dateTime);
-        let dataStr = isNaN(dt) ? 'Data inválida' : dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
-        
+        const dt = new Date(item.dateTime);
+        const dataStr = isNaN(dt) ? 'Data inválida' : 
+            dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+
         const div = document.createElement('div');
-        div.style.cursor = 'pointer';
+        div.style.cssText = 'cursor: pointer; margin: 10px 0; padding: 10px; background: #fff; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;';
+        
         div.innerHTML = `
-            <span>${dataStr} - ${item.client}</span>
-            <strong>${item.tipo || ''}</strong>
+            <span>${dataStr} - ${item.client} (${item.tipo})</span>
+            <button onclick="removeAgendamento('${item.id}', ${item.schIndex})" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;">
+                Remover
+            </button>
         `;
         
         div.addEventListener('click', (e) => {
             if (e.target.tagName !== 'BUTTON') {
-                showDetails(item.clientData, item.clientData.isAtivo ? 'ativos' : 'inativos');
+                window.clientManager.showDetails(item.clientData, 'agenda');
             }
         });
-        
-        const btn = document.createElement('button');
-        btn.textContent = 'Excluir';
-        btn.onclick = () => deleteSchedule(item.id, item.schIndex);
-        div.appendChild(btn);
         
         agendaList.appendChild(div);
     });
 }
 
-function deleteSchedule(id, schIndex) {
-    try {
-        if (schedules[id]) {
-            schedules[id].splice(schIndex, 1);
-            if (schedules[id].length === 0) delete schedules[id];
-            saveToIndexedDB('schedules', Object.entries(schedules).map(([id, sch]) => ({ id, schedules: sch })));
-            renderAgenda();
-            alert('Agendamento excluído!');
-        } else {
-            alert('Agendamento não encontrado!');
-        }
-    } catch (error) {
-        alert('Erro ao excluir agendamento: ' + (error.message || error));
-    }
-}
+// Salvar agendamento
+async function salvarAgendamento() {
+    if (!window.clientManager.currentItem) return;
 
-function prepareTornarAtivo() {
-    if (document.getElementById('editDataPedido')) document.getElementById('editDataPedido').style.display = 'inline-block';
-    if (document.getElementById('labelEditDataPedido')) document.getElementById('labelEditDataPedido').style.display = 'inline-block';
-    if (document.getElementById('confirmarAtivo')) document.getElementById('confirmarAtivo').style.display = 'inline-block';
-    if (document.getElementById('tornarAtivo')) document.getElementById('tornarAtivo').style.display = 'none';
-}
+    const dia = document.getElementById('diaSemana').value;
+    const horario = document.getElementById('horario').value;
+    const tipo = document.getElementById('tipo').value;
+    const repeticao = document.getElementById('repeticao').value;
 
-async function tornarAtivo() {
-    try {
-        const newDate = document.getElementById('editDataPedido')?.value;
-        if (!/^\d{2}\/\d{2}\/\d{4}$/.test(newDate)) {
-            alert('Data inválida! Use o formato DD/MM/AAAA.');
-            return;
-        }
-        
-        const [day, month, year] = newDate.split('/').map(Number);
-        const dateObj = new Date(year, month - 1, day);
-        if (
-            dateObj.getFullYear() !== year ||
-            dateObj.getMonth() !== month - 1 ||
-            dateObj.getDate() !== day
-        ) {
-            alert('Data inválida! Use uma data real no formato DD/MM/AAAA.');
-            return;
-        }
-        
-        if (!currentItem) {
-            alert('Erro interno: Nenhum cliente selecionado.');
-            return;
-        }
-        
-        currentItem['Data Ultimo Pedido'] = newDate;
-        ativos.push(currentItem);
-        data = data.filter(d => d.id !== currentItem.id);
-        await saveToIndexedDB('clients', data);
-        await saveToIndexedDB('ativos', ativos);
-        
-        window.data = data;
-        window.ativos = ativos;
-        window.filteredData = filteredData;
-        
-        applyFiltersAndSort();
-        
-        if (currentTab === 'mapa' && typeof window.loadMapData === 'function') {
-            setTimeout(() => window.loadMapData(), 300);
-        }
-        
-        if (document.getElementById('modal')) document.getElementById('modal').style.display = 'none';
-        alert('Cliente tornado ativo com sucesso!');
-    } catch (error) {
-        alert('Erro ao tornar cliente ativo: ' + (error.message || error));
-    }
-}
-
-async function excluirAtivo() {
-    try {
-        data.push(currentItem);
-        ativos = ativos.filter(a => a.id !== currentItem.id);
-        await saveToIndexedDB('clients', data);
-        await saveToIndexedDB('ativos', ativos);
-        
-        window.data = data;
-        window.ativos = ativos;
-        window.filteredData = filteredData;
-        
-        renderAtivos();
-        
-        if (currentTab === 'mapa' && typeof window.loadMapData === 'function') {
-            setTimeout(() => window.loadMapData(), 300);
-        }
-        
-        if (document.getElementById('modal')) document.getElementById('modal').style.display = 'none';
-        alert('Cliente retornado para inativos!');
-    } catch (error) {
-        alert('Erro ao excluir dos ativos: ' + (error.message || error));
-    }
-}
-
-function getInterval(type) {
-    if (type === 'Semanal') return 7;
-    if (type === 'Quinzenal') return 14;
-    if (type === 'Mensal') return 30;
-    return Infinity;
-}
-
-async function saveSchedule() {
-    const dia = document.getElementById('diaSemana')?.value;
-    const horario = document.getElementById('horario')?.value;
-    const tipo = document.getElementById('tipo')?.value;
-    const repeticao = document.getElementById('repeticao')?.value;
-    
-    if (!dia || !horario || !tipo) return alert('Preencha todos os campos obrigatórios!');
-    
-    if (!/^\d{2}:\d{2}$/.test(horario)) {
-        alert('Horário inválido! Use o formato HH:MM.');
+    if (!dia || !horario || !tipo) {
+        alert('Por favor, preencha todos os campos do agendamento.');
         return;
     }
+
+    const agendamento = {
+        dia,
+        horario,
+        tipo,
+        repeticao,
+        dateTime: calcularProximaData(dia, horario)
+    };
+
+    const clientId = window.clientManager.currentItem.id;
     
-    try {
-        schedules[currentItem.id] = [];
+    if (!window.clientManager.schedules[clientId]) {
+        window.clientManager.schedules[clientId] = [];
+    }
+    
+    window.clientManager.schedules[clientId].push(agendamento);
+    
+    await window.dbManager.saveData('schedules', window.clientManager.schedules);
+    
+    alert('Agendamento salvo com sucesso!');
+    renderAgenda();
+}
+
+// Calcular próxima data baseada no dia da semana
+function calcularProximaData(diaSemana, horario) {
+    const dias = {
+        'Domingo': 0, 'Segunda': 1, 'Terça': 2, 'Quarta': 3,
+        'Quinta': 4, 'Sexta': 5, 'Sábado': 6
+    };
+
+    const hoje = new Date();
+    const diaAlvo = dias[diaSemana];
+    const diasAteAlvo = (diaAlvo + 7 - hoje.getDay()) % 7;
+    
+    const proximaData = new Date(hoje);
+    proximaData.setDate(hoje.getDate() + (diasAteAlvo || 7));
+    
+    const [hora, minuto] = horario.split(':');
+    proximaData.setHours(parseInt(hora), parseInt(minuto), 0, 0);
+    
+    return proximaData.toISOString();
+}
+
+// Remover agendamento
+async function removeAgendamento(clientId, schIndex) {
+    if (window.clientManager.schedules[clientId] && window.clientManager.schedules[clientId][schIndex]) {
+        window.clientManager.schedules[clientId].splice(schIndex, 1);
         
-        const baseDate = new Date();
-        const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-        const dayIndex = dayNames.indexOf(dia);
-        if (dayIndex === -1) return alert('Dia inválido!');
-        
-        let daysToAdd = (dayIndex - baseDate.getDay() + 7) % 7;
-        if (daysToAdd === 0) daysToAdd = 7;
-        
-        const interval = getInterval(repeticao);
-        const maxRepetitions = 4;
-        
-        for (let i = 0; i < maxRepetitions; i++) {
-            const nextDate = new Date(baseDate);
-            nextDate.setDate(nextDate.getDate() + daysToAdd + (i * interval));
-            
-            const dateStr = nextDate.toISOString().split('T')[0];
-            const dateTime = `${dateStr}T${horario}`;
-            
-            if (isNaN(new Date(dateTime))) continue;
-            
-            schedules[currentItem.id].push({
-                dateTime,
-                dia, horario, tipo, repeticao
-            });
+        if (window.clientManager.schedules[clientId].length === 0) {
+            delete window.clientManager.schedules[clientId];
         }
         
-        await saveToIndexedDB('schedules', Object.entries(schedules).map(([id, sch]) => ({ id, schedules: sch })));
-        alert('Agendamento salvo com sucesso!');
-        if (document.getElementById('modal')) document.getElementById('modal').style.display = 'none';
+        await window.dbManager.saveData('schedules', window.clientManager.schedules);
         renderAgenda();
-    } catch (error) {
-        alert('Erro ao salvar agendamento: ' + (error.message || error));
     }
 }
 
-// Funções globais
-window.openTab = openTab;
-window.toggleCidades = toggleCidades;
-window.prepareTornarAtivo = prepareTornarAtivo;
-window.tornarAtivo = tornarAtivo;
-window.excluirAtivo = excluirAtivo;
-window.saveSchedule = saveSchedule;
-window.resetAllData = resetAllData;
-window.showDetails = showDetails;
-window.generateWhatsAppLink = generateWhatsAppLink;
-window.generateMapsLink = generateMapsLink;
-window.getFullAddress = getFullAddress;
-window.loadFileData = loadFileData;
-window.applyFiltersAndSort = applyFiltersAndSort;
+// Tornar cliente ativo
+async function tornarAtivo() {
+    if (!window.clientManager.currentItem) return;
 
-console.log('🚀 script.js carregado com sucesso');
+    const editDataPedido = document.getElementById('editDataPedido');
+    const confirmarAtivo = document.getElementById('confirmarAtivo');
+    const tornarAtivo = document.getElementById('tornarAtivo');
+    const labelEditDataPedido = document.getElementById('labelEditDataPedido');
+
+    if (editDataPedido.style.display === 'none') {
+        editDataPedido.style.display = 'inline-block';
+        confirmarAtivo.style.display = 'inline-block';
+        tornarAtivo.style.display = 'none';
+        labelEditDataPedido.style.display = 'inline-block';
+        editDataPedido.focus();
+    }
+}
+
+// Confirmar cliente ativo
+async function confirmarAtivo() {
+    if (!window.clientManager.currentItem) return;
+
+    const novaData = document.getElementById('editDataPedido').value;
+    
+    if (!novaData || !/^\d{2}\/\d{2}\/\d{4}$/.test(novaData)) {
+        alert('Por favor, insira uma data válida no formato DD/MM/AAAA.');
+        return;
+    }
+
+    try {
+        await window.clientManager.tornarAtivo(window.clientManager.currentItem, novaData);
+        
+        // Atualizar interface
+        window.clientManager.applyFiltersAndSort();
+        renderAtivos();
+        
+        // Atualizar mapa se necessário
+        if (typeof window.updateMapOnClientStatusChange === 'function') {
+            window.updateMapOnClientStatusChange();
+        }
+        
+        document.getElementById('modal').style.display = 'none';
+        alert('✅ Cliente tornado ativo com sucesso!');
+        
+    } catch (error) {
+        alert('❌ Erro ao tornar cliente ativo: ' + error.message);
+    }
+}
+
+// Excluir cliente dos ativos
+async function excluirAtivo() {
+    if (!window.clientManager.currentItem) return;
+
+    if (confirm('Tem certeza que deseja excluir este cliente dos ativos?')) {
+        try {
+            await window.clientManager.excluirAtivo(window.clientManager.currentItem);
+            
+            renderAtivos();
+            
+            // Atualizar mapa se necessário
+            if (typeof window.updateMapOnClientStatusChange === 'function') {
+                window.updateMapOnClientStatusChange();
+            }
+            
+            document.getElementById('modal').style.display = 'none';
+            alert('✅ Cliente removido dos ativos com sucesso!');
+            
+        } catch (error) {
+            alert('❌ Erro ao remover cliente: ' + error.message);
+        }
+    }
+}
+
+// Salvar observações
+function salvarObservacoes() {
+    if (!window.clientManager.currentItem) return;
+
+    const observacoes = document.getElementById('observacoes').value;
+    window.dbManager.saveObservation(window.clientManager.currentItem.id, observacoes);
+    alert('✅ Observações salvas com sucesso!');
+}
+
+// Fechar modal ao clicar fora
+window.addEventListener('click', (event) => {
+    const modal = document.getElementById('modal');
+    const modalCadastro = document.getElementById('modal-cadastro');
+    
+    if (event.target === modal) {
+        modal.style.display = 'none';
+    }
+    
+    if (event.target === modalCadastro) {
+        modalCadastro.style.display = 'none';
+    }
+});
+
+// Disponibilizar funções globalmente
+window.openTab = openTab;
+window.salvarAgendamento = salvarAgendamento;
+window.removeAgendamento = removeAgendamento;
+window.tornarAtivo = tornarAtivo;
+window.confirmarAtivo = confirmarAtivo;
+window.excluirAtivo = excluirAtivo;
+window.salvarObservacoes = salvarObservacoes;
+window.abrirModalCadastro = abrirModalCadastro;
+window.fecharModalCadastro = fecharModalCadastro;
