@@ -144,6 +144,38 @@ function setupEventListeners() {
         exportarAtivosBtn.addEventListener('click', () => exportarDados('ativos'));
     }
     
+    // Botões de ação do modal - CORRIGIDO
+    const tornarAtivoBtn = document.getElementById('tornarAtivo');
+    if (tornarAtivoBtn) {
+        tornarAtivoBtn.addEventListener('click', handleTornarAtivo);
+    }
+    
+    const confirmarAtivoBtn = document.getElementById('confirmarAtivo');
+    if (confirmarAtivoBtn) {
+        confirmarAtivoBtn.addEventListener('click', handleConfirmarAtivo);
+    }
+    
+    const excluirAtivoBtn = document.getElementById('excluirAtivo');
+    if (excluirAtivoBtn) {
+        excluirAtivoBtn.addEventListener('click', handleExcluirAtivo);
+    }
+    
+    // Botão de edição
+    const editarClienteBtn = document.getElementById('editarCliente');
+    if (editarClienteBtn) {
+        editarClienteBtn.addEventListener('click', toggleEditMode);
+    }
+    
+    const salvarEdicaoBtn = document.getElementById('salvarEdicao');
+    if (salvarEdicaoBtn) {
+        salvarEdicaoBtn.addEventListener('click', salvarEdicaoCliente);
+    }
+    
+    const cancelarEdicaoBtn = document.getElementById('cancelarEdicao');
+    if (cancelarEdicaoBtn) {
+        cancelarEdicaoBtn.addEventListener('click', cancelarEdicaoCliente);
+    }
+    
     // Observações
     const observacoes = document.getElementById('observacoes');
     if (observacoes) {
@@ -172,6 +204,176 @@ function setupEventListeners() {
             }
             this.value = value;
         });
+    }
+}
+
+// Manipuladores de eventos para os botões de ação - NOVOS
+function handleTornarAtivo() {
+    const cliente = window.clientManager.currentItem;
+    if (!cliente) return;
+    
+    // Mostrar campos de edição de data
+    document.getElementById('editDataPedido').style.display = 'block';
+    document.getElementById('labelEditDataPedido').style.display = 'block';
+    document.getElementById('confirmarAtivo').style.display = 'inline-block';
+    document.getElementById('tornarAtivo').style.display = 'none';
+    
+    // Preencher com data atual
+    const hoje = new Date();
+    const dataFormatada = hoje.getDate().toString().padStart(2, '0') + '/' + 
+                         (hoje.getMonth() + 1).toString().padStart(2, '0') + '/' + 
+                         hoje.getFullYear();
+    document.getElementById('editDataPedido').value = dataFormatada;
+}
+
+async function handleConfirmarAtivo() {
+    const cliente = window.clientManager.currentItem;
+    const novaData = document.getElementById('editDataPedido').value;
+    
+    if (!cliente || !novaData) {
+        alert('❌ Por favor, insira uma data válida!');
+        return;
+    }
+    
+    try {
+        await window.clientManager.tornarAtivo(cliente, novaData);
+        
+        // Fechar modal
+        document.getElementById('modal').style.display = 'none';
+        
+        // Atualizar interface
+        populateCidades();
+        window.clientManager.applyFiltersAndSort();
+        renderAtivos();
+        
+        alert('✅ Cliente tornado ativo com sucesso!');
+        
+    } catch (error) {
+        console.error('❌ Erro ao tornar cliente ativo:', error);
+        alert('❌ Erro ao tornar cliente ativo: ' + error.message);
+    }
+}
+
+async function handleExcluirAtivo() {
+    const cliente = window.clientManager.currentItem;
+    if (!cliente) return;
+    
+    if (confirm('Tem certeza que deseja excluir este cliente dos ativos?')) {
+        try {
+            await window.clientManager.excluirAtivo(cliente);
+            
+            // Fechar modal
+            document.getElementById('modal').style.display = 'none';
+            
+            // Atualizar interface
+            renderAtivos();
+            
+            alert('✅ Cliente removido dos ativos com sucesso!');
+            
+        } catch (error) {
+            console.error('❌ Erro ao excluir cliente ativo:', error);
+            alert('❌ Erro ao excluir cliente ativo: ' + error.message);
+        }
+    }
+}
+
+// Funcionalidades de edição - NOVAS
+function toggleEditMode() {
+    const editFields = document.querySelectorAll('.edit-field');
+    const displayFields = document.querySelectorAll('.display-field');
+    const editBtn = document.getElementById('editarCliente');
+    const saveBtn = document.getElementById('salvarEdicao');
+    const cancelBtn = document.getElementById('cancelarEdicao');
+    
+    // Alternar visibilidade
+    editFields.forEach(field => field.style.display = 'block');
+    displayFields.forEach(field => field.style.display = 'none');
+    
+    editBtn.style.display = 'none';
+    saveBtn.style.display = 'inline-block';
+    cancelBtn.style.display = 'inline-block';
+    
+    // Preencher campos de edição com dados atuais
+    const cliente = window.clientManager.currentItem;
+    if (cliente) {
+        document.getElementById('edit-nome-fantasia').value = cliente['Nome Fantasia'] || '';
+        document.getElementById('edit-cliente').value = cliente['Cliente'] || '';
+        document.getElementById('edit-cnpj-cpf').value = cliente['CNPJ / CPF'] || '';
+        document.getElementById('edit-contato').value = cliente['Contato'] || '';
+        document.getElementById('edit-telefone-comercial').value = cliente['Telefone Comercial'] || '';
+        document.getElementById('edit-celular').value = cliente['Celular'] || '';
+        document.getElementById('edit-email').value = cliente['Email'] || '';
+        document.getElementById('edit-endereco').value = cliente['Endereco'] || '';
+        document.getElementById('edit-numero').value = cliente['Numero'] || '';
+        document.getElementById('edit-bairro').value = cliente['Bairro'] || '';
+        document.getElementById('edit-cidade').value = cliente['Cidade'] || '';
+        document.getElementById('edit-uf').value = cliente['UF'] || '';
+        document.getElementById('edit-cep').value = cliente['CEP'] || '';
+        document.getElementById('edit-saldo-credito').value = cliente['Saldo de Credito'] || '';
+    }
+}
+
+function cancelarEdicaoCliente() {
+    const editFields = document.querySelectorAll('.edit-field');
+    const displayFields = document.querySelectorAll('.display-field');
+    const editBtn = document.getElementById('editarCliente');
+    const saveBtn = document.getElementById('salvarEdicao');
+    const cancelBtn = document.getElementById('cancelarEdicao');
+    
+    // Restaurar visibilidade
+    editFields.forEach(field => field.style.display = 'none');
+    displayFields.forEach(field => field.style.display = 'block');
+    
+    editBtn.style.display = 'inline-block';
+    saveBtn.style.display = 'none';
+    cancelBtn.style.display = 'none';
+}
+
+async function salvarEdicaoCliente() {
+    const cliente = window.clientManager.currentItem;
+    if (!cliente) return;
+    
+    try {
+        // Coletar dados editados
+        const dadosEditados = {
+            'Nome Fantasia': document.getElementById('edit-nome-fantasia').value.trim(),
+            'Cliente': document.getElementById('edit-cliente').value.trim(),
+            'CNPJ / CPF': document.getElementById('edit-cnpj-cpf').value.trim(),
+            'Contato': document.getElementById('edit-contato').value.trim(),
+            'Telefone Comercial': document.getElementById('edit-telefone-comercial').value.trim(),
+            'Celular': document.getElementById('edit-celular').value.trim(),
+            'Email': document.getElementById('edit-email').value.trim(),
+            'Endereco': document.getElementById('edit-endereco').value.trim(),
+            'Numero': document.getElementById('edit-numero').value.trim(),
+            'Bairro': document.getElementById('edit-bairro').value.trim(),
+            'Cidade': document.getElementById('edit-cidade').value.trim(),
+            'UF': document.getElementById('edit-uf').value.trim().toUpperCase(),
+            'CEP': document.getElementById('edit-cep').value.trim(),
+            'Saldo de Credito': document.getElementById('edit-saldo-credito').value
+        };
+        
+        // Validação básica
+        if (!dadosEditados['Nome Fantasia']) {
+            alert('❌ Nome Fantasia é obrigatório!');
+            return;
+        }
+        
+        // Salvar alterações
+        await window.clientManager.editarCliente(cliente.id, dadosEditados);
+        
+        // Fechar modal
+        document.getElementById('modal').style.display = 'none';
+        
+        // Atualizar interface
+        populateCidades();
+        window.clientManager.applyFiltersAndSort();
+        renderAtivos();
+        
+        alert('✅ Cliente editado com sucesso!');
+        
+    } catch (error) {
+        console.error('❌ Erro ao editar cliente:', error);
+        alert('❌ Erro ao editar cliente: ' + error.message);
     }
 }
 

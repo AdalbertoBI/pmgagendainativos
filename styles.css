@@ -144,6 +144,60 @@ h1 {
     font-size: 1.5em; 
 }
 
+/* Estilos para edição - NOVOS */
+.edit-field {
+    margin-top: 20px;
+}
+
+.edit-field label {
+    display: block;
+    margin-top: 10px;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.edit-input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+.edit-input:focus {
+    outline: none;
+    border-color: #007bff;
+}
+
+.action-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-right: 10px;
+}
+
+.edit-btn {
+    background: #007bff;
+    color: white;
+}
+
+.save-btn {
+    background: #28a745;
+    color: white;
+}
+
+.cancel-btn {
+    background: #6c757d;
+    color: white;
+}
+
+.action-btn:hover {
+    opacity: 0.8;
+}
+
 /* Modal de Cadastro */
 #modal-cadastro {
     display: none;
@@ -578,5 +632,14 @@ h1 {
     #modal-sucesso-content {
         width: 95%;
         padding: 20px;
+    }
+    
+    .edit-input {
+        width: 100%;
+    }
+    
+    .action-btn {
+        margin: 5px 0;
+        width: 100%;
     }
 }

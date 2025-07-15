@@ -60,66 +60,71 @@
 
     <div id="mapa-content" class="tab-content">
         <div id="mapa-controls">
-             <span id="map-status">Carregando mapa...</span>
+            <button id="edit-mode-btn" class="map-control-btn">✏️ Editar Localizações</button>
+            <span id="map-status">Carregando mapa...</span>
         </div>
         <div id="map" style="height: 400px;"></div>
     </div>
 
+    
     <!-- Modal de Detalhes -->
-    <div id="modal">
-        <div id="modal-content">
-            <span id="close">&times;</span>
-            <div id="modal-body"></div>
-            <div id="modal-actions">
-                <a id="whatsapp-btn" href="#" target="_blank" class="whatsapp-btn">📱 WhatsApp</a>
-                <a id="maps-btn" href="#" target="_blank" class="maps-btn">🗺️ Traçar Rota</a>
-            </div>
-            <div id="agendamento-section">
-                <h3>Agendamento</h3>
-                <label>Dia da Semana:</label>
-                <select id="diaSemana">
-                    <option value="">Selecione</option>
-                    <option value="Domingo">Domingo</option>
-                    <option value="Segunda">Segunda</option>
-                    <option value="Terça">Terça</option>
-                    <option value="Quarta">Quarta</option>
-                    <option value="Quinta">Quinta</option>
-                    <option value="Sexta">Sexta</option>
-                    <option value="Sábado">Sábado</option>
-                </select>
-                <label>Horário:</label>
-                <input type="time" id="horario">
-                <label>Tipo:</label>
-                <select id="tipoAgendamento">
-                    <option value="">Selecione</option>
-                    <option value="Visita">Visita</option>
-                    <option value="Ligação">Ligação</option>
-                    <option value="WhatsApp">WhatsApp</option>
-                </select>
-                <label>Repetição:</label>
-                <select id="repeticao">
-                    <option value="Semanal">Semanal</option>
-                    <option value="Quinzenal">Quinzenal</option>
-                    <option value="Mensal">Mensal</option>
-                </select>
-                <button onclick="salvarAgendamento()">Salvar agendamento</button>
-            </div>
-            <div id="status-section">
-                <h3>Status</h3>
-                <label id="labelEditDataPedido">Data Último Pedido:</label>
-                <input type="text" id="editDataPedido" placeholder="DD/MM/AAAA" maxlength="10">
-                <button id="tornarAtivo">Tornar Ativo</button>
-                <button id="confirmarAtivo">Confirmar Ativo</button>
-                <button id="excluirAtivo">Excluir dos Ativos</button>
-            </div>
-            <div id="observacoes-section">
-                <h3>Observações</h3>
-                <textarea id="observacoes" maxlength="2000" placeholder="Adicione observações sobre este cliente..."></textarea>
-                <div id="observacoes-contador">0/2000</div>
-                <button id="salvarObservacoes">Salvar Observações</button>
-            </div>
+<div id="modal">
+    <div id="modal-content">
+        <span id="close">&times;</span>
+        <div id="modal-body">
+            <!-- Conteúdo será inserido dinamicamente -->
+        </div>
+        <div id="modal-actions">
+            <a id="whatsapp-btn" href="#" target="_blank" class="whatsapp-btn">📱 WhatsApp</a>
+            <a id="maps-btn" href="#" target="_blank" class="maps-btn">🗺️ Traçar Rota</a>
+        </div>
+        <div id="agendamento-section">
+            <h3>Agendamento</h3>
+            <label>Dia da Semana:</label>
+            <select id="diaSemana">
+                <option value="">Selecione</option>
+                <option value="Domingo">Domingo</option>
+                <option value="Segunda">Segunda</option>
+                <option value="Terça">Terça</option>
+                <option value="Quarta">Quarta</option>
+                <option value="Quinta">Quinta</option>
+                <option value="Sexta">Sexta</option>
+                <option value="Sábado">Sábado</option>
+            </select>
+            <label>Horário:</label>
+            <input type="time" id="horario">
+            <label>Tipo:</label>
+            <select id="tipoAgendamento">
+                <option value="">Selecione</option>
+                <option value="Visita">Visita</option>
+                <option value="Ligação">Ligação</option>
+                <option value="WhatsApp">WhatsApp</option>
+            </select>
+            <label>Repetição:</label>
+            <select id="repeticao">
+                <option value="Semanal">Semanal</option>
+                <option value="Quinzenal">Quinzenal</option>
+                <option value="Mensal">Mensal</option>
+            </select>
+            <button onclick="salvarAgendamento()">Salvar agendamento</button>
+        </div>
+        <div id="status-section">
+            <h3>Status</h3>
+            <label id="labelEditDataPedido">Data Último Pedido:</label>
+            <input type="text" id="editDataPedido" placeholder="DD/MM/AAAA" maxlength="10">
+            <button id="tornarAtivo">Tornar Ativo</button>
+            <button id="confirmarAtivo">Confirmar Ativo</button>
+            <button id="excluirAtivo">Excluir dos Ativos</button>
+        </div>
+        <div id="observacoes-section">
+            <h3>Observações</h3>
+            <textarea id="observacoes" maxlength="2000" placeholder="Adicione observações sobre este cliente..."></textarea>
+            <div id="observacoes-contador">0/2000</div>
+            <button id="salvarObservacoes">Salvar Observações</button>
         </div>
     </div>
+</div>
+
 
     <!-- Modal de Cadastro -->
     <div id="modal-cadastro">
