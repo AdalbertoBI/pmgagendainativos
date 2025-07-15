@@ -382,32 +382,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Registro do Service Worker - Versão corrigida para mobile
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/pmgagendainativos/service-worker.js', {
-            scope: '/pmgagendainativos/'
-        })
-        .then(registration => {
-            console.log('✅ Service Worker registrado com sucesso:', registration.scope);
-            
-            // Verifica por atualizações
-            registration.addEventListener('updatefound', () => {
-                console.log('🔄 Nova versão do Service Worker encontrada');
-                const newWorker = registration.installing;
-                newWorker.addEventListener('statechange', () => {
-                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                        console.log('📱 Nova versão disponível, recarregue a página');
-                        // Opcional: mostrar notificação para o usuário
-                        if (confirm('Nova versão disponível! Deseja recarregar?')) {
-                            window.location.reload();
-                        }
-                    }
-                });
-            });
-        })
-        .catch(error => {
-            console.error('❌ Erro ao registrar Service Worker:', error);
-        });
-    });
+  navigator.serviceWorker.register('/pmgagendainativos/service-worker.js')
+  .then(registration => {
+    registration.onupdatefound = () => {
+      const installingWorker = registration.installing;
+      installingWorker.onstatechange = () => {
+        if (
+          installingWorker.state === 'installed' &&
+          navigator.serviceWorker.controller
+        ) {
+          // Nova versão disponível
+          alert('Nova versão disponível, a página será atualizada agora.');
+          window.location.reload();
+        }
+      };
+    };
+  });
 }
 
 // PWA Install - Versão corrigida para mobile
