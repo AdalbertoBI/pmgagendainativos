@@ -1,4 +1,4 @@
-// address-normalizer.js - Sistema de Normalização Avançada de Endereços
+// address-normalizer.js - Sistema de Normalização para APIs Reais
 
 class AddressNormalizer {
     constructor() {
@@ -10,96 +10,49 @@ class AddressNormalizer {
             'AV.': 'Avenida',
             'AV': 'Avenida',
             'AVENIDA': 'Avenida',
-            'AVENIA': 'Avenida',
-            'AVENIDA': 'Avenida',
             'AL.': 'Alameda',
             'AL': 'Alameda',
-            'ALAMEDA': 'Alameda',
             'PÇ.': 'Praça',
             'PÇ': 'Praça',
             'PC.': 'Praça',
             'PC': 'Praça',
-            'PRAÇA': 'Praça',
-            'PRACA': 'Praça',
             'TV.': 'Travessa',
             'TV': 'Travessa',
-            'TRAVESSA': 'Travessa',
             'EST.': 'Estrada',
             'EST': 'Estrada',
-            'ESTRADA': 'Estrada',
             'ROD.': 'Rodovia',
             'ROD': 'Rodovia',
-            'RODOVIA': 'Rodovia',
             'VIA': 'Via',
             'LG.': 'Largo',
-            'LG': 'Largo',
-            'LARGO': 'Largo',
-            'BCO.': 'Beco',
-            'BCO': 'Beco',
-            'BECO': 'Beco',
-            'QD.': 'Quadra',
-            'QD': 'Quadra',
-            'QUADRA': 'Quadra',
-            'LT.': 'Lote',
-            'LT': 'Lote',
-            'LOTE': 'Lote'
+            'LG': 'Largo'
         };
 
         // Mapeamento de abreviações de bairros
         this.neighborhoodAbbreviations = {
             'JD.': 'Jardim',
             'JD': 'Jardim',
-            'JARDIM': 'Jardim',
-            'JRD.': 'Jardim',
-            'JRD': 'Jardim',
             'VL.': 'Vila',
             'VL': 'Vila',
-            'VILA': 'Vila',
-            'VLA.': 'Vila',
-            'VLA': 'Vila',
             'CJ.': 'Conjunto',
             'CJ': 'Conjunto',
-            'CONJUNTO': 'Conjunto',
-            'CONJ.': 'Conjunto',
-            'CONJ': 'Conjunto',
             'RES.': 'Residencial',
             'RES': 'Residencial',
-            'RESIDENCIAL': 'Residencial',
-            'RESID.': 'Residencial',
-            'RESID': 'Residencial',
             'PQ.': 'Parque',
             'PQ': 'Parque',
-            'PARQUE': 'Parque',
-            'PRQ.': 'Parque',
-            'PRQ': 'Parque',
             'CH.': 'Chácara',
             'CH': 'Chácara',
-            'CHÁCARA': 'Chácara',
-            'CHACARA': 'Chácara',
-            'SIT.': 'Sítio',
-            'SIT': 'Sítio',
-            'SÍTIO': 'Sítio',
-            'SITIO': 'Sítio',
-            'FAZ.': 'Fazenda',
-            'FAZ': 'Fazenda',
-            'FAZENDA': 'Fazenda',
-            'LT.': 'Loteamento',
-            'LT': 'Loteamento',
-            'LOTEAMENTO': 'Loteamento',
-            'LOTM.': 'Loteamento',
-            'LOTM': 'Loteamento',
             'CENTRO': 'Centro',
             'CTR.': 'Centro',
-            'CTR': 'Centro'
+            'CTR': 'Centro',
+            'DIST.': 'Distrito',
+            'DIST': 'Distrito'
         };
 
         // Preposições que devem ficar em minúsculas
         this.prepositions = [
             'da', 'de', 'do', 'das', 'dos', 'e', 'em', 'na', 'no', 'nas', 'nos',
             'pela', 'pelo', 'pelas', 'pelos', 'por', 'para', 'com', 'sobre',
-            'sob', 'entre', 'ante', 'após', 'até', 'desde', 'durante', 'mediante',
-            'perante', 'segundo', 'sem', 'salvo', 'exceto', 'senão', 'afora',
-            'fora', 'menos', 'tirante', 'malgrado', 'apesar'
+            'sob', 'entre', 'ante', 'após', 'até', 'desde', 'durante'
         ];
 
         // Termos que devem manter capitalização especial
@@ -108,43 +61,13 @@ class AddressNormalizer {
             'SÃO': 'São',
             'SANTO': 'Santo',
             'SANTA': 'Santa',
-            'DOM': 'Dom',
-            'DONA': 'Dona',
             'DR.': 'Dr.',
             'DRA.': 'Dra.',
             'PROF.': 'Prof.',
-            'PROFA.': 'Profa.',
-            'ENGENHEIRO': 'Engenheiro',
-            'ENGENHEIRA': 'Engenheira',
-            'GENERAL': 'General',
-            'CORONEL': 'Coronel',
-            'MAJOR': 'Major',
-            'CAPITÃO': 'Capitão',
-            'CAPITAO': 'Capitão',
-            'TENENTE': 'Tenente',
-            'SARGENTO': 'Sargento',
-            'CABO': 'Cabo',
-            'SOLDADO': 'Soldado',
-            'ALMIRANTE': 'Almirante',
-            'MARECHAL': 'Marechal',
-            'MINISTRO': 'Ministro',
-            'MINISTRO': 'Ministro',
-            'PRESIDENTE': 'Presidente',
-            'GOVERNADOR': 'Governador',
-            'PREFEITO': 'Prefeito',
-            'VEREADOR': 'Vereador',
-            'DEPUTADO': 'Deputado',
-            'SENADOR': 'Senador',
-            'PADRE': 'Padre',
-            'FREI': 'Frei',
-            'IRMÃO': 'Irmão',
-            'IRMAO': 'Irmão'
+            'PROFA.': 'Profa.'
         };
 
-        // Regex para validação de CEP
-        this.cepRegex = /^\d{5}-?\d{3}$/;
-        
-        console.log('✅ AddressNormalizer inicializado');
+        console.log('✅ AddressNormalizer API Real inicializado');
     }
 
     // Método principal para normalizar dados do cliente
@@ -188,7 +111,6 @@ class AddressNormalizer {
     normalizeStreet(street) {
         if (!street || typeof street !== 'string') return '';
         
-        // Remover espaços extras e converter para maiúsculas para processamento
         let normalized = street.trim().replace(/\s+/g, ' ').toUpperCase();
         
         // Substituir abreviações
@@ -212,7 +134,6 @@ class AddressNormalizer {
     normalizeNeighborhood(neighborhood) {
         if (!neighborhood || typeof neighborhood !== 'string') return '';
         
-        // Remover espaços extras e converter para maiúsculas para processamento
         let normalized = neighborhood.trim().replace(/\s+/g, ' ').toUpperCase();
         
         // Substituir abreviações no início
@@ -223,7 +144,7 @@ class AddressNormalizer {
             }
         });
         
-        // Substituir abreviações no meio (ex: "RESIDENCIAL JD AMERICA" -> "Residencial Jardim America")
+        // Substituir abreviações no meio
         Object.keys(this.neighborhoodAbbreviations).forEach(abbrev => {
             const regex = new RegExp(`\\s${abbrev}\\s`, 'gi');
             normalized = normalized.replace(regex, ` ${this.neighborhoodAbbreviations[abbrev]} `);
@@ -242,16 +163,27 @@ class AddressNormalizer {
     normalizeCity(city) {
         if (!city || typeof city !== 'string') return '';
         
-        // Remover espaços extras
-        let normalized = city.trim().replace(/\s+/g, ' ').toUpperCase();
+        const normalized = city.trim();
         
-        // Aplicar capitalização correta
-        normalized = this.applyProperCapitalization(normalized);
+        // Variações comuns de São José dos Campos
+        const sjcVariations = [
+            'SAO JOSE DOS CAMPOS',
+            'SÃO JOSE DOS CAMPOS', 
+            'SAO JOSE',
+            'SÃO JOSE',
+            'SJC',
+            'S J C'
+        ];
         
-        // Limpeza final
-        normalized = normalized.trim().replace(/\s+/g, ' ');
+        const upperCity = normalized.toUpperCase();
+        for (const variation of sjcVariations) {
+            if (upperCity.includes(variation)) {
+                return 'São José dos Campos';
+            }
+        }
         
-        return normalized;
+        // Aplicar capitalização correta para outras cidades
+        return this.applyProperCapitalization(normalized);
     }
 
     // Normalizar CEP
@@ -287,7 +219,7 @@ class AddressNormalizer {
 
     // Normalizar UF
     normalizeUF(uf) {
-        if (!uf || typeof uf !== 'string') return '';
+        if (!uf || typeof uf !== 'string') return 'SP';
         return uf.trim().toUpperCase();
     }
 
@@ -297,6 +229,20 @@ class AddressNormalizer {
         
         // Converter para string se for número
         const numStr = number.toString().trim();
+        
+        // Padrões especiais
+        const patterns = {
+            'SN': 'S/N',
+            'S/N': 'S/N',
+            'S.N': 'S/N',
+            'SEM NUMERO': 'S/N',
+            'SEM NÚMERO': 'S/N'
+        };
+        
+        const upperNum = numStr.toUpperCase();
+        if (patterns[upperNum]) {
+            return patterns[upperNum];
+        }
         
         // Remover caracteres especiais, manter apenas números, letras e hífen
         const cleaned = numStr.replace(/[^0-9a-zA-Z-]/g, '');
@@ -340,164 +286,46 @@ class AddressNormalizer {
         return cleanCep.length === 8;
     }
 
-    // Método para limpar e padronizar endereço completo
-    normalizeFullAddress(client) {
+    // Método para formatar endereço completo para APIs
+    formatAddressForAPI(client) {
         const normalized = this.normalizeClientData(client);
         
-        const parts = [];
+        const rua = normalized.Endereco || '';
+        const numero = normalized.Numero || '';
+        const bairro = normalized.Bairro || '';
+        const cidade = normalized.Cidade || 'São José dos Campos';
+        const uf = normalized.UF || 'SP';
+        const cep = normalized.CEP || '';
         
-        if (normalized.Endereco) parts.push(normalized.Endereco);
-        if (normalized.Numero) parts.push(normalized.Numero);
-        if (normalized.Bairro) parts.push(normalized.Bairro);
-        if (normalized.Cidade) parts.push(normalized.Cidade);
-        if (normalized.UF) parts.push(normalized.UF);
-        if (normalized.CEP) parts.push(normalized.CEP);
-        
-        return parts.join(', ');
-    }
-
-    // Método para validar dados de endereço
-    validateAddressData(client) {
-        const errors = [];
-        
-        if (!client.Cidade || client.Cidade.trim() === '') {
-            errors.push('Cidade é obrigatória');
-        }
-        
-        if (!client.UF || client.UF.trim() === '') {
-            errors.push('UF é obrigatória');
-        }
-        
-        if (client.CEP && !this.validateCEP(client.CEP)) {
-            errors.push('CEP inválido');
-        }
-        
-        return errors;
-    }
-
-    // Método para detectar e corrigir inconsistências comuns
-    detectAndFixInconsistencies(client) {
-        const fixed = this.normalizeClientData(client);
-        const issues = [];
-        
-        // Verificar inconsistências entre CEP e cidade/UF
-        if (fixed.CEP && fixed.UF) {
-            const cepDigits = fixed.CEP.replace(/\D/g, '');
-            const expectedRange = this.getCEPRangeForState(fixed.UF);
-            
-            if (expectedRange && !this.isCEPInRange(cepDigits, expectedRange)) {
-                issues.push({
-                    type: 'CEP_UF_MISMATCH',
-                    message: `CEP ${fixed.CEP} não compatível com UF ${fixed.UF}`,
-                    field: 'CEP',
-                    value: fixed.CEP
-                });
-            }
-        }
-        
-        // Verificar se bairro contém cidade
-        if (fixed.Bairro && fixed.Cidade) {
-            const bairroUpper = fixed.Bairro.toUpperCase();
-            const cidadeUpper = fixed.Cidade.toUpperCase();
-            
-            if (bairroUpper.includes(cidadeUpper)) {
-                issues.push({
-                    type: 'BAIRRO_CONTAINS_CITY',
-                    message: `Bairro "${fixed.Bairro}" contém nome da cidade`,
-                    field: 'Bairro',
-                    value: fixed.Bairro
-                });
-            }
-        }
-        
-        return { normalized: fixed, issues };
-    }
-
-    // Obter faixa de CEP para estado
-    getCEPRangeForState(uf) {
-        const ranges = {
-            'SP': { min: 1000, max: 19999 },
-            'ES': { min: 29000, max: 29999 }
+        // Diferentes formatos para diferentes APIs
+        return {
+            completo: `${rua}, ${numero}, ${bairro}, ${cidade}, ${uf}, Brasil`,
+            semNumero: `${rua}, ${bairro}, ${cidade}, ${uf}, Brasil`,
+            comCEP: `${cep}, ${bairro}, ${cidade}, ${uf}, Brasil`,
+            bairroECidade: `${bairro}, ${cidade}, ${uf}, Brasil`,
+            apenasRua: `${rua}, ${cidade}, ${uf}, Brasil`,
+            cidadeUF: `${cidade}, ${uf}, Brasil`
         };
-        
-        return ranges[uf] || null;
     }
 
-    // Verificar se CEP está na faixa do estado
-    isCEPInRange(cep, range) {
-        const cepNum = parseInt(cep.substring(0, 5));
-        return cepNum >= range.min && cepNum <= range.max;
-    }
-
-    // Método para processar em lote
-    normalizeClientDataBatch(clients) {
-        const results = [];
+    // Método para debug
+    debugNormalization(client) {
+        console.log('🔍 DEBUG - Normalizando:', client);
         
-        clients.forEach((client, index) => {
-            try {
-                const result = this.detectAndFixInconsistencies(client);
-                results.push({
-                    index,
-                    original: client,
-                    normalized: result.normalized,
-                    issues: result.issues,
-                    success: true
-                });
-            } catch (error) {
-                results.push({
-                    index,
-                    original: client,
-                    normalized: null,
-                    issues: [],
-                    success: false,
-                    error: error.message
-                });
-            }
-        });
+        const original = { ...client };
+        const normalized = this.normalizeClientData(client);
+        const formatted = this.formatAddressForAPI(normalized);
         
-        return results;
-    }
-
-    // Método para gerar relatório de normalização
-    generateNormalizationReport(clients) {
-        const results = this.normalizeClientDataBatch(clients);
-        const report = {
-            total: results.length,
-            normalized: 0,
-            errors: 0,
-            issues: {
-                total: 0,
-                byType: {}
-            },
-            details: []
-        };
+        console.log('📊 Resultado da normalização:');
+        console.log('  Original:', original);
+        console.log('  Normalizado:', normalized);
+        console.log('  Formatado para APIs:', formatted);
         
-        results.forEach(result => {
-            if (result.success) {
-                report.normalized++;
-                
-                if (result.issues.length > 0) {
-                    report.issues.total += result.issues.length;
-                    
-                    result.issues.forEach(issue => {
-                        if (!report.issues.byType[issue.type]) {
-                            report.issues.byType[issue.type] = 0;
-                        }
-                        report.issues.byType[issue.type]++;
-                    });
-                }
-            } else {
-                report.errors++;
-            }
-            
-            report.details.push(result);
-        });
-        
-        return report;
+        return { original, normalized, formatted };
     }
 }
 
 // Instanciar e disponibilizar globalmente
 window.AddressNormalizer = new AddressNormalizer();
 
-console.log('✅ address-normalizer.js carregado - Sistema de normalização avançada pronto');
+console.log('✅ address-normalizer.js API Real carregado');

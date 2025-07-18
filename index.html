@@ -206,8 +206,26 @@
 
     <script src="database.js"></script>
     <script src="client-manager.js"></script>
-    <script src="map.js"></script>
-    <script src="address-normalizer.js"></script>
     <script src="script.js"></script>
+    <!-- Ordem obrigatória -->
+    <script src="address-validator.js"></script>
+    <script src="address-normalizer.js"></script>
+    <script src="sjc-geo-validator.js"></script>
+    <script src="map.js"></script>
+    <script src="service-worker-registration.js"></script>
+    <script>
+        // Inicialização do Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker registrado com sucesso:', registration);
+                    })
+                    .catch(error => {
+                        console.error('Falha ao registrar o Service Worker:', error);
+                    });
+            });
+        }
+    </script>
 </body>
 </html>
