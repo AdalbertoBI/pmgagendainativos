@@ -247,7 +247,6 @@ async function handleConfirmarAtivo() {
         renderAtivos();
         
         alert('✅ Cliente tornado ativo com sucesso!');
-        
     } catch (error) {
         console.error('❌ Erro ao tornar cliente ativo:', error);
         alert('❌ Erro ao tornar cliente ativo: ' + error.message);
@@ -269,7 +268,6 @@ async function handleExcluirAtivo() {
             renderAtivos();
             
             alert('✅ Cliente removido dos ativos com sucesso!');
-            
         } catch (error) {
             console.error('❌ Erro ao excluir cliente ativo:', error);
             alert('❌ Erro ao excluir cliente ativo: ' + error.message);
@@ -288,7 +286,6 @@ function toggleEditMode() {
     // Alternar visibilidade
     editFields.forEach(field => field.style.display = 'block');
     displayFields.forEach(field => field.style.display = 'none');
-    
     editBtn.style.display = 'none';
     saveBtn.style.display = 'inline-block';
     cancelBtn.style.display = 'inline-block';
@@ -323,7 +320,6 @@ function cancelarEdicaoCliente() {
     // Restaurar visibilidade
     editFields.forEach(field => field.style.display = 'none');
     displayFields.forEach(field => field.style.display = 'block');
-    
     editBtn.style.display = 'inline-block';
     saveBtn.style.display = 'none';
     cancelBtn.style.display = 'none';
@@ -370,7 +366,6 @@ async function salvarEdicaoCliente() {
         renderAtivos();
         
         alert('✅ Cliente editado com sucesso!');
-        
     } catch (error) {
         console.error('❌ Erro ao editar cliente:', error);
         alert('❌ Erro ao editar cliente: ' + error.message);
@@ -383,6 +378,7 @@ function setupPWA() {
         navigator.serviceWorker.register('/pmgagendainativos/service-worker.js')
             .then(registration => {
                 console.log('✅ Service Worker registrado');
+                
                 registration.onupdatefound = () => {
                     const installingWorker = registration.installing;
                     installingWorker.onstatechange = () => {
@@ -401,8 +397,8 @@ function setupPWA() {
     const installBtn = document.getElementById('install-btn');
     
     function isPWAInstalled() {
-        return window.matchMedia('(display-mode: standalone)').matches ||
-               window.navigator.standalone === true ||
+        return window.matchMedia('(display-mode: standalone)').matches || 
+               window.navigator.standalone === true || 
                document.referrer.includes('android-app://');
     }
     
@@ -447,23 +443,18 @@ function setupUploadHandler() {
     }
 }
 
-// Manipular upload de arquivo
+// Manipular upload de arquivo - VERSÃO CORRIGIDA
 async function handleFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
-    
+
     if (file.size > 10 * 1024 * 1024) {
         alert('Arquivo muito grande! O limite é 10MB.');
         return;
     }
-    
+
     console.log('📁 Processando arquivo:', file.name);
-    
-    // Limpar dados de inativos
-    await window.dbManager.clearData('clients');
-    window.clientManager.data = [];
-    window.data = [];
-    
+
     const reader = new FileReader();
     reader.onload = async (e) => {
         try {
@@ -472,16 +463,19 @@ async function handleFileUpload(event) {
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
             const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
-            
+
             if (rawData.length <= 1) {
                 alert('❌ Arquivo inválido ou vazio!');
                 return;
             }
-            
+
             const headers = rawData[0].map(h => h ? h.trim().replace(/\s+/g, ' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '');
             const dataRows = rawData.slice(1);
-            
-            const processedData = [];
+
+            // Separar clientes ativos e inativos
+            const clientesAtivos = [];
+            const clientesInativos = [];
+
             dataRows.forEach((row, index) => {
                 const hasValidData = row.some(cell => cell && cell.toString().trim() !== '');
                 if (hasValidData) {
@@ -489,33 +483,54 @@ async function handleFileUpload(event) {
                     headers.forEach((header, j) => {
                         obj[header] = row[j] || '';
                     });
-                    obj.id = `inactive-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`;
-                    processedData.push(obj);
+                    
+                    obj.id = `client-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`;
+                    
+                    // Verificar status do cliente
+                    const status = (obj.Status || '').toString().trim().toLowerCase();
+                    
+                    if (status === 'ativo') {
+                        clientesAtivos.push(obj);
+                    } else {
+                        // Por padrão, considerar como inativo se não especificado ou se for "inativo"
+                        clientesInativos.push(obj);
+                    }
                 }
             });
-            
-            if (processedData.length === 0) {
-                alert('❌ Nenhum cliente válido encontrado no arquivo!');
-                return;
+
+            // Limpar dados existentes
+            await window.dbManager.clearData('clients');
+            await window.dbManager.clearData('ativos');
+
+            // Salvar clientes inativos
+            window.clientManager.data = clientesInativos;
+            window.data = clientesInativos;
+            if (clientesInativos.length > 0) {
+                await window.dbManager.saveData('clients', clientesInativos);
             }
-            
-            // Salvar dados
-            window.clientManager.data = processedData;
-            window.data = processedData;
-            await window.dbManager.saveData('clients', processedData);
-            
+
+            // Salvar clientes ativos
+            window.clientManager.ativos = clientesAtivos;
+            window.ativos = clientesAtivos;
+            if (clientesAtivos.length > 0) {
+                await window.dbManager.saveData('ativos', clientesAtivos);
+            }
+
             // Atualizar interface
             populateCidades();
             window.clientManager.applyFiltersAndSort();
-            
-            alert(`✅ Arquivo carregado com sucesso!\n📊 ${processedData.length} clientes inativos encontrados`);
-            
+            renderAtivos();
+
+            // Mensagem de sucesso detalhada
+            const totalClientes = clientesAtivos.length + clientesInativos.length;
+            alert(`✅ Arquivo carregado com sucesso!\n📊 Total: ${totalClientes} clientes\n🟢 Ativos: ${clientesAtivos.length}\n🔴 Inativos: ${clientesInativos.length}`);
+
         } catch (error) {
             console.error('❌ Erro ao processar arquivo:', error);
             alert('❌ Erro ao processar o arquivo: ' + error.message);
         }
     };
-    
+
     reader.readAsBinaryString(file);
 }
 
@@ -813,24 +828,31 @@ function renderAtivos() {
     list.innerHTML = '';
     
     if (window.clientManager.ativos.length === 0) {
-        list.innerHTML = '<li style="text-align: center; color: #666;">Nenhum cliente ativo encontrado</li>';
+        list.innerHTML = '<p style="text-align: center; color: #666; margin: 20px 0;">Nenhum cliente ativo encontrado</p>';
         return;
     }
     
-    window.clientManager.ativos.forEach(item => {
+    window.clientManager.ativos.forEach(cliente => {
         const li = document.createElement('li');
+        li.onclick = () => window.clientManager.openModal(cliente, 'ativos');
+        
+        const daysSince = window.clientManager.daysSince(cliente['Data Ultimo Pedido']);
+        const daysText = daysSince === 'N/A' ? 'Sem data' : `${daysSince} dias atrás`;
+        
         li.innerHTML = `
             <div>
-                <strong>${item['Nome Fantasia'] || 'Sem Nome'}</strong>
-                <span class="days-since">Ativo desde: ${item['Data Ultimo Pedido'] || 'N/A'}</span>
-            </div>
-            <div style="font-size: 0.9em; color: #666;">
-                ${item['Cidade'] || ''} - Saldo: R$ ${item['Saldo de Credito'] || '0'}
+                <strong>${cliente['Nome Fantasia'] || 'Sem nome'}</strong>
+                <div style="font-size: 0.9em; color: #666;">
+                    ${cliente['Cidade'] || 'Cidade não informada'} | 
+                    Último pedido: ${daysText}
+                </div>
             </div>
         `;
-        li.onclick = () => window.clientManager.openModal(item, 'ativos');
+        
         list.appendChild(li);
     });
+    
+    console.log(`✅ ${window.clientManager.ativos.length} clientes ativos renderizados`);
 }
 
 // Renderizar agenda
@@ -840,78 +862,48 @@ function renderAgenda() {
     
     list.innerHTML = '';
     
-    const schedules = window.clientManager.schedules;
-    const scheduleEntries = Object.entries(schedules);
+    const schedules = window.clientManager.schedules || {};
+    const schedulesArray = Object.keys(schedules).map(key => schedules[key]);
     
-    if (scheduleEntries.length === 0) {
-        list.innerHTML = '<div style="text-align: center; color: #666;">Nenhum agendamento encontrado</div>';
+    if (schedulesArray.length === 0) {
+        list.innerHTML = '<p style="text-align: center; color: #666; margin: 20px 0;">Nenhum agendamento encontrado</p>';
         return;
     }
     
-    scheduleEntries.forEach(([clientId, schedule]) => {
+    schedulesArray.forEach(schedule => {
         const div = document.createElement('div');
         div.innerHTML = `
-            <div>
-                <strong>${schedule.cliente}</strong><br>
-                ${schedule.diaSemana} às ${schedule.horario} - ${schedule.tipo}
-            </div>
-            <button onclick="removerAgendamento('${clientId}')">Remover</button>
+            <span>${schedule.clientName} - ${schedule.day} ${schedule.time} (${schedule.type})</span>
+            <button onclick="removeSchedule('${schedule.id}')">Remover</button>
         `;
         list.appendChild(div);
     });
-}
-
-// Salvar observações
-function salvarObservacoes() {
-    const observacoes = document.getElementById('observacoes').value;
-    const clienteId = window.clientManager.currentItem?.id;
     
-    if (clienteId) {
-        window.dbManager.saveObservation(clienteId, observacoes);
-        alert('✅ Observações salvas com sucesso!');
-    }
-}
-
-// Salvar agendamento
-function salvarAgendamento() {
-    const diaSemana = document.getElementById('diaSemana').value;
-    const horario = document.getElementById('horario').value;
-    const tipo = document.getElementById('tipoAgendamento').value;
-    const repeticao = document.getElementById('repeticao').value;
-    
-    if (!diaSemana || !horario || !tipo) {
-        alert('❌ Preencha todos os campos do agendamento!');
-        return;
-    }
-    
-    const clienteId = window.clientManager.currentItem?.id;
-    const cliente = window.clientManager.currentItem?.['Nome Fantasia'];
-    
-    if (clienteId) {
-        window.clientManager.schedules[clienteId] = {
-            cliente,
-            diaSemana,
-            horario,
-            tipo,
-            repeticao
-        };
-        
-        window.dbManager.saveData('schedules', window.clientManager.schedules);
-        alert('✅ Agendamento salvo com sucesso!');
-        
-        // Limpar campos
-        document.getElementById('diaSemana').value = '';
-        document.getElementById('horario').value = '';
-        document.getElementById('tipoAgendamento').value = '';
-        document.getElementById('repeticao').value = 'Semanal';
-    }
+    console.log(`✅ ${schedulesArray.length} agendamentos renderizados`);
 }
 
 // Remover agendamento
-function removerAgendamento(clientId) {
-    if (confirm('Tem certeza que deseja remover este agendamento?')) {
-        delete window.clientManager.schedules[clientId];
+function removeSchedule(id) {
+    if (confirm('Remover este agendamento?')) {
+        delete window.clientManager.schedules[id];
         window.dbManager.saveData('schedules', window.clientManager.schedules);
         renderAgenda();
     }
 }
+
+// Salvar observações
+function salvarObservacoes() {
+    const cliente = window.clientManager.currentItem;
+    const observacoes = document.getElementById('observacoes').value;
+    
+    if (!cliente) return;
+    
+    window.dbManager.saveObservation(cliente.id, observacoes);
+    alert('✅ Observações salvas com sucesso!');
+}
+
+// Disponibilizar função globalmente
+window.openTab = openTab;
+window.removeSchedule = removeSchedule;
+
+console.log('✅ script.js carregado - versão corrigida com separação de ativos/inativos');
