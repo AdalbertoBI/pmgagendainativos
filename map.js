@@ -1,5 +1,4 @@
-// map.js - Versão com precisão de geocodificação restaurada e otimizada
-
+// map.js - Versão com precisão de geocodificação restaurada e normalização avançada
 let map = null;
 let markers = [];
 let addressCache = {};
@@ -11,62 +10,19 @@ let precisaoStats = { total: 0, alta: 0, media: 0, baixa: 0 };
 // Coordenadas precisas das principais cidades brasileiras (expandidas)
 const COORDENADAS_PRECISAS = {
     'SAO PAULO': { lat: -23.5505, lng: -46.6333, precision: 'centro' },
-    'RIO DE JANEIRO': { lat: -22.9068, lng: -43.1729, precision: 'centro' },
-    'BELO HORIZONTE': { lat: -19.9191, lng: -43.9386, precision: 'centro' },
-    'SALVADOR': { lat: -12.9714, lng: -38.5014, precision: 'centro' },
-    'BRASILIA': { lat: -15.7941, lng: -47.8825, precision: 'centro' },
-    'FORTALEZA': { lat: -3.7319, lng: -38.5267, precision: 'centro' },
-    'CURITIBA': { lat: -25.4284, lng: -49.2733, precision: 'centro' },
-    'RECIFE': { lat: -8.0476, lng: -34.8770, precision: 'centro' },
-    'PORTO ALEGRE': { lat: -30.0346, lng: -51.2177, precision: 'centro' },
-    'MANAUS': { lat: -3.1190, lng: -60.0217, precision: 'centro' },
-    'GOIANIA': { lat: -16.6864, lng: -49.2643, precision: 'centro' },
-    'CAMPINAS': { lat: -22.9099, lng: -47.0626, precision: 'centro' },
     'SAO JOSE DOS CAMPOS': { lat: -23.2237, lng: -45.9009, precision: 'centro' },
-    'SANTOS': { lat: -23.9618, lng: -46.3322, precision: 'centro' },
-    'SOROCABA': { lat: -23.5015, lng: -47.4526, precision: 'centro' },
-    'RIBEIRAO PRETO': { lat: -21.1775, lng: -47.8142, precision: 'centro' },
-    'UBERLANDIA': { lat: -18.9113, lng: -48.2622, precision: 'centro' },
-    'CONTAGEM': { lat: -19.9317, lng: -44.0536, precision: 'centro' },
-    'NATAL': { lat: -5.7945, lng: -35.2110, precision: 'centro' },
-    'CAMPO GRANDE': { lat: -20.4697, lng: -54.6201, precision: 'centro' },
-    'TRES LAGOAS': { lat: -20.7519, lng: -51.6782, precision: 'centro' },
-    'FLORIANOPOLIS': { lat: -27.5954, lng: -48.5480, precision: 'centro' },
-    'JOINVILLE': { lat: -26.3044, lng: -48.8487, precision: 'centro' },
-    'LONDRINA': { lat: -23.3045, lng: -51.1696, precision: 'centro' },
-    'MARINGA': { lat: -23.4205, lng: -51.9331, precision: 'centro' },
-    'VITORIA': { lat: -20.2976, lng: -40.2958, precision: 'centro' },
-    'MACEIO': { lat: -9.6476, lng: -35.7175, precision: 'centro' },
-    'JOAO PESSOA': { lat: -7.1195, lng: -34.8450, precision: 'centro' },
-    'ARACAJU': { lat: -10.9472, lng: -37.0731, precision: 'centro' },
-    'TERESINA': { lat: -5.0892, lng: -42.8019, precision: 'centro' },
-    'PALMAS': { lat: -10.1689, lng: -48.3317, precision: 'centro' },
-    'CUIABA': { lat: -15.6014, lng: -56.0979, precision: 'centro' },
-    'BOA VISTA': { lat: 2.8235, lng: -60.6758, precision: 'centro' },
-    'MACAPA': { lat: 0.0389, lng: -51.0664, precision: 'centro' },
-    'RIO BRANCO': { lat: -9.9754, lng: -67.8249, precision: 'centro' },
     'PORTO VELHO': { lat: -8.7619, lng: -63.9039, precision: 'centro' }
 };
 
 // Padrões de CEP por estado para validação
 const PADROES_CEP = {
     'SP': { inicio: '01000', fim: '19999' },
-    'RJ': { inicio: '20000', fim: '28999' },
-    'MG': { inicio: '30000', fim: '39999' },
-    'BA': { inicio: '40000', fim: '48999' },
-    'PR': { inicio: '80000', fim: '87999' },
-    'RS': { inicio: '90000', fim: '99999' },
-    'SC': { inicio: '88000', fim: '89999' },
-    'GO': { inicio: '72800', fim: '76999' },
-    'MT': { inicio: '78000', fim: '78899' },
-    'MS': { inicio: '79000', fim: '79999' },
     'DF': { inicio: '70000', fim: '72799' }
 };
 
 // Inicializar mapa
 function initMap() {
     console.log('🗺️ Inicializando mapa com precisão otimizada...');
-    
     if (map) return;
     
     map = L.map('map').setView([-23.2237, -45.9009], 12);
@@ -112,11 +68,9 @@ function obterLocalizacaoUsuario() {
                 
                 if (map) {
                     map.setView([latitude, longitude], 14);
-                    
                     const userMarker = L.marker([latitude, longitude], {
                         icon: createUserLocationIcon()
                     }).addTo(map);
-                    
                     userMarker.bindPopup('📍 Sua localização atual').openPopup();
                     updateMapStatus('Mapa centralizado na sua localização');
                 }
@@ -125,11 +79,7 @@ function obterLocalizacaoUsuario() {
                 console.log('⚠️ Geolocalização não disponível:', error.message);
                 updateMapStatus('Usando localização padrão');
             },
-            {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 60000
-            }
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
         );
     }
 }
@@ -138,24 +88,7 @@ function obterLocalizacaoUsuario() {
 function createUserLocationIcon() {
     return L.divIcon({
         className: 'user-location-marker',
-        html: `
-            <div style="
-                background: linear-gradient(45deg, #4285f4, #34a853);
-                width: 18px; 
-                height: 18px; 
-                border-radius: 50%; 
-                border: 3px solid white; 
-                box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.3);
-                animation: pulse 2s infinite;
-            "></div>
-            <style>
-                @keyframes pulse {
-                    0% { transform: scale(1); }
-                    50% { transform: scale(1.1); }
-                    100% { transform: scale(1); }
-                }
-            </style>
-        `,
+        html: `<div style="background: #4285f4; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"></div>`,
         iconSize: [24, 24],
         iconAnchor: [12, 12]
     });
@@ -168,7 +101,6 @@ function setupEditButton() {
     
     editBtn.removeEventListener('click', handleEditButtonClick);
     editBtn.addEventListener('click', handleEditButtonClick);
-    
     editBtn.innerHTML = '✏️ Editar Localizações';
     editBtn.style.background = '';
     editBtn.classList.remove('active');
@@ -178,7 +110,6 @@ function setupEditButton() {
 // Manipular clique no botão de edição
 function handleEditButtonClick(event) {
     event.preventDefault();
-    
     const editBtn = document.getElementById('edit-mode-btn');
     if (!editBtn) return;
     
@@ -196,7 +127,6 @@ function handleEditButtonClick(event) {
                 marker.dragging.enable();
                 marker.setOpacity(0.8);
                 enabledCount++;
-                
                 if (!marker._editEventConfigured) {
                     marker.on('dragend', handleMarkerDragEnd);
                     marker._editEventConfigured = true;
@@ -255,7 +185,6 @@ function handleMarkerDragEnd(event) {
         
         marker.setIcon(createMarkerIcon('blue', 1.0, true));
         marker.setPopupContent(createPopupContent(client, newLatLng, true));
-        
         updateMapStatus(`✅ Posição de "${clientName}" corrigida!`);
     } else {
         const originalCoords = getOriginalCoords(client);
@@ -288,9 +217,8 @@ async function loadMapData() {
     updateMapStatus(`${statusPrefix}: ${clientsToShow.length} clientes...`);
     
     precisaoStats = { total: 0, alta: 0, media: 0, baixa: 0 };
-    
     let loaded = 0;
-    let batchSize = 3; // Reduzido para melhor controle
+    let batchSize = 3;
     
     for (let i = 0; i < clientsToShow.length; i += batchSize) {
         const batch = clientsToShow.slice(i, i + batchSize);
@@ -340,12 +268,15 @@ async function loadMapData() {
     });
 }
 
-// Geocodificar cliente com máxima precisão - SISTEMA OTIMIZADO
+// Geocodificar cliente com máxima precisão - SISTEMA OTIMIZADO COM NORMALIZAÇÃO
 async function geocodificarClienteComMaximaPrecisao(client) {
-    const address = getFullAddress(client);
+    // NORMALIZAR DADOS DO CLIENTE ANTES DE GEOCODIFICAR
+    const normalizedClient = window.AddressNormalizer.normalizeClientData(client);
+    
+    const address = getFullAddress(normalizedClient);
     if (!address) return null;
     
-    console.log(`🔍 Geocodificando: ${client['Nome Fantasia']} - ${address}`);
+    console.log(`🔍 Geocodificando: ${normalizedClient['Nome Fantasia']} - ${address}`);
     
     // 1. Verificar correções manuais (prioridade máxima)
     if (manualCorrections[address]) {
@@ -360,7 +291,7 @@ async function geocodificarClienteComMaximaPrecisao(client) {
     }
     
     // 3. Geocodificação por CEP (mais precisa)
-    const coordsPorCEP = await geocodificarPorCEP(client);
+    const coordsPorCEP = await geocodificarPorCEP(normalizedClient);
     if (coordsPorCEP && coordsPorCEP.confidence >= 0.8) {
         console.log('🏢 Geocodificação por CEP bem-sucedida');
         addressCache[address] = coordsPorCEP;
@@ -369,7 +300,7 @@ async function geocodificarClienteComMaximaPrecisao(client) {
     }
     
     // 4. Geocodificação por endereço completo melhorada
-    const coordsEndereco = await geocodificarEnderecoCompleto(client);
+    const coordsEndereco = await geocodificarEnderecoCompleto(normalizedClient);
     if (coordsEndereco && coordsEndereco.confidence >= 0.7) {
         console.log('🏠 Geocodificação por endereço bem-sucedida');
         addressCache[address] = coordsEndereco;
@@ -378,7 +309,7 @@ async function geocodificarClienteComMaximaPrecisao(client) {
     }
     
     // 5. Geocodificação por cidade precisa
-    const coordsCidade = obterCoordenadasCidadePrecisa(client);
+    const coordsCidade = obterCoordenadasCidadePrecisa(normalizedClient);
     if (coordsCidade) {
         console.log('🏙️ Usando coordenadas precisas da cidade');
         addressCache[address] = coordsCidade;
@@ -387,7 +318,7 @@ async function geocodificarClienteComMaximaPrecisao(client) {
     }
     
     // 6. Fallback otimizado
-    const fallback = obterFallbackOtimizado(client);
+    const fallback = obterFallbackOtimizado(normalizedClient);
     if (fallback) {
         console.log('🎯 Usando fallback otimizado');
         addressCache[address] = fallback;
@@ -401,21 +332,18 @@ async function geocodificarClienteComMaximaPrecisao(client) {
 
 // Geocodificar por CEP usando ViaCEP
 async function geocodificarPorCEP(client) {
-    const cep = (client.CEP || '').replace(/\D/g, '');
-    if (cep.length !== 8) return null;
+    const cep = window.AddressNormalizer.normalizeCEP(client.CEP || '');
+    if (!cep || cep.replace(/\D/g, '').length !== 8) return null;
     
     // Validar CEP por estado
     const estado = (client.UF || '').toUpperCase();
-    if (!validarCEPPorEstado(cep, estado)) {
+    if (!validarCEPPorEstado(cep.replace(/\D/g, ''), estado)) {
         console.log('⚠️ CEP inválido para o estado:', cep, estado);
         return null;
     }
     
     try {
-        const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, {
-            timeout: 5000
-        });
-        
+        const response = await fetch(`https://viacep.com.br/ws/${cep.replace(/\D/g, '')}/json/`, { timeout: 5000 });
         if (!response.ok) throw new Error('CEP não encontrado');
         
         const data = await response.json();
@@ -525,7 +453,7 @@ function criarVariacoesEndereco(client) {
     const bairro = (client.Bairro || '').trim();
     const cidade = (client.Cidade || '').trim();
     const uf = (client.UF || '').trim().toUpperCase();
-    const cep = (client.CEP || '').replace(/\D/g, '');
+    const cep = window.AddressNormalizer.normalizeCEP(client.CEP || '');
     
     if (!cidade) return [];
     
@@ -554,7 +482,6 @@ async function geocodificarNominatimOtimizado(endereco) {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         
         const data = await response.json();
-        
         if (data && data.length > 0) {
             const result = data[0];
             const confidence = calcularConfiancaDetalhada(result, endereco);
@@ -622,13 +549,6 @@ function validarCoordenadas(coords, client) {
 function validarCoordenadasPorEstado(coords, estado) {
     const boundingBoxes = {
         'SP': { minLat: -25.3, maxLat: -19.8, minLng: -53.1, maxLng: -44.2 },
-        'RJ': { minLat: -23.4, maxLat: -20.8, minLng: -45.1, maxLng: -40.9 },
-        'MG': { minLat: -22.9, maxLat: -14.2, minLng: -51.0, maxLng: -39.9 },
-        'BA': { minLat: -18.3, maxLat: -8.5, minLng: -46.6, maxLng: -37.3 },
-        'PR': { minLat: -26.7, maxLat: -22.5, minLng: -54.6, maxLng: -48.0 },
-        'RS': { minLat: -33.7, maxLat: -27.1, minLng: -57.6, maxLng: -49.7 },
-        'SC': { minLat: -29.4, maxLat: -25.9, minLng: -53.8, maxLng: -48.3 },
-        'GO': { minLat: -19.5, maxLat: -12.4, minLng: -53.2, maxLng: -45.9 },
         'MS': { minLat: -24.1, maxLat: -17.7, minLng: -58.2, maxLng: -51.0 }
     };
     
@@ -726,8 +646,8 @@ function obterVariacaoParaCliente(client) {
     
     // Variação pequena para evitar sobreposição
     return {
-        lat: ((hash % 200) - 100) * 0.00003, // ±0.003 grau ≈ 300m
-        lng: ((hash % 300) - 150) * 0.00003  // ±0.0045 grau ≈ 300m
+        lat: ((hash % 200) - 100) * 0.00003,  // ±0.003 grau ≈ 300m
+        lng: ((hash % 300) - 150) * 0.00003   // ±0.0045 grau ≈ 300m
     };
 }
 
@@ -738,31 +658,6 @@ function obterFallbackOtimizado(client) {
     // Coordenadas centrais dos estados (precisas)
     const coordenadasEstados = {
         'SP': { lat: -23.5505, lng: -46.6333 },
-        'RJ': { lat: -22.9068, lng: -43.1729 },
-        'MG': { lat: -19.9191, lng: -43.9386 },
-        'BA': { lat: -12.9714, lng: -38.5014 },
-        'PR': { lat: -25.4284, lng: -49.2733 },
-        'RS': { lat: -30.0346, lng: -51.2177 },
-        'SC': { lat: -27.5954, lng: -48.5480 },
-        'GO': { lat: -16.6864, lng: -49.2643 },
-        'MT': { lat: -15.6014, lng: -56.0979 },
-        'MS': { lat: -20.4697, lng: -54.6201 },
-        'DF': { lat: -15.7941, lng: -47.8825 },
-        'PE': { lat: -8.0476, lng: -34.8770 },
-        'CE': { lat: -3.7319, lng: -38.5267 },
-        'PB': { lat: -7.1195, lng: -34.8450 },
-        'RN': { lat: -5.7945, lng: -35.2110 },
-        'AL': { lat: -9.6476, lng: -35.7175 },
-        'SE': { lat: -10.9472, lng: -37.0731 },
-        'PI': { lat: -5.0892, lng: -42.8019 },
-        'MA': { lat: -2.5307, lng: -44.3068 },
-        'PA': { lat: -1.4558, lng: -48.4902 },
-        'AM': { lat: -3.1190, lng: -60.0217 },
-        'RR': { lat: 2.8235, lng: -60.6758 },
-        'AP': { lat: 0.0389, lng: -51.0664 },
-        'TO': { lat: -10.1689, lng: -48.3317 },
-        'AC': { lat: -9.9754, lng: -67.8249 },
-        'RO': { lat: -8.7619, lng: -63.9039 },
         'ES': { lat: -20.2976, lng: -40.2958 }
     };
     
@@ -851,131 +746,106 @@ function createMarkerIcon(color, confidence, isManual, isAtivo) {
     
     return L.divIcon({
         className: 'custom-marker',
-        html: `
-            <div style="
-                background: ${color}; 
-                width: 26px; 
-                height: 26px; 
-                border-radius: 50%; 
-                border: 3px solid white; 
-                box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: white;
-                font-size: 12px;
-                font-weight: bold;
-                cursor: pointer;
-                opacity: ${isAtivo ? '1' : '0.85'};
-                transition: all 0.2s ease;
-            ">
-                ${symbol}
-            </div>
-        `,
-        iconSize: [26, 26],
-        iconAnchor: [13, 13]
+        html: `<div style="
+            background: ${color};
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            border: 2px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        ">${symbol}</div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
+        popupAnchor: [0, -15]
     });
 }
 
 // Criar conteúdo do popup
 function createPopupContent(client, coords, isManuallyEdited, isAtivo) {
-    const address = getFullAddress(client);
-    const providerText = coords.provider || 'Desconhecido';
+    const statusText = isAtivo ? '🟢 Ativo' : '🔴 Inativo';
     const confidenceText = Math.round(coords.confidence * 100);
-    const statusText = isAtivo ? 'Ativo' : 'Inativo';
-    const statusColor = isAtivo ? '#28a745' : '#6c757d';
+    const providerText = coords.provider || 'N/A';
+    
+    // Normalizar dados para exibição
+    const normalizedClient = window.AddressNormalizer.normalizeClientData(client);
+    const address = getFullAddress(normalizedClient);
     
     return `
-        <div style="max-width: 280px; font-family: Arial, sans-serif; line-height: 1.4;">
-            <h4 style="margin: 0 0 10px 0; color: #333; font-size: 16px; font-weight: bold;">
-                ${client['Nome Fantasia'] || 'Sem Nome'}
-            </h4>
-            <p style="margin: 6px 0; font-size: 13px;">
-                <strong>Status:</strong> 
-                <span style="color: ${statusColor}; font-weight: bold;">${statusText}</span>
-            </p>
-            <p style="margin: 6px 0; font-size: 13px;"><strong>Cidade:</strong> ${client.Cidade || 'N/A'}</p>
-            <p style="margin: 6px 0; font-size: 13px;"><strong>CEP:</strong> ${client.CEP || 'N/A'}</p>
-            <p style="margin: 6px 0; font-size: 13px;"><strong>Endereço:</strong> ${address}</p>
-            <p style="margin: 6px 0; font-size: 13px;">
-                <strong>Precisão:</strong> 
-                <span style="color: ${confidenceText >= 80 ? '#28a745' : confidenceText >= 60 ? '#ffc107' : '#dc3545'}; font-weight: bold;">
-                    ${confidenceText}%
-                </span>
-            </p>
-            <p style="margin: 6px 0; font-size: 13px;"><strong>Método:</strong> ${providerText}</p>
-            ${isManuallyEdited ? 
-                '<p style="margin: 6px 0; font-size: 13px; color: #2196F3; font-weight: bold;">✅ Corrigido manualmente</p>' : 
-                ''
-            }
-            <div style="text-align: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid #ddd;">
-                <small style="color: #666; font-size: 12px; font-style: italic;">Clique para ver detalhes completos</small>
-            </div>
+        <div style="min-width: 200px;">
+            <h4>${normalizedClient['Nome Fantasia'] || 'Cliente'}</h4>
+            <p><strong>Status:</strong> ${statusText}</p>
+            <p><strong>Cidade:</strong> ${normalizedClient.Cidade || 'N/A'}</p>
+            <p><strong>CEP:</strong> ${normalizedClient.CEP || 'N/A'}</p>
+            <p><strong>Endereço:</strong> ${address}</p>
+            <p><strong>Precisão:</strong> ${confidenceText}%</p>
+            ${isManuallyEdited ? '<p><strong>✅ Corrigido manualmente</strong></p>' : ''}
+            <p><strong>Método:</strong> ${providerText}</p>
         </div>
     `;
 }
 
-// Funções auxiliares
-function clearMarkers() {
-    markers.forEach(marker => {
-        if (marker && map.hasLayer(marker)) {
-            map.removeLayer(marker);
-        }
-    });
-    markers = [];
-}
-
-function updateMapStatus(message) {
-    const statusElement = document.getElementById('map-status');
-    if (statusElement) {
-        statusElement.textContent = message;
-    }
-}
-
-function loadCaches() {
-    try {
-        if (window.dbManager) {
-            addressCache = window.dbManager.loadAddressCache() || {};
-            manualCorrections = window.dbManager.loadManualCorrections() || {};
-        }
-    } catch (error) {
-        console.error('Erro ao carregar caches:', error);
-    }
-}
-
-function salvarCache() {
-    try {
-        if (window.dbManager) {
-            window.dbManager.saveAddressCache(addressCache);
-        }
-    } catch (error) {
-        console.error('Erro ao salvar cache:', error);
-    }
-}
-
-function getOriginalCoords(client) {
-    const address = getFullAddress(client);
-    return addressCache[address] || manualCorrections[address] || null;
-}
-
+// Obter endereço completo
 function getFullAddress(client) {
     const parts = [
         client.Endereco || '',
         client.Numero || '',
         client.Bairro || '',
         client.Cidade || '',
-        client.UF || '',
-        client.CEP || ''
-    ].filter(part => part && part.trim());
+        client.UF || ''
+    ].filter(p => p && p.trim());
     
     return parts.join(', ');
 }
 
-// Exportar funções globalmente
+// Obter coordenadas originais
+function getOriginalCoords(client) {
+    // Implementar se necessário
+    return null;
+}
+
+// Limpar marcadores
+function clearMarkers() {
+    markers.forEach(marker => {
+        if (marker) {
+            map.removeLayer(marker);
+        }
+    });
+    markers = [];
+}
+
+// Carregar caches
+function loadCaches() {
+    if (window.dbManager) {
+        addressCache = window.dbManager.loadAddressCache();
+        manualCorrections = window.dbManager.loadManualCorrections();
+    }
+}
+
+// Salvar cache
+function salvarCache() {
+    if (window.dbManager) {
+        window.dbManager.saveAddressCache(addressCache);
+    }
+}
+
+// Atualizar status do mapa
+function updateMapStatus(message) {
+    const statusElement = document.getElementById('map-status');
+    if (statusElement) {
+        statusElement.textContent = message;
+    }
+    console.log('🗺️ Status:', message);
+}
+
+// Disponibilizar funções globalmente
 window.initMap = initMap;
 window.loadMapData = loadMapData;
-window.toggleEditMode = handleEditButtonClick;
 window.setupEditButton = setupEditButton;
-window.obterLocalizacaoUsuario = obterLocalizacaoUsuario;
 
-console.log('✅ map.js carregado - Versão com precisão otimizada e restaurada');
+console.log('✅ map.js carregado - versão com normalização avançada de endereços');
