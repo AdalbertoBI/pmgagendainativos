@@ -1,8 +1,8 @@
-// address-normalizer.js - Sistema de Normalização para APIs Reais
+// address-normalizer.js - Sistema de Normalização para APIs Reais - VERSÃO COMPLETA
 
 class AddressNormalizer {
     constructor() {
-        // Mapeamento de abreviações de logradouros
+        // Mapeamento completo de abreviações de logradouros
         this.streetAbbreviations = {
             'R.': 'Rua',
             'R': 'Rua',
@@ -10,42 +10,65 @@ class AddressNormalizer {
             'AV.': 'Avenida',
             'AV': 'Avenida',
             'AVENIDA': 'Avenida',
+            'AVENIA': 'Avenida',
             'AL.': 'Alameda',
             'AL': 'Alameda',
+            'ALAMEDA': 'Alameda',
             'PÇ.': 'Praça',
             'PÇ': 'Praça',
             'PC.': 'Praça',
             'PC': 'Praça',
+            'PRAÇA': 'Praça',
+            'PRACA': 'Praça',
             'TV.': 'Travessa',
             'TV': 'Travessa',
+            'TRAVESSA': 'Travessa',
             'EST.': 'Estrada',
             'EST': 'Estrada',
+            'ESTRADA': 'Estrada',
             'ROD.': 'Rodovia',
             'ROD': 'Rodovia',
+            'RODOVIA': 'Rodovia',
             'VIA': 'Via',
             'LG.': 'Largo',
-            'LG': 'Largo'
+            'LG': 'Largo',
+            'LARGO': 'Largo',
+            'BCO.': 'Beco',
+            'BCO': 'Beco',
+            'BECO': 'Beco'
         };
 
-        // Mapeamento de abreviações de bairros
+        // Mapeamento completo de abreviações de bairros
         this.neighborhoodAbbreviations = {
             'JD.': 'Jardim',
             'JD': 'Jardim',
+            'JARDIM': 'Jardim',
             'VL.': 'Vila',
             'VL': 'Vila',
+            'VILA': 'Vila',
             'CJ.': 'Conjunto',
             'CJ': 'Conjunto',
+            'CONJUNTO': 'Conjunto',
+            'CONJ.': 'Conjunto',
+            'CONJ': 'Conjunto',
             'RES.': 'Residencial',
             'RES': 'Residencial',
+            'RESIDENCIAL': 'Residencial',
+            'RESID.': 'Residencial',
+            'RESID': 'Residencial',
             'PQ.': 'Parque',
             'PQ': 'Parque',
+            'PARQUE': 'Parque',
             'CH.': 'Chácara',
             'CH': 'Chácara',
+            'CHÁCARA': 'Chácara',
+            'CHACARA': 'Chácara',
             'CENTRO': 'Centro',
             'CTR.': 'Centro',
             'CTR': 'Centro',
             'DIST.': 'Distrito',
-            'DIST': 'Distrito'
+            'DIST': 'Distrito',
+            'DISTRITO': 'Distrito'
         };
 
         // Preposições que devem ficar em minúsculas
@@ -64,7 +87,9 @@ class AddressNormalizer {
             'DR.': 'Dr.',
             'DRA.': 'Dra.',
             'PROF.': 'Prof.',
-            'PROFA.': 'Profa.'
+            'PROFA.': 'Profa.',
+            'ENG.': 'Eng.',
+            'ENGA.': 'Enga.'
         };
 
         console.log('✅ AddressNormalizer API Real inicializado');
@@ -113,7 +138,7 @@ class AddressNormalizer {
         
         let normalized = street.trim().replace(/\s+/g, ' ').toUpperCase();
         
-        // Substituir abreviações
+        // Substituir abreviações no início
         Object.keys(this.streetAbbreviations).forEach(abbrev => {
             const regex = new RegExp(`^${abbrev}\\s+`, 'i');
             if (regex.test(normalized)) {
@@ -172,7 +197,10 @@ class AddressNormalizer {
             'SAO JOSE',
             'SÃO JOSE',
             'SJC',
-            'S J C'
+            'S J C',
+            'S.J.C.',
+            'SAO JOSE DO CAMPOS',
+            'SÃO JOSE DO CAMPOS'
         ];
         
         const upperCity = normalized.toUpperCase();
@@ -236,7 +264,9 @@ class AddressNormalizer {
             'S/N': 'S/N',
             'S.N': 'S/N',
             'SEM NUMERO': 'S/N',
-            'SEM NÚMERO': 'S/N'
+            'SEM NÚMERO': 'S/N',
+            'SEM NUM': 'S/N',
+            'S N': 'S/N'
         };
         
         const upperNum = numStr.toUpperCase();
@@ -304,7 +334,13 @@ class AddressNormalizer {
             comCEP: `${cep}, ${bairro}, ${cidade}, ${uf}, Brasil`,
             bairroECidade: `${bairro}, ${cidade}, ${uf}, Brasil`,
             apenasRua: `${rua}, ${cidade}, ${uf}, Brasil`,
-            cidadeUF: `${cidade}, ${uf}, Brasil`
+            cidadeUF: `${cidade}, ${uf}, Brasil`,
+            // Formatos específicos para Nominatim
+            nominatimCompleto: `${rua} ${numero}, ${bairro}, ${cidade}, São Paulo, Brasil`,
+            nominatimSemNumero: `${rua}, ${bairro}, ${cidade}, São Paulo, Brasil`,
+            // Formatos específicos para outras APIs
+            googleFormat: `${rua}, ${numero} - ${bairro}, ${cidade} - ${uf}, Brasil`,
+            hereFormat: `${numero} ${rua}, ${bairro}, ${cidade}, ${uf}, Brasil`
         };
     }
 

@@ -1,4 +1,4 @@
-// address-validator.js - Sistema de Validação com APIs Reais
+// address-validator.js - Sistema de Validação com APIs Reais - VERSÃO COMPLETA
 
 class AddressValidator {
     constructor() {
@@ -34,7 +34,13 @@ class AddressValidator {
             'RUA 15 DE NOVEMBRO': 'Rua Quinze de Novembro',
             'RUA 7 DE SETEMBRO': 'Rua Sete de Setembro',
             'AV JOAO XXIII': 'Avenida João XXIII',
-            'AV JOÃO XXIII': 'Avenida João XXIII'
+            'AV JOÃO XXIII': 'Avenida João XXIII',
+            'RUA CORONEL JOSE VICENTE': 'Rua Coronel José Vicente',
+            'RUA CEL JOSE VICENTE': 'Rua Coronel José Vicente',
+            'RUA MAJOR JOSE DIAS': 'Rua Major José Dias',
+            'RUA MAJ JOSE DIAS': 'Rua Major José Dias',
+            'AVENIDA PRESIDENTE VARGAS': 'Avenida Presidente Vargas',
+            'AV PRESIDENTE VARGAS': 'Avenida Presidente Vargas'
         };
 
         // Padrões de números
@@ -183,7 +189,7 @@ class AddressValidator {
         }
     }
 
-    // Formatar endereço para API
+    // Formatar endereço para API com múltiplas variações
     formatarEnderecoParaAPI(resultado) {
         const rua = resultado.corrigido.Endereco || '';
         const numero = resultado.corrigido.Numero || '';
@@ -192,28 +198,51 @@ class AddressValidator {
         const uf = resultado.corrigido.UF || 'SP';
         const cep = resultado.corrigido.CEP || '';
 
-        // Formato para APIs de geocodificação
-        const enderecoCompleto = `${rua}, ${numero}, ${bairro}, ${cidade}, ${uf}, Brasil`;
-        const enderecoSemNumero = `${rua}, ${bairro}, ${cidade}, ${uf}, Brasil`;
-        const enderecoCEP = `${cep}, ${cidade}, ${uf}, Brasil`;
-        const enderecoSimples = `${cidade}, ${uf}, Brasil`;
-
+        // Múltiplas formatações para maximizar chances de sucesso nas APIs
         resultado.enderecoFormatado = {
-            completo: enderecoCompleto,
-            semNumero: enderecoSemNumero,
-            comCEP: enderecoCEP,
-            simples: enderecoSimples,
+            // Formato mais completo
+            completo: `${rua}, ${numero}, ${bairro}, ${cidade}, ${uf}, Brasil`,
+            
+            // Formato sem número (para ruas que não têm numeração específica)
+            semNumero: `${rua}, ${bairro}, ${cidade}, ${uf}, Brasil`,
+            
+            // Formato com CEP (mais preciso quando disponível)
+            comCEP: `${cep}, ${bairro}, ${cidade}, ${uf}, Brasil`,
+            
+            // Formato simples
+            simples: `${cidade}, ${uf}, Brasil`,
+            
+            // Variações estratégicas para diferentes APIs
             variacoes: [
-                enderecoCompleto,
-                enderecoSemNumero,
-                enderecoCEP,
-                `${rua}, ${cidade}, ${uf}`,
-                `${bairro}, ${cidade}, ${uf}`,
-                enderecoSimples
-            ].filter(addr => addr.length > 10)
+                // Prioridade 1: Endereço mais específico
+                `${rua}, ${numero}, ${bairro}, ${cidade}, SP`,
+                `${rua} ${numero}, ${bairro}, ${cidade}, SP`,
+                `${rua}, ${numero}, ${bairro}, ${cidade}`,
+                
+                // Prioridade 2: Sem número
+                `${rua}, ${bairro}, ${cidade}, SP`,
+                `${rua}, ${bairro}, ${cidade}`,
+                
+                // Prioridade 3: Com CEP
+                `${cep}, ${cidade}, SP`,
+                `${rua}, ${cep}, ${cidade}`,
+                
+                // Prioridade 4: Bairro e cidade
+                `${bairro}, ${cidade}, SP`,
+                `${bairro}, ${cidade}`,
+                
+                // Prioridade 5: Apenas cidade
+                `${cidade}, SP`,
+                `${cidade}, São Paulo`,
+                
+                // Formato internacional
+                `${rua}, ${numero}, ${bairro}, ${cidade}, São Paulo, Brasil`,
+                `${rua}, ${bairro}, ${cidade}, São Paulo, Brasil`
+            ].filter(addr => addr.length > 10 && !addr.includes('undefined') && !addr.includes('null'))
         };
 
-        console.log(`📍 Endereço formatado para API:`, resultado.enderecoFormatado.completo);
+        console.log(`📍 Endereço formatado para APIs:`, resultado.enderecoFormatado.completo);
+        console.log(`📋 ${resultado.enderecoFormatado.variacoes.length} variações geradas`);
     }
 
     // Validar consistência final
@@ -243,6 +272,20 @@ class AddressValidator {
                     });
                     resultado.confianca -= 0.2;
                 }
+            }
+        }
+
+        // Verificar cidade
+        if (resultado.corrigido.Cidade) {
+            const cidade = resultado.corrigido.Cidade.toUpperCase();
+            if (!cidade.includes('SAO JOSE') && !cidade.includes('SJC')) {
+                resultado.warnings.push({
+                    campo: 'Cidade',
+                    tipo: 'cidade_diferente_sjc',
+                    valor: resultado.corrigido.Cidade,
+                    motivo: 'Cidade pode não ser São José dos Campos'
+                });
+                resultado.confianca -= 0.1;
             }
         }
     }
