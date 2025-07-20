@@ -10,7 +10,7 @@ const urlsToCache = [
   '/pmgagendainativos/manifest.json'
 ];
 
-// Instalação do SW
+// InstalaÃ§Ã£o do SW
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -19,7 +19,7 @@ self.addEventListener('install', event => {
   self.skipWaiting();
 });
 
-// Ativação: limpa caches antigos imediatamente
+// AtivaÃ§Ã£o: limpa caches antigos imediatamente
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -41,7 +41,7 @@ self.addEventListener('fetch', event => {
       // Sempre tenta atual (freshness over cache)
       const fetchPromise = fetch(event.request)
         .then(networkResponse => {
-          // Atualiza o cache para o próximo acesso
+          // Atualiza o cache para o prÃ³ximo acesso
           caches.open(CACHE_NAME).then(cache => {
             cache.put(event.request, networkResponse.clone());
           });
@@ -49,7 +49,7 @@ self.addEventListener('fetch', event => {
         })
         .catch(() => response || new Response('Offline', { status: 503 }));
 
-      // Responde pelo cache imediatamente, e faz update para próxima visita
+      // Responde pelo cache imediatamente, e faz update para prÃ³xima visita
       return response || fetchPromise;
     })
   );

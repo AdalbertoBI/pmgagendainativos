@@ -3,229 +3,437 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prospecção de Clientes Inativos</title>
+    <title>PMG Agenda - Prospecção de Clientes</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="manifest" href="manifest.json">
-    <link rel="icon" href="icon-192.png" type="image/png">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <meta name="theme-color" content="#007bff">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
-    <h1>Prospecção de Clientes Inativos</h1>
-    
-    <div id="upload">
-        <input type="file" id="xlsxFile" accept=".xlsx" />
-        <button id="cadastrar-cliente-btn">➕ Cadastrar Cliente</button>
-    </div>
-
-    <div id="tabs">
-        <button onclick="openTab('inativos')" class="active">Inativos</button>
-        <button onclick="openTab('ativos')">Ativos</button>
-        <button onclick="openTab('agenda')">Agenda</button>
-        <button onclick="openTab('mapa')">Mapa</button>
-    </div>
-
-    <div id="inativos-content" class="tab-content active">
-        <div id="filters">
-            <input type="number" id="saldoFilter" placeholder="Saldo mínimo" min="0">
-            <select id="sortOption">
-                <option value="nome-az">Nome Fantasia (A-Z)</option>
-                <option value="nome-za">Nome Fantasia (Z-A)</option>
-                <option value="saldo-desc">Saldo de Crédito (Maior-Menor)</option>
-                <option value="saldo-asc">Saldo de Crédito (Menor-Maior)</option>
-                <option value="data-asc">Data Último Pedido (Antigo-Recente)</option>
-                <option value="data-desc">Data Último Pedido (Recente-Antigo)</option>
-            </select>
-            <div id="cidadeSelector">
-                <span id="cidadeSelectorText">Selecionar cidades</span>
-                <span class="seta">▼</span>
+    <!-- Header Unificado -->
+    <header class="unified-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1>PMG Agenda</h1>
+                <p class="header-subtitle">Sistema de Prospecção de Clientes</p>
             </div>
-            <div id="cidadeList" class="escondido"></div>
-            <button id="exportar-inativos" class="export-btn">📊 Exportar Inativos</button>
+            
+            <div class="stats-summary">
+                <div class="stat-item">
+                    <span class="stat-number" id="total-clientes">0</span>
+                    <span class="stat-label">Total</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="total-ativos">0</span>
+                    <span class="stat-label">Ativos</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="total-novos">0</span>
+                    <span class="stat-label">Novos</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="total-inativos">0</span>
+                    <span class="stat-label">Inativos</span>
+                </div>
+            </div>
+            
+            <div class="header-right">
+                <div class="status-indicator" id="status-indicator">
+                    <div class="status-dot online"></div>
+                    <span class="status-text">Sistema Online</span>
+                </div>
+                <button id="install-btn" class="install-button" style="display: none;">
+                    📱 Instalar App
+                </button>
+            </div>
         </div>
-        <ul id="list"></ul>
+    </header>
+
+    <!-- Upload Section -->
+    <div id="upload" class="upload-section">
+        <div class="upload-content">
+            <div class="upload-icon">📊</div>
+            <label for="xlsxFile" class="upload-label">Carregar Nova Planilha</label>
+            <input type="file" id="xlsxFile" class="upload-input" accept=".xlsx,.xls">
+            <div class="upload-help">Formatos aceitos: .xlsx, .xls (máximo 10MB)</div>
+        </div>
     </div>
 
-    <div id="ativos-content" class="tab-content">
-        <div style="text-align: center; margin: 10px 0;">
-            <button id="exportar-ativos" class="export-btn">📊 Exportar Ativos</button>
+    <!-- Navegação Principal -->
+    <nav class="main-navigation">
+        <button class="tab-button active" data-tab="inativos" onclick="openTab('inativos')">
+            <div class="tab-icon">💤</div>
+            <div class="tab-label">Inativos</div>
+            <div class="tab-count" id="count-inativos">0</div>
+        </button>
+        <button class="tab-button" data-tab="novos" onclick="openTab('novos')">
+            <div class="tab-icon">🆕</div>
+            <div class="tab-label">Novos</div>
+            <div class="tab-count" id="count-novos">0</div>
+        </button>
+        <button class="tab-button" data-tab="ativos" onclick="openTab('ativos')">
+            <div class="tab-icon">✅</div>
+            <div class="tab-label">Ativos</div>
+            <div class="tab-count" id="count-ativos">0</div>
+        </button>
+        <button class="tab-button" data-tab="agenda" onclick="openTab('agenda')">
+            <div class="tab-icon">📅</div>
+            <div class="tab-label">Agenda</div>
+            <div class="tab-count" id="count-agenda">0</div>
+        </button>
+        <button class="tab-button" data-tab="mapa" onclick="openTab('mapa')">
+            <div class="tab-icon">🗺️</div>
+            <div class="tab-label">Mapa</div>
+        </button>
+    </nav>
+
+    <!-- Conteúdo das Abas -->
+    <!-- Aba Inativos -->
+    <div id="inativos-content" class="tab-content active">
+        <div class="controls">
+            <div class="filter-group">
+                <label for="sortOption">📊 Ordenar:</label>
+                <select id="sortOption">
+                    <option value="nome-az">Nome (A-Z)</option>
+                    <option value="nome-za">Nome (Z-A)</option>
+                    <option value="cidade-az">Cidade (A-Z)</option>
+                    <option value="cidade-za">Cidade (Z-A)</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label>🏙️ Filtrar Cidades</label>
+                <div id="cidadeSelector">
+                    <span>Todas as cidades</span>
+                    <span>▼</span>
+                </div>
+                <div id="cidadeList" class="escondido"></div>
+            </div>
+            
+            <button class="export-btn" onclick="window.clientManager?.exportarDados('inativos')">
+                📤 Exportar
+            </button>
         </div>
+        
+        <ul id="client-list"></ul>
+    </div>
+
+    <!-- Aba Novos -->
+    <div id="novos-content" class="tab-content">
+        <div class="controls">
+            <button class="export-btn" onclick="window.clientManager?.exportarDados('novos')">
+                📤 Exportar
+            </button>
+            <button class="action-btn" onclick="window.clientManager?.moverTodosNovosParaInativos()">
+                🔄 Mover Todos → Inativos
+            </button>
+            <button class="save-btn" onclick="window.clientManager?.abrirModalCadastro()">
+                ➕ Cadastrar Cliente
+            </button>
+        </div>
+        
+        <ul id="novos-list"></ul>
+    </div>
+
+    <!-- Aba Ativos -->
+    <div id="ativos-content" class="tab-content">
+        <div class="controls">
+            <button class="export-btn" onclick="window.clientManager?.exportarDados('ativos')">
+                📤 Exportar
+            </button>
+        </div>
+        
         <ul id="ativos-list"></ul>
     </div>
 
+    <!-- Aba Agenda -->
     <div id="agenda-content" class="tab-content">
+        <div class="controls">
+            <button class="cancel-btn" onclick="window.clientManager?.limparAgenda()">
+                🗑️ Limpar Agenda
+            </button>
+        </div>
+        
         <div id="agenda-list"></div>
     </div>
 
+    <!-- Aba Mapa -->
     <div id="mapa-content" class="tab-content">
-        <div id="mapa-controls">
-            <button id="edit-mode-btn" class="map-control-btn">✏️ Editar Localizações</button>
-            <label class="checkbox-container">
+        <div class="map-controls">
+            <button id="edit-mode-btn" class="map-control-btn">
+                ✏️ Editar Posições
+            </button>
+            
+            <div class="checkbox-container">
                 <input type="checkbox" id="include-inativos-checkbox">
-                <span class="checkmark"></span>
-                Incluir inativos
-            </label>
-            <span id="map-status">Carregando mapa...</span>
+                <label for="include-inativos-checkbox">Incluir inativos</label>
+            </div>
+            
+            <div class="checkbox-container">
+                <input type="checkbox" id="include-novos-checkbox">
+                <label for="include-novos-checkbox">Incluir novos</label>
+            </div>
+            
+            <button id="reload-map-btn" class="map-control-btn">
+                🔄 Recarregar Mapa
+            </button>
         </div>
-        <div id="map" style="height: 400px;"></div>
+        
+        <div id="map-status">Inicializando mapa...</div>
+        <div id="map" class="map-container"></div>
     </div>
 
     <!-- Modal de Detalhes -->
-    <div id="modal">
-        <div id="modal-content">
-            <span id="close">&times;</span>
-            <div id="modal-body">
-                <!-- Conteúdo será inserido dinamicamente -->
+    <div id="clientModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            
+            <h2>📊 Detalhes do Cliente</h2>
+            
+            <div class="info-row">
+                <strong>Nome Fantasia:</strong>
+                <span class="display-field" id="modal-nome-fantasia"></span>
+                <input type="text" class="edit-field" id="edit-nome-fantasia" style="display: none;">
             </div>
-            <div id="modal-actions">
-                <a id="whatsapp-btn" href="#" target="_blank" class="whatsapp-btn">📱 WhatsApp</a>
-                <a id="maps-btn" href="#" target="_blank" class="maps-btn">🗺️ Traçar Rota</a>
+            
+            <div class="info-row">
+                <strong>Cliente:</strong>
+                <span class="display-field" id="modal-cliente"></span>
+                <input type="text" class="edit-field" id="edit-cliente" style="display: none;">
             </div>
-            <div id="agendamento-section">
-                <h3>Agendamento</h3>
-                <label>Dia da Semana:</label>
-                <select id="diaSemana">
-                    <option value="">Selecione</option>
-                    <option value="Domingo">Domingo</option>
-                    <option value="Segunda">Segunda</option>
-                    <option value="Terça">Terça</option>
-                    <option value="Quarta">Quarta</option>
-                    <option value="Quinta">Quinta</option>
-                    <option value="Sexta">Sexta</option>
-                    <option value="Sábado">Sábado</option>
-                </select>
-                <label>Horário:</label>
-                <input type="time" id="horario">
-                <label>Tipo:</label>
-                <select id="tipoAgendamento">
-                    <option value="">Selecione</option>
-                    <option value="Visita">Visita</option>
-                    <option value="Ligação">Ligação</option>
-                    <option value="WhatsApp">WhatsApp</option>
-                </select>
-                <label>Repetição:</label>
-                <select id="repeticao">
-                    <option value="Semanal">Semanal</option>
-                    <option value="Quinzenal">Quinzenal</option>
-                    <option value="Mensal">Mensal</option>
-                </select>
-                <button onclick="salvarAgendamento()">Salvar agendamento</button>
+            
+            <div class="info-row">
+                <strong>Contato:</strong>
+                <span class="display-field" id="modal-contato"></span>
+                <input type="text" class="edit-field" id="edit-contato" style="display: none;">
             </div>
-            <div id="status-section">
-                <h3>Status</h3>
-                <label id="labelEditDataPedido">Data Último Pedido:</label>
-                <input type="text" id="editDataPedido" placeholder="DD/MM/AAAA" maxlength="10">
-                <button id="tornarAtivo">Tornar Ativo</button>
-                <button id="confirmarAtivo">Confirmar Ativo</button>
-                <button id="excluirAtivo">Excluir dos Ativos</button>
+            
+            <div class="info-row">
+                <strong>Celular:</strong>
+                <span class="display-field" id="modal-celular"></span>
+                <input type="text" class="edit-field" id="edit-celular" style="display: none;">
+                <button class="whatsapp-btn" onclick="window.clientManager?.abrirWhatsApp()">
+                    💬 WhatsApp
+                </button>
             </div>
-            <div id="observacoes-section">
-                <h3>Observações</h3>
-                <textarea id="observacoes" maxlength="2000" placeholder="Adicione observações sobre este cliente..."></textarea>
-                <div id="observacoes-contador">0/2000</div>
-                <button id="salvarObservacoes">Salvar Observações</button>
+            
+            <div class="info-row">
+                <strong>CNPJ/CPF:</strong>
+                <span class="display-field" id="modal-cnpj-cpf"></span>
+                <input type="text" class="edit-field" id="edit-cnpj-cpf" style="display: none;">
+            </div>
+            
+            <div class="info-row">
+                <strong>Email:</strong>
+                <span class="display-field" id="modal-email"></span>
+                <input type="email" class="edit-field" id="edit-email" style="display: none;">
+            </div>
+            
+            <div class="info-row">
+                <strong>Endereço:</strong>
+                <span class="display-field" id="modal-endereco"></span>
+                <input type="text" class="edit-field" id="edit-endereco" style="display: none;">
+                <button class="rota-btn" onclick="window.clientManager?.tracarRota()">
+                    🗺️ Traçar Rota
+                </button>
+            </div>
+            
+            <div class="info-row">
+                <strong>Cidade:</strong>
+                <span class="display-field" id="modal-cidade"></span>
+                <input type="text" class="edit-field" id="edit-cidade" style="display: none;">
+            </div>
+            
+            <div class="info-row">
+                <strong>UF:</strong>
+                <span class="display-field" id="modal-uf"></span>
+                <input type="text" class="edit-field" id="edit-uf" style="display: none;">
+            </div>
+            
+            <div class="info-row">
+                <strong>CEP:</strong>
+                <span class="display-field" id="modal-cep"></span>
+                <input type="text" class="edit-field" id="edit-cep" style="display: none;">
+            </div>
+            
+            <div class="info-row">
+                <strong>Segmento:</strong>
+                <span class="display-field" id="modal-segmento"></span>
+                <input type="text" class="edit-field" id="edit-segmento" style="display: none;">
+            </div>
+            
+            <!-- Observações -->
+            <div class="observacoes-section">
+                <h4>📝 Observações</h4>
+                <textarea id="observacoes-textarea" placeholder="Digite suas observações..." maxlength="1000"></textarea>
+                <div class="observacoes-counter">
+                    <span id="observacoes-count">0/1000</span>
+                    <button class="save-btn" onclick="window.clientManager?.salvarObservacoes()">
+                        💾 Salvar
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Agendamento -->
+            <div class="agendamento-section">
+                <h4>📅 Agendar Visita</h4>
+                <div class="agendamento-form">
+                    <div class="form-row">
+                        <select id="agenda-dia">
+                            <option value="">Selecione o dia</option>
+                            <option value="Segunda-feira">Segunda-feira</option>
+                            <option value="Terça-feira">Terça-feira</option>
+                            <option value="Quarta-feira">Quarta-feira</option>
+                            <option value="Quinta-feira">Quinta-feira</option>
+                            <option value="Sexta-feira">Sexta-feira</option>
+                            <option value="Sábado">Sábado</option>
+                        </select>
+                        
+                        <select id="agenda-horario">
+                            <option value="">Selecione o horário</option>
+                            <option value="08:00">08:00</option>
+                            <option value="09:00">09:00</option>
+                            <option value="10:00">10:00</option>
+                            <option value="11:00">11:00</option>
+                            <option value="14:00">14:00</option>
+                            <option value="15:00">15:00</option>
+                            <option value="16:00">16:00</option>
+                            <option value="17:00">17:00</option>
+                        </select>
+                        
+                        <select id="agenda-tipo">
+                            <option value="">Tipo de visita</option>
+                            <option value="Visita comercial">Visita comercial</option>
+                            <option value="Apresentação">Apresentação</option>
+                            <option value="Negociação">Negociação</option>
+                            <option value="Entrega">Entrega</option>
+                        </select>
+                    </div>
+                    
+                    <div class="date-input">
+                        <label for="agenda-data">Data específica (opcional):</label>
+                        <input type="date" id="agenda-data">
+                    </div>
+                    
+                    <button class="agenda-btn" onclick="window.clientManager?.agendarVisita()">
+                        📅 Agendar Visita
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Botões de Ação -->
+            <div class="modal-actions">
+                <button class="edit-btn" id="edit-btn" onclick="window.clientManager?.toggleEditMode()">
+                    ✏️ Editar
+                </button>
+                <button class="save-btn" id="save-btn" onclick="window.clientManager?.salvarEdicao()" style="display: none;">
+                    💾 Salvar Edição
+                </button>
+                <button class="cancel-btn" id="cancel-btn" onclick="window.clientManager?.cancelarEdicao()" style="display: none;">
+                    ❌ Cancelar
+                </button>
+                <button class="save-btn" id="activate-btn" onclick="window.clientManager?.confirmarAtivacao()">
+                    ✅ Tornar Ativo
+                </button>
+                <button class="action-btn" id="confirm-btn" onclick="window.clientManager?.confirmarPedido()" style="display: none;">
+                    ✅ Confirmar
+                </button>
+                <button class="cancel-btn" id="remove-active-btn" onclick="window.clientManager?.removerAtivo()" style="display: none;">
+                    🗑️ Remover dos Ativos
+                </button>
+                <button class="action-btn" id="move-inactive-btn" onclick="window.clientManager?.moverParaInativo()" style="display: none;">
+                    🔄 Mover → Inativos
+                </button>
+            </div>
+            
+            <!-- Campo Data do Pedido (oculto inicialmente) -->
+            <div class="info-row" id="data-pedido-row" style="display: none;">
+                <strong>Data do Pedido:</strong>
+                <input type="date" id="data-pedido-input">
             </div>
         </div>
     </div>
 
     <!-- Modal de Cadastro -->
-    <div id="modal-cadastro">
-        <div id="modal-cadastro-content">
-            <span id="close-cadastro">&times;</span>
-            <h2>Cadastrar Novo Cliente</h2>
-            <form id="form-cadastro">
-                <label>Nome Fantasia:</label>
-                <input type="text" id="nome-fantasia" required>
+    <div id="cadastroModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            
+            <h2>➕ Cadastrar Cliente</h2>
+            
+            <form id="cadastroForm">
+                <div class="form-group">
+                    <label for="cadastro-nome-fantasia">Nome Fantasia *</label>
+                    <input type="text" id="cadastro-nome-fantasia" required>
+                </div>
                 
-                <label>Cliente:</label>
-                <input type="text" id="cliente">
+                <div class="form-group">
+                    <label for="cadastro-cliente">Cliente</label>
+                    <input type="text" id="cadastro-cliente">
+                </div>
                 
-                <label>CNPJ/CPF:</label>
-                <input type="text" id="cnpj-cpf">
+                <div class="form-group">
+                    <label for="cadastro-contato">Contato</label>
+                    <input type="text" id="cadastro-contato">
+                </div>
                 
-                <label>Contato:</label>
-                <input type="text" id="contato">
+                <div class="form-group">
+                    <label for="cadastro-celular">Celular</label>
+                    <input type="tel" id="cadastro-celular">
+                </div>
                 
-                <label>Telefone Comercial:</label>
-                <input type="tel" id="telefone-comercial">
+                <div class="form-group">
+                    <label for="cadastro-cnpj-cpf">CNPJ/CPF</label>
+                    <input type="text" id="cadastro-cnpj-cpf">
+                </div>
                 
-                <label>Celular:</label>
-                <input type="tel" id="celular">
+                <div class="form-group">
+                    <label for="cadastro-email">Email</label>
+                    <input type="email" id="cadastro-email">
+                </div>
                 
-                <label>Email:</label>
-                <input type="email" id="email">
+                <div class="form-group">
+                    <label for="cadastro-endereco">Endereço</label>
+                    <input type="text" id="cadastro-endereco">
+                </div>
                 
-                <label>Endereço:</label>
-                <input type="text" id="endereco">
+                <div class="form-group">
+                    <label for="cadastro-cidade">Cidade</label>
+                    <input type="text" id="cadastro-cidade" value="São José dos Campos">
+                </div>
                 
-                <label>Número:</label>
-                <input type="text" id="numero">
+                <div class="form-group">
+                    <label for="cadastro-uf">UF</label>
+                    <input type="text" id="cadastro-uf" value="SP" maxlength="2">
+                </div>
                 
-                <label>Bairro:</label>
-                <input type="text" id="bairro">
+                <div class="form-group">
+                    <label for="cadastro-cep">CEP</label>
+                    <input type="text" id="cadastro-cep">
+                </div>
                 
-                <label>Cidade:</label>
-                <input type="text" id="cidade">
-                
-                <label>UF:</label>
-                <input type="text" id="uf" maxlength="2">
-                
-                <label>CEP:</label>
-                <input type="text" id="cep" maxlength="9">
-                
-                <label>Saldo de Crédito:</label>
-                <input type="number" id="saldo-credito" min="0" step="0.01">
-                
-                <label>Data Último Pedido:</label>
-                <input type="date" id="data-ultimo-pedido">
+                <div class="form-group">
+                    <label for="cadastro-segmento">Segmento</label>
+                    <input type="text" id="cadastro-segmento">
+                </div>
                 
                 <div class="form-actions">
-                    <button type="submit">Cadastrar</button>
-                    <button type="button" id="cancelar-cadastro">Cancelar</button>
+                    <button type="submit" class="save-btn">💾 Cadastrar</button>
+                    <button type="button" class="cancel-btn" onclick="window.clientManager?.fecharModalCadastro()">❌ Cancelar</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Modal de Sucesso -->
-    <div id="modal-sucesso">
-        <div id="modal-sucesso-content">
-            <span id="close-sucesso">&times;</span>
-            <div class="success-icon">✅</div>
-            <h2>Cliente Cadastrado com Sucesso!</h2>
-            <div id="cliente-cadastrado-info"></div>
-            <div class="success-actions">
-                <button id="cadastrar-outro">Cadastrar Outro Cliente</button>
-                <button id="fechar-sucesso">Fechar</button>
-            </div>
-        </div>
-    </div>
-
-    <button id="install-btn">Instalar App</button>
-
-    <script src="database.js"></script>
+    <!-- Scripts -->
+    <script src="db-manager.js"></script>
+    <script src="api-manager.js"></script>
     <script src="client-manager.js"></script>
-    <script src="script.js"></script>
-    <!-- Ordem obrigatória -->
-    <script src="address-validator.js"></script>
-    <script src="address-normalizer.js"></script>
-    <script src="sjc-geo-validator.js"></script>
+    <script src="map-precision.js"></script>
     <script src="map.js"></script>
-    <script src="service-worker-registration.js"></script>
-    <script>
-        // Inicialização do Service Worker
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('service-worker.js')
-                    .then(registration => {
-                        console.log('Service Worker registrado com sucesso:', registration);
-                    })
-                    .catch(error => {
-                        console.error('Falha ao registrar o Service Worker:', error);
-                    });
-            });
-        }
-    </script>
+    <script src="analytics.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
