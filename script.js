@@ -708,7 +708,7 @@ function setupExportEvents() {
 function setupPWA() {
     try {
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/pmgagendainativos/service-worker.js')
+            navigator.serviceWorker.register('/service-worker.js')
                 .then(() => console.log(' Service Worker registrado'))
                 .catch(error => console.error('Erro SW:', error));
         }

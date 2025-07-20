@@ -1,13 +1,13 @@
 const CACHE_NAME = 'agenda-inativos-v1.0.0.5'; // Troque o nome a cada deploy
 const urlsToCache = [
-  '/pmgagendainativos/',
-  '/pmgagendainativos/index.html',
-  '/pmgagendainativos/styles.css',
-  '/pmgagendainativos/script.js',
-  '/pmgagendainativos/map.js',
-  '/pmgagendainativos/icon-192.png',
-  '/pmgagendainativos/icon-512.png',
-  '/pmgagendainativos/manifest.json'
+  '/',
+  '/index.html',
+  '/styles.css',
+  '/script.js',
+  '/map.js',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/manifest.json'
 ];
 
 // InstalaÃ§Ã£o do SW
