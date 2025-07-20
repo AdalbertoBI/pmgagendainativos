@@ -517,7 +517,7 @@ async function handleFileUpload(event) {
         
         const totalClientes = clientesAtivos.length + clientesInativos.length + clientesNovos.length;
         
-        alert(` Planilha carregada com sucesso!\nðŸ“Š Total: ${totalClientes} clientes\nðŸŸ¢ Ativos: ${clientesAtivos.length}\nðŸ”´ Inativos: ${clientesInativos.length}\nðŸ†• Novos: ${clientesNovos.length}\n\nðŸ—ºï¸ Os marcadores do mapa sero atualizados automaticamente.`);
+        alert(` Planilha carregada com sucesso!\ Total: ${totalClientes} clientes\ Ativos: ${clientesAtivos.length}\ Inativos: ${clientesInativos.length}\• Novos: ${clientesNovos.length}\n\Os marcadores do mapa sero atualizados automaticamente.`);
         
     } catch (error) {
         console.error('Erro ao processar planilha:', error);
