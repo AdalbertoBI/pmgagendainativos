@@ -1,4 +1,4 @@
-// clientManager.js - Versão com persistência robusta e sem perda de dados
+// clientManager.js - Versão com tratamento aprimorado de endereços e geocodificação inteligente
 class ClientManager {
     constructor() {
         this.data = [];
@@ -10,10 +10,8 @@ class ClientManager {
         this.currentTab = 'inativos';
         this.initialized = false;
         this.editMode = false;
-        this.geocodingNeeded = false;
-        this.autoSaveInterval = null;
-        this.pendingChanges = false;
-        this.lastSaveTime = null;
+        this.geocodingNeeded = false; // Flag para controlar quando geocodificar
+        this.dataLoaded = false; // Flag para controlar se dados foram carregados
     }
 
     async init() {
@@ -25,261 +23,174 @@ class ClientManager {
                 await this.waitForDbManager();
             }
 
-            // Carregar dados com retry automático
-            await this.loadAllDataWithRetry();
-            
+            await this.loadAllData();
             this.initialized = true;
             console.log('✅ ClientManager inicializado com sucesso');
-            
-            // Iniciar auto-save
-            this.startAutoSave();
-            
-            // Salvar dados na visibilidade e antes de fechar
-            this.setupVisibilityHandlers();
-            
             this.applyFiltersAndSort();
-            
         } catch (error) {
             console.error('❌ Erro ao inicializar ClientManager:', error);
-            // Tentar carregar dados básicos mesmo com erro
-            await this.initializeEmptyData();
-            this.initialized = true;
             throw error;
         }
     }
 
-    async initializeEmptyData() {
-        console.log('⚠️ Inicializando com dados vazios devido a erro');
-        this.data = [];
-        this.ativos = [];
-        this.novos = [];
-        this.schedules = {};
-        window.data = this.data;
-        window.ativos = this.ativos;
-        window.novos = this.novos;
-    }
-
     async waitForDbManager() {
         return new Promise((resolve) => {
-            let attempts = 0;
-            const maxAttempts = 100;
-            
             const checkDbManager = () => {
-                attempts++;
                 if (window.dbManager && window.dbManager.db) {
                     resolve();
-                } else if (attempts < maxAttempts) {
-                    setTimeout(checkDbManager, 100);
                 } else {
-                    console.error('❌ Timeout: dbManager não inicializou');
-                    resolve(); // Continuar mesmo com erro
+                    setTimeout(checkDbManager, 100);
                 }
             };
             checkDbManager();
         });
     }
 
-    async loadAllDataWithRetry(maxRetries = 3) {
-        let lastError = null;
-        
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                console.log(`📖 Tentativa ${attempt}/${maxRetries} - Carregando dados salvos...`);
-                await this.loadAllData();
-                console.log('✅ Dados carregados com sucesso');
-                return;
-                
-            } catch (error) {
-                lastError = error;
-                console.warn(`⚠️ Tentativa ${attempt} falhou:`, error);
-                
-                if (attempt < maxRetries) {
-                    await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-                }
-            }
-        }
-        
-        console.error('❌ Falha ao carregar dados após todas as tentativas:', lastError);
-        // Inicializar com dados vazios para não quebrar o sistema
-        await this.initializeEmptyData();
-    }
-
     async loadAllData() {
         try {
-            // Carregar dados principais
-            const [clients, ativos, novos, schedules] = await Promise.all([
-                this.safeLoadData('clients', []),
-                this.safeLoadData('ativos', []),
-                this.safeLoadData('novos', []),
-                this.safeLoadData('schedules', {})
-            ]);
-
+            console.log('📖 Carregando dados salvos...');
+            
+            const clients = await window.dbManager.loadData('clients');
             this.data = Array.isArray(clients) ? clients : [];
+            
+            const ativos = await window.dbManager.loadData('ativos');
             this.ativos = Array.isArray(ativos) ? ativos : [];
+            
+            const novos = await window.dbManager.loadData('novos');
             this.novos = Array.isArray(novos) ? novos : [];
+            
+            const schedules = await window.dbManager.loadData('schedules');
             this.schedules = (typeof schedules === 'object' && schedules !== null) ? schedules : {};
 
-            // Garantir IDs únicos
-            this.ensureUniqueIds();
-
-            // Atualizar referências globais
+            // Atualizar variáveis globais
             window.data = this.data;
             window.ativos = this.ativos;
             window.novos = this.novos;
 
-            this.lastSaveTime = new Date();
-            this.pendingChanges = false;
+            this.dataLoaded = true;
 
             console.log(`📊 Dados carregados: 🔴 Inativos: ${this.data.length} 🟢 Ativos: ${this.ativos.length} 🆕 Novos: ${this.novos.length} 📅 Agendamentos: ${Object.keys(this.schedules).length}`);
-
+            
         } catch (error) {
             console.error('❌ Erro ao carregar dados:', error);
+            this.data = [];
+            this.ativos = [];
+            this.novos = [];
+            this.schedules = {};
+            window.data = this.data;
+            window.ativos = this.ativos;
+            window.novos = this.novos;
+            this.dataLoaded = false;
+        }
+    }
+
+    // Limpar todos os dados anteriores (chamado ao carregar novo arquivo)
+    async clearAllPreviousData() {
+        try {
+            console.log('🧹 Limpando todos os dados anteriores...');
+            
+            // Limpar dados em memória
+            this.data = [];
+            this.ativos = [];
+            this.novos = [];
+            this.schedules = {};
+            this.filteredData = [];
+            
+            // Limpar variáveis globais
+            window.data = this.data;
+            window.ativos = this.ativos;
+            window.novos = this.novos;
+            
+            // Limpar dados no IndexedDB
+            await window.dbManager.clearData('clients');
+            await window.dbManager.clearData('ativos');
+            await window.dbManager.clearData('novos');
+            await window.dbManager.clearData('schedules');
+            
+            // Limpar cache de geocodificação
+            if (window.mapManager && typeof window.mapManager.clearGeocodingCache === 'function') {
+                window.mapManager.clearGeocodingCache();
+            }
+            
+            // Limpar observações do localStorage
+            localStorage.removeItem('client-observations');
+            
+            this.geocodingNeeded = true;
+            this.dataLoaded = false;
+            
+            console.log('✅ Todos os dados anteriores foram limpos');
+            
+        } catch (error) {
+            console.error('❌ Erro ao limpar dados anteriores:', error);
             throw error;
         }
     }
 
-    async safeLoadData(storeName, defaultValue) {
-        try {
-            if (!window.dbManager) {
-                throw new Error('dbManager não disponível');
-            }
-            
-            const data = await window.dbManager.loadData(storeName);
-            return data !== undefined && data !== null ? data : defaultValue;
-            
-        } catch (error) {
-            console.warn(`⚠️ Erro ao carregar ${storeName}, usando valor padrão:`, error);
-            return defaultValue;
-        }
-    }
-
-    ensureUniqueIds() {
-        const allArrays = [
-            { name: 'data', array: this.data },
-            { name: 'ativos', array: this.ativos },
-            { name: 'novos', array: this.novos }
-        ];
-
-        allArrays.forEach(({ name, array }) => {
-            const usedIds = new Set();
-            
-            array.forEach((item, index) => {
-                if (!item.id || usedIds.has(item.id)) {
-                    item.id = this.generateUniqueId();
-                    console.log(`🔧 ID único gerado para item em ${name}[${index}]: ${item.id}`);
-                }
-                usedIds.add(item.id);
-            });
-        });
-    }
-
-    generateUniqueId() {
-        return `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    }
-
-    // Auto-save system
-    startAutoSave() {
-        if (this.autoSaveInterval) {
-            clearInterval(this.autoSaveInterval);
-        }
-        
-        // Auto-save a cada 30 segundos se houver mudanças pendentes
-        this.autoSaveInterval = setInterval(async () => {
-            if (this.pendingChanges) {
-                try {
-                    await this.saveAllData();
-                    console.log('💾 Auto-save executado com sucesso');
-                } catch (error) {
-                    console.error('❌ Erro no auto-save:', error);
-                }
-            }
-        }, 30000);
-
-        console.log('⏰ Auto-save iniciado (30s)');
-    }
-
-    markDataChanged() {
-        this.pendingChanges = true;
-        console.log('📝 Dados marcados como alterados');
-        
-        // Debounced save - salvar após 5 segundos de inatividade
-        if (this.saveTimeout) {
-            clearTimeout(this.saveTimeout);
-        }
-        
-        this.saveTimeout = setTimeout(async () => {
-            try {
-                await this.saveAllData();
-                console.log('💾 Salvamento automático executado');
-            } catch (error) {
-                console.error('❌ Erro no salvamento automático:', error);
-            }
-        }, 5000);
-    }
-
+    // Salvar todos os dados no IndexedDB (chamado após carregar novos dados)
     async saveAllData() {
-        if (!window.dbManager) {
-            console.warn('⚠️ dbManager não disponível para salvar');
-            return;
-        }
-
         try {
             console.log('💾 Salvando todos os dados...');
             
-            await Promise.all([
-                window.dbManager.saveData('clients', this.data),
-                window.dbManager.saveData('ativos', this.ativos),
-                window.dbManager.saveData('novos', this.novos),
-                window.dbManager.saveData('schedules', this.schedules)
-            ]);
-
-            this.lastSaveTime = new Date();
-            this.pendingChanges = false;
+            await window.dbManager.saveData('clients', this.data);
+            await window.dbManager.saveData('ativos', this.ativos);
+            await window.dbManager.saveData('novos', this.novos);
+            await window.dbManager.saveData('schedules', this.schedules);
             
-            console.log('✅ Todos os dados salvos com sucesso');
-
+            this.dataLoaded = true;
+            
+            console.log('✅ Todos os dados foram salvos com sucesso');
+            
         } catch (error) {
             console.error('❌ Erro ao salvar dados:', error);
             throw error;
         }
     }
 
-    setupVisibilityHandlers() {
-        // Salvar quando a página ficar oculta ou antes de fechar
-        const saveOnExit = async () => {
-            if (this.pendingChanges) {
-                try {
-                    await this.saveAllData();
-                    console.log('💾 Dados salvos antes de sair/ocultar página');
-                } catch (error) {
-                    console.error('❌ Erro ao salvar antes de sair:', error);
-                }
+    // Processar novos dados (chamado ao carregar planilha)
+    async processNewData(newData) {
+        try {
+            console.log('📊 Processando novos dados...');
+            
+            // Primeiro, limpar todos os dados anteriores
+            await this.clearAllPreviousData();
+            
+            // Processar e validar novos dados
+            if (newData.clients && Array.isArray(newData.clients)) {
+                this.data = newData.clients;
             }
-        };
-
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'hidden') {
-                saveOnExit();
+            
+            if (newData.ativos && Array.isArray(newData.ativos)) {
+                this.ativos = newData.ativos;
             }
-        });
-
-        window.addEventListener('beforeunload', (event) => {
-            if (this.pendingChanges) {
-                saveOnExit();
-                // Opcional: mostrar confirmação para usuário
-                event.preventDefault();
-                return 'Existem dados não salvos. Deseja realmente sair?';
+            
+            if (newData.novos && Array.isArray(newData.novos)) {
+                this.novos = newData.novos;
             }
-        });
-
-        // Salvar periodicamente quando em foco
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible' && this.pendingChanges) {
-                setTimeout(() => this.saveAllData(), 1000);
+            
+            if (newData.schedules && typeof newData.schedules === 'object') {
+                this.schedules = newData.schedules;
             }
-        });
-
-        console.log('👁️ Handlers de visibilidade configurados');
+            
+            // Atualizar variáveis globais
+            window.data = this.data;
+            window.ativos = this.ativos;
+            window.novos = this.novos;
+            
+            // Salvar novos dados
+            await this.saveAllData();
+            
+            // Marcar que geocodificação é necessária
+            this.markGeocodingNeeded();
+            
+            // Aplicar filtros e renderizar
+            this.applyFiltersAndSort();
+            
+            console.log(`✅ Novos dados processados: 🔴 Inativos: ${this.data.length} 🟢 Ativos: ${this.ativos.length} 🆕 Novos: ${this.novos.length}`);
+            
+        } catch (error) {
+            console.error('❌ Erro ao processar novos dados:', error);
+            throw error;
+        }
     }
 
     // Marcar que geocodificação é necessária (nova planilha carregada)
@@ -288,33 +199,6 @@ class ClientManager {
         if (window.mapManager && typeof window.mapManager.clearGeocodingCache === 'function') {
             window.mapManager.clearGeocodingCache();
             console.log('🧹 Cache de geocodificação limpo devido à nova planilha');
-        }
-    }
-
-    // Método melhorado para processar planilha
-    async processSpreadsheetData(data) {
-        try {
-            console.log('📊 Processando dados da planilha...');
-            
-            // Processar dados
-            this.data = Array.isArray(data) ? data : [];
-            this.ensureUniqueIds();
-            
-            // Marcar mudanças e salvar
-            this.markDataChanged();
-            this.markGeocodingNeeded();
-            
-            // Atualizar referências globais
-            window.data = this.data;
-            
-            // Salvar imediatamente
-            await this.saveAllData();
-            
-            console.log(`✅ Planilha processada: ${this.data.length} registros`);
-            
-        } catch (error) {
-            console.error('❌ Erro ao processar planilha:', error);
-            throw error;
         }
     }
 
@@ -374,31 +258,6 @@ class ClientManager {
         return this.extrairCidadeDoEndereco(item['Endereço'] || '');
     }
 
-    extrairCidadeDoEndereco(endereco) {
-        if (!endereco) return '';
-        
-        // Remover CEP primeiro
-        let enderecoLimpo = endereco.replace(/\d{5}-?\d{3}/, '').trim();
-        
-        // Padrões para extrair cidade
-        const padroes = [
-            /,\s*([^,\-]+)\s*-\s*SP\s*$/i,
-            /,\s*([^,\-]+)\s*,?\s*SP\s*$/i,
-            /,\s*([^,\-]+)\s*$/i,
-            /-\s*([^,\-]+)\s*-\s*SP\s*$/i,
-            /([^,\-]+)\s*-\s*SP\s*$/i
-        ];
-        
-        for (const padrao of padroes) {
-            const match = enderecoLimpo.match(padrao);
-            if (match) {
-                return match[1].trim();
-            }
-        }
-        
-        return '';
-    }
-
     saveCurrentFilters() {
         try {
             const filters = {
@@ -415,105 +274,6 @@ class ClientManager {
         }
     }
 
-    // Método melhorado para mover cliente
-    async moverCliente(clienteId, origem, destino) {
-        try {
-            console.log(`🔄 Movendo cliente ${clienteId} de ${origem} para ${destino}`);
-            
-            let cliente = null;
-            let origemArray = null;
-            let destinoArray = null;
-            
-            // Identificar arrays de origem e destino
-            switch (origem) {
-                case 'inativos':
-                    origemArray = this.data;
-                    break;
-                case 'ativos':
-                    origemArray = this.ativos;
-                    break;
-                case 'novos':
-                    origemArray = this.novos;
-                    break;
-            }
-            
-            switch (destino) {
-                case 'inativos':
-                    destinoArray = this.data;
-                    break;
-                case 'ativos':
-                    destinoArray = this.ativos;
-                    break;
-                case 'novos':
-                    destinoArray = this.novos;
-                    break;
-            }
-            
-            if (!origemArray || !destinoArray) {
-                throw new Error('Arrays de origem ou destino não encontrados');
-            }
-            
-            // Encontrar cliente
-            const index = origemArray.findIndex(c => c.id === clienteId);
-            if (index === -1) {
-                throw new Error('Cliente não encontrado na origem');
-            }
-            
-            // Mover cliente
-            cliente = origemArray.splice(index, 1)[0];
-            destinoArray.push(cliente);
-            
-            // Marcar mudanças e salvar
-            this.markDataChanged();
-            
-            console.log(`✅ Cliente movido com sucesso para ${destino}`);
-            
-        } catch (error) {
-            console.error('❌ Erro ao mover cliente:', error);
-            throw error;
-        }
-    }
-
-    // Método melhorado para agendar
-    async agendarCliente(clienteId, dataHora, observacao = '') {
-        try {
-            console.log(`📅 Agendando cliente ${clienteId} para ${dataHora}`);
-            
-            const agendamentoId = `schedule_${clienteId}_${Date.now()}`;
-            
-            this.schedules[agendamentoId] = {
-                id: agendamentoId,
-                clientId: clienteId,
-                dataHora: dataHora,
-                observacao: observacao,
-                criadoEm: new Date().toISOString(),
-                status: 'agendado'
-            };
-            
-            // Marcar mudanças e salvar
-            this.markDataChanged();
-            
-            console.log(`✅ Agendamento criado: ${agendamentoId}`);
-            return agendamentoId;
-            
-        } catch (error) {
-            console.error('❌ Erro ao agendar cliente:', error);
-            throw error;
-        }
-    }
-
-    // Método melhorado para salvar observação
-    async salvarObservacao(clienteId, observacao) {
-        try {
-            if (window.dbManager && typeof window.dbManager.saveObservation === 'function') {
-                window.dbManager.saveObservation(clienteId, observacao);
-                console.log(`📝 Observação salva para cliente ${clienteId}`);
-            }
-        } catch (error) {
-            console.error('❌ Erro ao salvar observação:', error);
-        }
-    }
-
     renderList(data) {
         const list = document.getElementById('client-list');
         if (!list) return;
@@ -521,7 +281,7 @@ class ClientManager {
         list.innerHTML = '';
 
         if (data.length === 0) {
-            list.innerHTML = '<p class="empty-state">Nenhum cliente encontrado com os filtros aplicados.</p>';
+            list.innerHTML = '<div class="empty-state">Nenhum cliente encontrado com os filtros aplicados.</div>';
             return;
         }
 
@@ -529,67 +289,253 @@ class ClientManager {
             const div = document.createElement('div');
             div.className = 'client-item';
             div.setAttribute('data-status', 'inativo');
-
+            
             const cidade = this.extrairCidadeDoItem(item);
             
             div.innerHTML = `
-                <h4>${item['Nome Fantasia'] || item['Cliente'] || 'Cliente sem nome'}</h4>
+                <h4>${item['Nome Fantasia'] || item['Cliente'] || 'N/A'}</h4>
                 <p><strong>Contato:</strong> ${item['Contato'] || 'N/A'}</p>
-                <p><strong>Telefone:</strong> ${item['Telefone'] || 'N/A'}</p>
+                <p><strong>Telefone:</strong> ${item['Celular'] || 'N/A'}</p>
                 <p><strong>Cidade:</strong> ${cidade || 'N/A'}</p>
                 <p><strong>Segmento:</strong> ${item['Segmento'] || 'N/A'}</p>
-                <p><strong>Endereço:</strong> ${item['Endereço'] || 'N/A'}</p>
             `;
 
-            div.addEventListener('click', () => {
-                if (typeof window.openClientModal === 'function') {
-                    window.openClientModal(item);
-                }
-            });
-
+            div.onclick = () => this.showClientModal(item);
             list.appendChild(div);
         });
     }
 
-    // Método para limpeza ao destruir
-    destroy() {
-        if (this.autoSaveInterval) {
-            clearInterval(this.autoSaveInterval);
-        }
+    showClientModal(cliente) {
+        this.currentItem = cliente;
+        const modal = document.getElementById('modal');
         
-        if (this.saveTimeout) {
-            clearTimeout(this.saveTimeout);
+        if (!modal) {
+            console.error('Modal não encontrado');
+            return;
         }
+
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
         
-        // Salvar dados pendentes antes de destruir
-        if (this.pendingChanges) {
-            this.saveAllData().catch(error => {
-                console.error('❌ Erro ao salvar dados na destruição:', error);
-            });
+        if (!modalTitle || !modalBody) {
+            console.error('Elementos do modal não encontrados');
+            return;
         }
+
+        modalTitle.textContent = cliente['Nome Fantasia'] || cliente['Cliente'] || 'Cliente';
         
-        console.log('🧹 ClientManager destruído');
+        const cidade = this.extrairCidadeDoItem(cliente);
+        const endereco = this.formatarEndereco(cliente['Endereço'] || '');
+        
+        modalBody.innerHTML = `
+            <div class="client-details">
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <label>Nome Fantasia:</label>
+                        <div class="detail-value">${cliente['Nome Fantasia'] || 'N/A'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <label>Contato:</label>
+                        <div class="detail-value">${cliente['Contato'] || 'N/A'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <label>Telefone:</label>
+                        <div class="detail-value">${cliente['Celular'] || 'N/A'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <label>CNPJ/CPF:</label>
+                        <div class="detail-value">${cliente['CNPJ / CPF'] || 'N/A'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <label>Cidade:</label>
+                        <div class="detail-value">${cidade || 'N/A'}</div>
+                    </div>
+                    <div class="detail-item">
+                        <label>Segmento:</label>
+                        <div class="detail-value">${cliente['Segmento'] || 'N/A'}</div>
+                    </div>
+                    <div class="detail-item full-width">
+                        <label>Endereço:</label>
+                        <div class="detail-value">${endereco || 'N/A'}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-section">
+                <h3>🗓️ Agendamento</h3>
+                <div class="agenda-form">
+                    <div>
+                        <label>Data:</label>
+                        <input type="date" id="agendaData" class="agenda-select">
+                    </div>
+                    <div>
+                        <label>Hora:</label>
+                        <select id="agendaHora" class="agenda-select">
+                            <option value="">Selecione</option>
+                            <option value="08:00">08:00</option>
+                            <option value="09:00">09:00</option>
+                            <option value="10:00">10:00</option>
+                            <option value="11:00">11:00</option>
+                            <option value="14:00">14:00</option>
+                            <option value="15:00">15:00</option>
+                            <option value="16:00">16:00</option>
+                            <option value="17:00">17:00</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-success" onclick="window.clientManager.salvarAgendamento()">
+                        📅 Agendar
+                    </button>
+                </div>
+            </div>
+            
+            <div class="modal-section">
+                <h3>📝 Observações</h3>
+                <div class="observacoes-container">
+                    <textarea 
+                        id="observacoes" 
+                        class="observacoes-textarea" 
+                        placeholder="Digite suas observações sobre este cliente..."
+                        oninput="updateCharCounter()"
+                        maxlength="2000"
+                    >${this.loadObservacao(cliente.id) || ''}</textarea>
+                    <div class="observacoes-footer">
+                        <button class="btn btn-primary" onclick="window.clientManager.salvarObservacao()">
+                            💾 Salvar Observação
+                        </button>
+                        <div id="observacoes-contador" class="char-counter">0/2000</div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Atualizar contador de caracteres
+        setTimeout(() => {
+            if (typeof updateCharCounter === 'function') {
+                updateCharCounter();
+            }
+        }, 100);
+
+        modal.style.display = 'block';
     }
 
-    // Método para verificar status dos dados
-    getDataStatus() {
-        return {
-            initialized: this.initialized,
-            pendingChanges: this.pendingChanges,
-            lastSaveTime: this.lastSaveTime,
-            dataCount: {
-                inativos: this.data.length,
-                ativos: this.ativos.length,
-                novos: this.novos.length,
-                agendamentos: Object.keys(this.schedules).length
+    closeModal() {
+        const modal = document.getElementById('modal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+        this.currentItem = null;
+    }
+
+    async salvarAgendamento() {
+        if (!this.currentItem) return;
+
+        const data = document.getElementById('agendaData')?.value;
+        const hora = document.getElementById('agendaHora')?.value;
+
+        if (!data || !hora) {
+            alert('Por favor, selecione data e hora');
+            return;
+        }
+
+        try {
+            const agendamento = {
+                clientId: this.currentItem.id,
+                cliente: this.currentItem['Nome Fantasia'] || this.currentItem['Cliente'],
+                data: data,
+                hora: hora,
+                createdAt: new Date().toISOString()
+            };
+
+            const scheduleId = `${this.currentItem.id}_${Date.now()}`;
+            this.schedules[scheduleId] = agendamento;
+
+            await window.dbManager.saveData('schedules', this.schedules);
+
+            if (typeof window.showSuccessMessage === 'function') {
+                window.showSuccessMessage('Agendamento salvo com sucesso!');
             }
+
+            this.closeModal();
+
+            if (typeof window.renderAllTabs === 'function') {
+                window.renderAllTabs();
+            }
+
+        } catch (error) {
+            console.error('❌ Erro ao salvar agendamento:', error);
+            alert('Erro ao salvar agendamento');
+        }
+    }
+
+    salvarObservacao() {
+        if (!this.currentItem) return;
+
+        const observacao = document.getElementById('observacoes')?.value || '';
+        
+        try {
+            if (window.dbManager && typeof window.dbManager.saveObservation === 'function') {
+                window.dbManager.saveObservation(this.currentItem.id, observacao);
+                
+                if (typeof window.showSuccessMessage === 'function') {
+                    window.showSuccessMessage('Observação salva com sucesso!');
+                }
+            }
+        } catch (error) {
+            console.error('❌ Erro ao salvar observação:', error);
+            alert('Erro ao salvar observação');
+        }
+    }
+
+    loadObservacao(clientId) {
+        try {
+            if (window.dbManager && typeof window.dbManager.loadObservation === 'function') {
+                return window.dbManager.loadObservation(clientId);
+            }
+            return '';
+        } catch (error) {
+            console.error('❌ Erro ao carregar observação:', error);
+            return '';
+        }
+    }
+
+    extrairCidadeDoEndereco(endereco) {
+        if (!endereco) return '';
+        
+        const linhas = endereco.split('\n').map(linha => linha.trim()).filter(linha => linha);
+        
+        if (linhas.length >= 3) {
+            return linhas[2];
+        }
+        
+        const cidadeMatch = endereco.match(/([A-ZÁÊÔÇÃÉÍ\s]+)(?:\s*-\s*[A-Z]{2})?/);
+        return cidadeMatch ? cidadeMatch[1].trim() : '';
+    }
+
+    formatarEndereco(endereco) {
+        if (!endereco) return '';
+        return endereco.replace(/\r?\n/g, ', ').replace(/,\s*,/g, ',').trim();
+    }
+
+    // Verificar se há dados carregados
+    hasData() {
+        return this.dataLoaded && (this.data.length > 0 || this.ativos.length > 0 || this.novos.length > 0);
+    }
+
+    // Obter estatísticas dos dados
+    getDataStats() {
+        return {
+            inativos: this.data.length,
+            ativos: this.ativos.length,
+            novos: this.novos.length,
+            agendamentos: Object.keys(this.schedules).length,
+            total: this.data.length + this.ativos.length + this.novos.length
         };
     }
 }
 
-// Expor globalmente
+// Inicializar instância global
 if (typeof window !== 'undefined') {
-    window.ClientManager = ClientManager;
+    window.clientManager = new ClientManager();
 }
 
-console.log('✅ client-manager.js carregado - versão com persistência robusta');
+console.log('✅ client-manager.js carregado');
