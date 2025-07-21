@@ -1,6 +1,6 @@
 // service-worker.js - Service Worker corrigido para resolver erros de clone
 
-const CACHE_NAME = 'pmg-agenda-v2.2';
+const CACHE_NAME = 'pmg-agenda-v1.0.7';
 const CACHE_VERSION = '2.2';
 
 // Arquivos para cache
