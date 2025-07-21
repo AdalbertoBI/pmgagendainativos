@@ -1,5 +1,5 @@
 // service-worker.js - Service Worker adaptado para novo formato
-const CACHE_NAME = 'pmg-agenda-v1.1.0';
+const CACHE_NAME = 'pmg-agenda-v2.1';
 const CACHE_VERSION = '2.1';
 
 // Arquivos para cache - ATUALIZADO
