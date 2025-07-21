@@ -1,9 +1,9 @@
-// service-worker.js - Service Worker corrigido para resolver erros de clone
+// service-worker.js - Service Worker otimizado para funcionamento offline COMPLETO
 
-const CACHE_NAME = 'pmg-agenda-v1.0.8';
-const CACHE_VERSION = '2.2';
+const CACHE_NAME = 'pmg-agenda-v3.2';
+const CACHE_VERSION = '3.2';
 
-// Arquivos para cache
+// Arquivos para cache - TODOS os recursos necessários
 const STATIC_CACHE_FILES = [
     '/pmgagendainativos/',
     '/pmgagendainativos/index.html',
@@ -11,48 +11,94 @@ const STATIC_CACHE_FILES = [
     '/pmgagendainativos/client-manager.js',
     '/pmgagendainativos/dbManager.js',
     '/pmgagendainativos/map.js',
+    '/pmgagendainativos/styles.css',
     '/pmgagendainativos/manifest.json',
     '/pmgagendainativos/icon-48.png',
     '/pmgagendainativos/icon-192.png',
     '/pmgagendainativos/icon-512.png',
+    // CDN resources
     'https://unpkg.com/leaflet@1.7.1/dist/leaflet.css',
     'https://unpkg.com/leaflet@1.7.1/dist/leaflet.js',
     'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
 ];
 
-// URLs que devem sempre buscar da rede
+// URLs que devem sempre buscar da rede (quando disponível)
 const NETWORK_FIRST_URLS = [
     'nominatim.openstreetmap.org',
     'tile.openstreetmap.org',
     '/pmgagendainativos/api/'
 ];
 
-// Cache de dados dinâmicos
 const DYNAMIC_CACHE_NAME = `${CACHE_NAME}-dynamic`;
-const DYNAMIC_CACHE_LIMIT = 50;
+const DYNAMIC_CACHE_LIMIT = 150; // Aumentado para suportar mais conteúdo offline
 
 // Instalar Service Worker
 self.addEventListener('install', (event) => {
     console.log('🔧 Service Worker: Instalando versão', CACHE_VERSION);
+    
     event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
+        caches.open(CACHE_NAME).then(async (cache) => {
             console.log('📦 Service Worker: Cacheando arquivos estáticos');
-            return Promise.allSettled(
-                STATIC_CACHE_FILES.map(async (url) => {
-                    try {
-                        const response = await fetch(url);
-                        if (response.ok) {
-                            return cache.put(url, response);
-                        } else {
-                            console.warn(`⚠️ Não foi possível cachear ${url}: ${response.status}`);
+            
+            // Cachear arquivos um por um para melhor controle de erros
+            const cachePromises = STATIC_CACHE_FILES.map(async (url) => {
+                try {
+                    // Para recursos externos, usar mode: 'cors'
+                    const fetchOptions = url.startsWith('http') ? 
+                        { mode: 'cors', cache: 'no-cache' } : 
+                        { cache: 'no-cache' };
+                    
+                    const response = await fetch(url, fetchOptions);
+                    
+                    if (response.ok) {
+                        await cache.put(url, response);
+                        console.log(`✅ Cacheado: ${url}`);
+                    } else {
+                        console.warn(`⚠️ Não foi possível cachear ${url}: ${response.status}`);
+                        
+                        // Para recursos locais que falharam, tentar alternativa
+                        if (url.startsWith('/pmgagendainativos/')) {
+                            try {
+                                const alternativeResponse = await fetch(url.replace('/pmgagendainativos/', './'));
+                                if (alternativeResponse.ok) {
+                                    await cache.put(url, alternativeResponse);
+                                    console.log(`✅ Cacheado (alternativo): ${url}`);
+                                }
+                            } catch (altError) {
+                                console.warn(`⚠️ Falha alternativa para ${url}:`, altError);
+                            }
                         }
-                    } catch (error) {
-                        console.warn(`⚠️ Erro ao cachear ${url}:`, error);
                     }
-                })
-            );
-        }).then(() => {
-            console.log('✅ Service Worker: Instalação concluída');
+                } catch (error) {
+                    console.warn(`⚠️ Erro ao cachear ${url}:`, error.message);
+                    
+                    // Tentar estratégias de fallback
+                    if (url.startsWith('/pmgagendainativos/')) {
+                        const fallbacks = [
+                            url.replace('/pmgagendainativos/', './'),
+                            url.replace('/pmgagendainativos/', ''),
+                            url.substring(url.lastIndexOf('/') + 1)
+                        ];
+                        
+                        for (const fallback of fallbacks) {
+                            try {
+                                const fallbackResponse = await fetch(fallback);
+                                if (fallbackResponse.ok) {
+                                    await cache.put(url, fallbackResponse);
+                                    console.log(`✅ Cacheado (fallback): ${url} -> ${fallback}`);
+                                    break;
+                                }
+                            } catch (fallbackError) {
+                                continue;
+                            }
+                        }
+                    }
+                }
+            });
+            
+            await Promise.allSettled(cachePromises);
+            console.log('✅ Service Worker: Cache inicial concluído');
+            
             return self.skipWaiting();
         }).catch((error) => {
             console.error('❌ Service Worker: Erro na instalação:', error);
@@ -63,6 +109,7 @@ self.addEventListener('install', (event) => {
 // Ativar Service Worker
 self.addEventListener('activate', (event) => {
     console.log('🚀 Service Worker: Ativando versão', CACHE_VERSION);
+    
     event.waitUntil(
         Promise.all([
             // Limpar caches antigos
@@ -76,171 +123,289 @@ self.addEventListener('activate', (event) => {
                     })
                 );
             }),
-            // Assumir controle de todas as páginas
+            // Assumir controle imediato
             self.clients.claim()
         ]).then(() => {
             console.log('✅ Service Worker: Ativação concluída');
+            
+            // Notificar clientes da nova versão
+            self.clients.matchAll().then(clients => {
+                clients.forEach(client => {
+                    client.postMessage({
+                        type: 'SW_UPDATED',
+                        version: CACHE_VERSION
+                    });
+                });
+            });
         }).catch((error) => {
             console.error('❌ Service Worker: Erro na ativação:', error);
         })
     );
 });
 
-// Interceptar requisições
+// Interceptar requisições - Estratégia otimizada para offline
 self.addEventListener('fetch', (event) => {
     const requestUrl = new URL(event.request.url);
-
+    
     // Ignorar requests que não são GET
     if (event.request.method !== 'GET') {
         return;
     }
-
-    // Ignorar requests do Chrome DevTools
-    if (requestUrl.protocol === 'chrome-extension:') {
+    
+    // Ignorar Chrome extensions e outros protocolos não HTTP
+    if (!requestUrl.protocol.startsWith('http')) {
         return;
     }
-
-    // Estratégia Network First para URLs específicas
+    
+    // Estratégia Network First para APIs e mapas
     if (NETWORK_FIRST_URLS.some(url => requestUrl.href.includes(url))) {
-        event.respondWith(networkFirst(event.request));
+        event.respondWith(networkFirstStrategy(event.request));
         return;
     }
-
-    // Estratégia Cache First para arquivos estáticos
+    
+    // Estratégia Cache First para recursos estáticos
     if (STATIC_CACHE_FILES.some(url => {
-        const fileName = url.split('/').pop();
-        return event.request.url.includes(fileName) || event.request.url === url;
+        const urlPath = requestUrl.pathname;
+        const staticPath = new URL(url, self.location).pathname;
+        return urlPath === staticPath || event.request.url === url;
     })) {
-        event.respondWith(cacheFirst(event.request));
+        event.respondWith(cacheFirstStrategy(event.request));
         return;
     }
-
-    // Estratégia Cache First com fallback para outros recursos
-    event.respondWith(cacheFirstWithFallback(event.request));
+    
+    // Estratégia híbrida para outros recursos
+    event.respondWith(hybridStrategy(event.request));
 });
 
-// Estratégia Cache First - CORRIGIDA
-async function cacheFirst(request) {
+// Estratégia Cache First - Otimizada para recursos estáticos
+async function cacheFirstStrategy(request) {
     try {
         const cacheResponse = await caches.match(request);
+        
         if (cacheResponse) {
-            console.log('📦 Service Worker: Servindo do cache:', request.url);
+            console.log('📦 Cache hit:', request.url);
+            
+            // Atualizar em background se possível
+            updateCacheInBackground(request);
             return cacheResponse;
         }
-
-        console.log('🌐 Service Worker: Buscando da rede:', request.url);
-        const networkResponse = await fetch(request.clone()); // Clone da request, não da response
         
-        // Verificar se a resposta é válida antes de cachear
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+        console.log('🌐 Cache miss, buscando da rede:', request.url);
+        const networkResponse = await fetchWithTimeout(request, 15000);
+        
+        if (networkResponse && networkResponse.ok) {
             const cache = await caches.open(CACHE_NAME);
-            // Clonar ANTES de usar a response
-            const responseToCache = networkResponse.clone();
-            cache.put(request, responseToCache);
+            await cache.put(request, networkResponse.clone());
+            console.log('✅ Recurso cacheado:', request.url);
         }
-
+        
         return networkResponse;
     } catch (error) {
-        console.error('❌ Service Worker: Erro em cacheFirst:', error);
+        console.warn('❌ Falha em cache first:', error);
         
-        // Tentar buscar do cache como fallback
-        const cacheResponse = await caches.match(request);
-        if (cacheResponse) {
-            return cacheResponse;
+        // Fallback para cache mesmo se expirado
+        const staleCache = await caches.match(request);
+        if (staleCache) {
+            console.log('📦 Servindo cache expirado:', request.url);
+            return staleCache;
         }
-
-        return new Response('Offline - Recurso não disponível', {
-            status: 503,
-            statusText: 'Service Unavailable',
-            headers: { 'Content-Type': 'text/plain' }
-        });
+        
+        return createOfflineResponse(request);
     }
 }
 
-// Estratégia Network First - CORRIGIDA
-async function networkFirst(request) {
+// Estratégia Network First - Para conteúdo dinâmico
+async function networkFirstStrategy(request) {
     try {
-        console.log('🌐 Service Worker: Network first para:', request.url);
+        const networkResponse = await fetchWithTimeout(request, 10000);
         
-        // Configurar timeout para evitar esperas longas
+        if (networkResponse && networkResponse.ok) {
+            const cache = await caches.open(DYNAMIC_CACHE_NAME);
+            await cache.put(request, networkResponse.clone());
+            await limitCacheSize(DYNAMIC_CACHE_NAME, DYNAMIC_CACHE_LIMIT);
+            console.log('✅ Recurso dinâmico cacheado:', request.url);
+        }
+        
+        return networkResponse;
+    } catch (error) {
+        console.log('📦 Network falhou, tentando cache:', request.url);
+        const cacheResponse = await caches.match(request);
+        
+        if (cacheResponse) {
+            return cacheResponse;
+        }
+        
+        return createOfflineResponse(request);
+    }
+}
+
+// Estratégia híbrida - Equilibrio entre cache e network
+async function hybridStrategy(request) {
+    try {
+        const cache = await caches.open(DYNAMIC_CACHE_NAME);
+        const cacheResponse = await cache.match(request);
+        
+        // Se temos cache, servir imediatamente e atualizar em background
+        if (cacheResponse) {
+            console.log('📦 Servindo do cache híbrido:', request.url);
+            updateCacheInBackground(request);
+            return cacheResponse;
+        }
+        
+        // Se não temos cache, buscar da rede
+        const networkResponse = await fetchWithTimeout(request, 8000);
+        
+        if (networkResponse && networkResponse.ok) {
+            await cache.put(request, networkResponse.clone());
+            await limitCacheSize(DYNAMIC_CACHE_NAME, DYNAMIC_CACHE_LIMIT);
+        }
+        
+        return networkResponse;
+    } catch (error) {
+        return createOfflineResponse(request);
+    }
+}
+
+// Fetch com timeout melhorado
+function fetchWithTimeout(request, timeout = 10000) {
+    return new Promise((resolve, reject) => {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const timeoutId = setTimeout(() => {
+            controller.abort();
+            reject(new Error(`Timeout após ${timeout}ms`));
+        }, timeout);
         
-        const networkResponse = await fetch(request.clone(), {
-            signal: controller.signal
-        });
+        const fetchOptions = {
+            signal: controller.signal,
+            cache: 'no-cache'
+        };
         
-        clearTimeout(timeoutId);
-
-        // Cache da resposta se for bem-sucedida
-        if (networkResponse && networkResponse.status === 200) {
-            const cache = await caches.open(DYNAMIC_CACHE_NAME);
-            // Clonar ANTES de usar a response
-            const responseToCache = networkResponse.clone();
-            cache.put(request, responseToCache);
-            
-            // Limitar tamanho do cache dinâmico
-            limitCacheSize(DYNAMIC_CACHE_NAME, DYNAMIC_CACHE_LIMIT);
+        // Para recursos externos, usar mode cors
+        if (request.url.startsWith('http') && !request.url.includes(self.location.origin)) {
+            fetchOptions.mode = 'cors';
         }
+        
+        fetch(request.clone(), fetchOptions)
+            .then(response => {
+                clearTimeout(timeoutId);
+                resolve(response);
+            })
+            .catch(error => {
+                clearTimeout(timeoutId);
+                reject(error);
+            });
+    });
+}
 
-        return networkResponse;
+// Atualizar cache em background
+async function updateCacheInBackground(request) {
+    try {
+        const networkResponse = await fetchWithTimeout(request, 5000);
+        
+        if (networkResponse && networkResponse.ok) {
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(request, networkResponse);
+            console.log('🔄 Cache atualizado em background:', request.url);
+        }
     } catch (error) {
-        console.log('📦 Service Worker: Rede falhou, tentando cache:', request.url);
-        
-        const cacheResponse = await caches.match(request);
-        if (cacheResponse) {
-            return cacheResponse;
-        }
-
-        return new Response('Offline - Dados não disponíveis', {
-            status: 503,
-            statusText: 'Service Unavailable',
-            headers: { 'Content-Type': 'text/plain' }
-        });
+        // Falha silenciosa em background updates
     }
 }
 
-// Estratégia Cache First com fallback - CORRIGIDA
-async function cacheFirstWithFallback(request) {
-    try {
-        const cacheResponse = await caches.match(request);
-        if (cacheResponse) {
-            console.log('📦 Service Worker: Cache hit:', request.url);
-            return cacheResponse;
-        }
-
-        console.log('🌐 Service Worker: Cache miss, buscando da rede:', request.url);
-        const networkResponse = await fetch(request.clone());
-        
-        // Cache apenas respostas bem-sucedidas
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-            const cache = await caches.open(DYNAMIC_CACHE_NAME);
-            // Clonar ANTES de usar a response
-            const responseToCache = networkResponse.clone();
-            cache.put(request, responseToCache);
-            
-            // Limitar tamanho do cache dinâmico
-            limitCacheSize(DYNAMIC_CACHE_NAME, DYNAMIC_CACHE_LIMIT);
-        }
-
-        return networkResponse;
-    } catch (error) {
-        console.error('❌ Service Worker: Erro em cacheFirstWithFallback:', error);
-        
-        // Fallback para página offline se for uma navegação
-        if (request.destination === 'document') {
-            const offlineResponse = await caches.match('/pmgagendainativos/index.html');
-            if (offlineResponse) {
-                return offlineResponse;
-            }
-        }
-
-        return new Response('Offline', {
-            status: 503,
-            statusText: 'Service Unavailable',
-            headers: { 'Content-Type': 'text/plain' }
+// Criar resposta offline personalizada
+function createOfflineResponse(request) {
+    const url = new URL(request.url);
+    
+    // Para navegação (páginas HTML)
+    if (request.destination === 'document' || 
+        request.headers.get('accept')?.includes('text/html')) {
+        return caches.match('/pmgagendainativos/index.html').then(response => {
+            return response || new Response(`
+                <!DOCTYPE html>
+                <html lang="pt-BR">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>PMG Agenda - Offline</title>
+                    <style>
+                        body {
+                            font-family: 'Segoe UI', sans-serif;
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            height: 100vh;
+                            margin: 0;
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            color: white;
+                            text-align: center;
+                        }
+                        .offline-icon {
+                            font-size: 4rem;
+                            margin-bottom: 1rem;
+                        }
+                        h1 { margin-bottom: 0.5rem; }
+                        p { margin-bottom: 1.5rem; opacity: 0.9; }
+                        button {
+                            background: rgba(255,255,255,0.2);
+                            border: 2px solid white;
+                            color: white;
+                            padding: 0.75rem 1.5rem;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-size: 1rem;
+                            font-weight: 500;
+                            transition: all 0.3s ease;
+                        }
+                        button:hover {
+                            background: rgba(255,255,255,0.3);
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="offline-icon">🌐</div>
+                    <h1>Você está offline</h1>
+                    <p>O aplicativo PMG Agenda carregará assim que a conexão for restaurada.</p>
+                    <button onclick="location.reload()">🔄 Tentar Novamente</button>
+                </body>
+                </html>
+            `, {
+                status: 200,
+                statusText: 'OK',
+                headers: { 'Content-Type': 'text/html' }
+            });
         });
     }
+    
+    // Para recursos JavaScript
+    if (request.destination === 'script' || url.pathname.endsWith('.js')) {
+        return new Response('console.log("Recurso offline - JS não disponível");', {
+            status: 200,
+            statusText: 'OK',
+            headers: { 'Content-Type': 'application/javascript' }
+        });
+    }
+    
+    // Para recursos CSS
+    if (request.destination === 'style' || url.pathname.endsWith('.css')) {
+        return new Response('/* Recurso offline - CSS não disponível */', {
+            status: 200,
+            statusText: 'OK',
+            headers: { 'Content-Type': 'text/css' }
+        });
+    }
+    
+    // Para outros tipos de conteúdo
+    return new Response(JSON.stringify({
+        error: 'Offline',
+        message: 'Este recurso não está disponível offline',
+        url: request.url,
+        timestamp: new Date().toISOString()
+    }), {
+        status: 503,
+        statusText: 'Service Unavailable',
+        headers: { 'Content-Type': 'application/json' }
+    });
 }
 
 // Limitar tamanho do cache dinâmico
@@ -250,78 +415,96 @@ async function limitCacheSize(cacheName, maxItems) {
         const keys = await cache.keys();
         
         if (keys.length > maxItems) {
-            console.log(`🧹 Service Worker: Limpando cache ${cacheName}, ${keys.length} > ${maxItems}`);
-            
-            // Remover itens mais antigos
             const itemsToDelete = keys.slice(0, keys.length - maxItems);
             await Promise.all(itemsToDelete.map(key => cache.delete(key)));
-            
-            console.log(`✅ Service Worker: ${itemsToDelete.length} itens removidos do cache`);
+            console.log(`🧹 Cache limitado: ${itemsToDelete.length} itens removidos de ${cacheName}`);
         }
     } catch (error) {
-        console.error('❌ Service Worker: Erro ao limitar cache:', error);
+        console.error('❌ Erro ao limitar cache:', error);
     }
 }
 
-// Sincronização em background
+// Background sync para quando voltar online
 self.addEventListener('sync', (event) => {
-    console.log('🔄 Service Worker: Evento de sincronização:', event.tag);
+    console.log('🔄 Background sync:', event.tag);
     
     if (event.tag === 'background-sync-clients') {
-        event.waitUntil(syncClients());
+        event.waitUntil(syncOfflineData());
     }
 });
 
-// Função de sincronização de clientes
-async function syncClients() {
+// Sincronizar dados offline
+async function syncOfflineData() {
     try {
-        console.log('🔄 Service Worker: Sincronizando dados de clientes...');
-        // Implementar lógica de sincronização quando necessário
-        console.log('✅ Service Worker: Sincronização concluída');
+        console.log('🔄 Sincronizando dados offline...');
+        
+        // Notificar clientes que a sincronização iniciou
+        const clients = await self.clients.matchAll();
+        clients.forEach(client => {
+            client.postMessage({
+                type: 'SYNC_STARTED'
+            });
+        });
+        
+        // Aqui você pode implementar lógica específica de sincronização
+        // Por exemplo, enviar dados pendentes para o servidor
+        
+        console.log('✅ Sincronização concluída');
+        
+        clients.forEach(client => {
+            client.postMessage({
+                type: 'SYNC_COMPLETED'
+            });
+        });
+        
     } catch (error) {
-        console.error('❌ Service Worker: Erro na sincronização:', error);
+        console.error('❌ Erro na sincronização:', error);
+        
+        const clients = await self.clients.matchAll();
+        clients.forEach(client => {
+            client.postMessage({
+                type: 'SYNC_FAILED',
+                error: error.message
+            });
+        });
     }
 }
 
-// Push notifications
+// Push notifications (preparado para futuro uso)
 self.addEventListener('push', (event) => {
     if (!event.data) return;
-
+    
     try {
         const data = event.data.json();
-        console.log('📬 Service Worker: Push recebido:', data);
-        
         const options = {
-            body: data.body || 'Nova notificação da PMG Agenda',
+            body: data.body || 'Nova atualização da PMG Agenda',
             icon: '/pmgagendainativos/icon-192.png',
             badge: '/pmgagendainativos/icon-48.png',
-            vibrate: [100, 50, 100],
+            vibrate: [200, 100, 200],
             data: data.data || {},
             actions: [
-                {
-                    action: 'open',
-                    title: 'Abrir App'
-                },
-                {
-                    action: 'close',
-                    title: 'Fechar'
-                }
-            ]
+                { action: 'open', title: 'Abrir', icon: '/pmgagendainativos/icon-48.png' },
+                { action: 'close', title: 'Fechar' }
+            ],
+            requireInteraction: true,
+            silent: false
         };
-
+        
         event.waitUntil(
-            self.registration.showNotification(data.title || 'PMG Agenda', options)
+            self.registration.showNotification(
+                data.title || 'PMG Agenda Clientes',
+                options
+            )
         );
     } catch (error) {
-        console.error('❌ Service Worker: Erro ao processar push:', error);
+        console.error('❌ Erro ao processar push:', error);
     }
 });
 
 // Clique em notificação
 self.addEventListener('notificationclick', (event) => {
-    console.log('👆 Service Worker: Notificação clicada:', event.action);
     event.notification.close();
-
+    
     if (event.action === 'open') {
         event.waitUntil(
             clients.openWindow('/pmgagendainativos/')
@@ -329,9 +512,9 @@ self.addEventListener('notificationclick', (event) => {
     }
 });
 
-// Mensagens do cliente
+// Comunicação com cliente
 self.addEventListener('message', (event) => {
-    console.log('💬 Service Worker: Mensagem recebida:', event.data);
+    console.log('💬 Mensagem recebida:', event.data);
     
     if (event.data && event.data.type) {
         switch (event.data.type) {
@@ -352,28 +535,99 @@ self.addEventListener('message', (event) => {
                 });
                 break;
                 
+            case 'CACHE_URLS':
+                if (event.data.urls) {
+                    cacheSpecificUrls(event.data.urls).then((result) => {
+                        event.ports[0].postMessage({ cached: result });
+                    });
+                }
+                break;
+                
+            case 'GET_CACHE_STATUS':
+                getCacheStatus().then((status) => {
+                    event.ports[0].postMessage({ status });
+                });
+                break;
+                
             default:
-                console.log('⚠️ Service Worker: Tipo de mensagem desconhecido:', event.data.type);
+                console.log('⚠️ Tipo de mensagem desconhecido:', event.data.type);
         }
     }
 });
+
+// Obter status do cache
+async function getCacheStatus() {
+    try {
+        const cacheNames = await caches.keys();
+        const status = {};
+        
+        for (const cacheName of cacheNames) {
+            const cache = await caches.open(cacheName);
+            const keys = await cache.keys();
+            status[cacheName] = {
+                itemCount: keys.length,
+                urls: keys.map(request => request.url).slice(0, 10) // Primeiras 10 URLs
+            };
+        }
+        
+        return {
+            version: CACHE_VERSION,
+            caches: status,
+            timestamp: new Date().toISOString()
+        };
+    } catch (error) {
+        return { error: error.message };
+    }
+}
+
+// Cachear URLs específicas
+async function cacheSpecificUrls(urls) {
+    try {
+        const cache = await caches.open(DYNAMIC_CACHE_NAME);
+        const results = [];
+        
+        for (const url of urls) {
+            try {
+                const response = await fetchWithTimeout(url, 10000);
+                if (response && response.ok) {
+                    await cache.put(url, response);
+                    results.push({ url, success: true });
+                } else {
+                    results.push({ 
+                        url, 
+                        success: false, 
+                        error: `Status ${response ? response.status : 'unknown'}` 
+                    });
+                }
+            } catch (error) {
+                results.push({ url, success: false, error: error.message });
+            }
+        }
+        
+        await limitCacheSize(DYNAMIC_CACHE_NAME, DYNAMIC_CACHE_LIMIT);
+        return results;
+    } catch (error) {
+        console.error('❌ Erro ao cachear URLs específicas:', error);
+        return [];
+    }
+}
 
 // Limpar todos os caches
 async function clearAllCaches() {
     try {
         const cacheNames = await caches.keys();
         await Promise.all(cacheNames.map(name => caches.delete(name)));
-        console.log('🧹 Service Worker: Todos os caches foram limpos');
+        console.log('🧹 Todos os caches limpos');
         return true;
     } catch (error) {
-        console.error('❌ Service Worker: Erro ao limpar caches:', error);
+        console.error('❌ Erro ao limpar caches:', error);
         return false;
     }
 }
 
-// Tratamento de erros não capturados
+// Tratamento global de erros
 self.addEventListener('error', (event) => {
-    console.error('❌ Service Worker: Erro não capturado:', event.error);
+    console.error('❌ Service Worker: Erro global:', event.error);
 });
 
 self.addEventListener('unhandledrejection', (event) => {
@@ -381,7 +635,4 @@ self.addEventListener('unhandledrejection', (event) => {
     event.preventDefault();
 });
 
-// Log de inicialização
-console.log(`✅ Service Worker carregado - Versão ${CACHE_VERSION}`);
-console.log('🔧 Recursos em cache:', STATIC_CACHE_FILES.length);
-console.log('📦 Cache dinâmico limitado a:', DYNAMIC_CACHE_LIMIT, 'itens');
+console.log(`✅ Service Worker carregado - Versão ${CACHE_VERSION} (Offline Completo Melhorado)`);

@@ -1,4 +1,4 @@
-// script.js - Arquivo principal com filtros recolhíveis e geocodificação inteligente
+// script.js - Arquivo principal TOTALMENTE corrigido com processamento adequado da planilha
 
 let currentTab = 'inativos';
 let isSystemReady = false;
@@ -7,13 +7,12 @@ let isSystemReady = false;
 document.addEventListener('DOMContentLoaded', async () => {
     try {
         console.log('🚀 Iniciando sistema PMG Agenda Inativos...');
-        
         showLoadingIndicator();
+        
         await initializeSystem();
         
         console.log('✅ Sistema inicializado com sucesso!');
         isSystemReady = true;
-        
         hideLoadingIndicator();
         
     } catch (error) {
@@ -23,112 +22,369 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// Mostrar indicador de carregamento
-function showLoadingIndicator() {
-    const indicator = document.createElement('div');
-    indicator.id = 'loading-indicator';
-    indicator.innerHTML = `
-        <div class="loading-indicator">
-            <div class="spinner"></div>
-            <p>Inicializando sistema...</p>
-            <small>Aguarde enquanto carregamos todos os recursos...</small>
-        </div>
-    `;
-    document.body.appendChild(indicator);
-}
-
-// Esconder indicador de carregamento
-function hideLoadingIndicator() {
-    const indicator = document.getElementById('loading-indicator');
-    if (indicator) {
-        indicator.remove();
-    }
-}
-
 // Inicializar sistema completo
 async function initializeSystem() {
     try {
-        console.log('🔧 Inicializando componentes...');
+        // 1. Aguardar dependências externas
+        await waitForDependencies();
         
-        if (window.dbManager) {
-            await window.dbManager.init();
-            console.log('✅ DBManager inicializado');
+        // 2. Inicializar dbManager
+        if (!window.dbManager) {
+            throw new Error('dbManager não encontrado');
         }
-        
-        if (window.clientManager) {
-            if (!window.clientManager.initialized) {
-                await window.clientManager.init();
-            }
-            console.log('✅ ClientManager inicializado');
+        await window.dbManager.init();
+        console.log('✅ dbManager inicializado');
+
+        // 3. Inicializar clientManager
+        if (!window.clientManager) {
+            throw new Error('clientManager não encontrado');
         }
-        
+        await window.clientManager.init();
+        console.log('✅ clientManager inicializado');
+
+        // 4. Configurar manipuladores de eventos
         setupEventListeners();
-        console.log('✅ Event listeners configurados');
-        
-        renderAllTabs();
-        console.log('✅ Dados iniciais renderizados');
-        
+
+        // 5. Configurar navegação de abas
+        setupTabNavigation();
+
+        // 6. Renderizar interface
+        await renderAllTabs();
+
+        // 7. Atualizar filtros de cidade
         updateCityFilter();
-        console.log('✅ Filtros de cidades atualizados');
+
+        // 8. Inicializar mapa com delay
+        setTimeout(() => {
+            initializeMap();
+        }, 1500);
+
+        console.log('🎉 Sistema totalmente inicializado!');
         
     } catch (error) {
-        console.error('❌ Erro na inicialização do sistema:', error);
+        console.error('❌ Falha na inicialização completa:', error);
         throw error;
     }
 }
 
-// Inicialização básica em caso de erro
+// Aguardar dependências externas
+async function waitForDependencies() {
+    console.log('⏳ Aguardando dependências...');
+    
+    // Aguardar XLSX
+    await waitForGlobal('XLSX');
+    console.log('✅ XLSX carregado');
+    
+    // Aguardar Leaflet
+    await waitForGlobal('L');
+    console.log('✅ Leaflet carregado');
+    
+    // Aguardar managers
+    await waitForGlobal('dbManager');
+    await waitForGlobal('clientManager');
+    console.log('✅ Managers carregados');
+}
+
+// Aguardar variável global
+function waitForGlobal(globalName, timeout = 30000) {
+    return new Promise((resolve, reject) => {
+        const startTime = Date.now();
+        
+        const checkGlobal = () => {
+            if (window[globalName]) {
+                resolve(window[globalName]);
+                return;
+            }
+            
+            if (Date.now() - startTime > timeout) {
+                reject(new Error(`Timeout esperando por ${globalName}`));
+                return;
+            }
+            
+            setTimeout(checkGlobal, 100);
+        };
+        
+        checkGlobal();
+    });
+}
+
+// Inicializar sistema básico em caso de falha
 async function initializeBasicSystem() {
     try {
-        console.log('⚠️ Inicializando sistema básico...');
+        console.log('🚑 Inicializando sistema básico...');
         
-        setupEventListeners();
+        // Configurar handlers básicos
+        setupBasicEventListeners();
         
-        const container = document.querySelector('.container');
-        if (container) {
-            const warning = document.createElement('div');
-            warning.innerHTML = `
-                <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px; margin: 20px 0; color: #856404;">
-                    <h4>⚠️ Sistema em modo básico</h4>
-                    <p>Alguns recursos podem não estar disponíveis. Tente recarregar a página.</p>
-                </div>
-            `;
-            container.insertBefore(warning, container.firstChild);
-        }
+        // Mostrar interface de upload
+        showUploadInterface();
         
+        isSystemReady = true;
         hideLoadingIndicator();
+        console.log('✅ Sistema básico pronto');
+        
     } catch (error) {
-        console.error('❌ Erro na inicialização básica:', error);
-        hideLoadingIndicator();
+        console.error('❌ Falha crítica no sistema básico:', error);
+        showErrorMessage('Sistema não pôde ser inicializado. Recarregue a página.');
     }
 }
 
-// Configurar event listeners
+// Configurar navegação de abas - CORRIGIDA
+function setupTabNavigation() {
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    tabButtons.forEach(button => {
+        button.addEventListener('click', async () => {
+            try {
+                const tabName = button.getAttribute('data-tab');
+                console.log(`🔄 Alternando para aba: ${tabName}`);
+                
+                // Remover classe active de todos os botões e conteúdos
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabContents.forEach(content => content.classList.remove('active'));
+                
+                // Adicionar classe active ao botão e conteúdo selecionados
+                button.classList.add('active');
+                const targetContent = document.getElementById(`${tabName}-tab`);
+                if (targetContent) {
+                    targetContent.classList.add('active');
+                } else {
+                    console.warn(`⚠️ Conteúdo da aba ${tabName} não encontrado`);
+                }
+                
+                currentTab = tabName;
+                
+                // Renderizar conteúdo da aba com tratamento específico
+                switch(tabName) {
+                    case 'inativos':
+                        if (typeof renderInativos === 'function') {
+                            renderInativos();
+                        } else {
+                            console.warn('⚠️ Função renderInativos não encontrada');
+                        }
+                        break;
+                        
+                    case 'ativos':
+                        if (typeof renderAtivos === 'function') {
+                            renderAtivos();
+                        } else {
+                            console.warn('⚠️ Função renderAtivos não encontrada');
+                        }
+                        break;
+                        
+                    case 'novos':
+                        if (typeof renderNovos === 'function') {
+                            renderNovos();
+                        } else {
+                            console.warn('⚠️ Função renderNovos não encontrada');
+                        }
+                        break;
+                        
+                    case 'agenda':
+                        if (typeof renderAgenda === 'function') {
+                            renderAgenda();
+                        } else {
+                            console.warn('⚠️ Função renderAgenda não encontrada');
+                        }
+                        break;
+                        
+                    case 'mapa':
+                        // TRATAMENTO ESPECIAL PARA O MAPA - CORRIGIDO
+                        await handleMapTabActivation();
+                        break;
+                        
+                    default:
+                        console.log(`ℹ️ Aba ${tabName} ativada sem ação específica`);
+                }
+                
+            } catch (error) {
+                console.error(`❌ Erro ao alternar para aba ${button.getAttribute('data-tab')}:`, error);
+                // Não impedir a mudança de aba mesmo com erro
+            }
+        });
+    });
+}
+
+// Função específica para lidar com ativação da aba do mapa - NOVA
+async function handleMapTabActivation() {
+    try {
+        console.log('🗺️ Ativando aba do mapa...');
+        
+        // Verificar se mapManager existe
+        if (!window.mapManager) {
+            console.log('⚠️ MapManager não encontrado, tentando inicializar...');
+            
+            // Tentar aguardar o mapManager ser carregado
+            await waitForMapManager();
+            
+            if (!window.mapManager) {
+                throw new Error('MapManager não pôde ser carregado');
+            }
+        }
+
+        // Verificar se o mapa foi inicializado
+        if (!window.mapManager.initialized) {
+            console.log('🗺️ Mapa não inicializado, inicializando agora...');
+            
+            try {
+                await window.mapManager.init();
+                console.log('✅ Mapa inicializado com sucesso');
+            } catch (initError) {
+                console.error('❌ Erro ao inicializar mapa:', initError);
+                showMapError('Erro ao inicializar mapa. Clique em "Tentar Novamente".');
+                return;
+            }
+        }
+
+        // Usar o método específico para ativação da aba (se disponível)
+        if (typeof window.mapManager.onMapTabActivated === 'function') {
+            console.log('🔄 Notificando mapManager sobre ativação da aba');
+            window.mapManager.onMapTabActivated();
+        } else {
+            // Fallback - invalidar tamanho e atualizar marcadores
+            console.log('🔄 Usando método fallback para ativar mapa');
+            
+            setTimeout(() => {
+                try {
+                    // Verificar se o mapa interno existe antes de usar
+                    if (window.mapManager.map && typeof window.mapManager.map.invalidateSize === 'function') {
+                        window.mapManager.map.invalidateSize(true);
+                        console.log('✅ Tamanho do mapa invalidado');
+                    }
+                    
+                    // Atualizar marcadores se disponível
+                    if (typeof window.mapManager.updateAllMarkers === 'function') {
+                        window.mapManager.updateAllMarkers();
+                        console.log('✅ Marcadores do mapa atualizados');
+                    }
+                } catch (updateError) {
+                    console.error('❌ Erro ao atualizar mapa:', updateError);
+                }
+            }, 200);
+        }
+
+    } catch (error) {
+        console.error('❌ Erro crítico ao ativar aba do mapa:', error);
+        
+        // Mostrar erro no container do mapa
+        showMapError('Erro ao carregar mapa. Verifique sua conexão e tente novamente.');
+    }
+}
+
+// Função para aguardar mapManager - NOVA
+function waitForMapManager(timeout = 10000) {
+    return new Promise((resolve) => {
+        const startTime = Date.now();
+        
+        const checkMapManager = () => {
+            if (window.mapManager && typeof window.mapManager.init === 'function') {
+                console.log('✅ MapManager encontrado');
+                resolve(true);
+                return;
+            }
+            
+            if (Date.now() - startTime > timeout) {
+                console.warn('⏰ Timeout aguardando mapManager');
+                resolve(false);
+                return;
+            }
+            
+            setTimeout(checkMapManager, 100);
+        };
+        
+        checkMapManager();
+    });
+}
+
+// Função melhorada para mostrar erro no mapa - NOVA
+function showMapError(message) {
+    const mapContainer = document.getElementById('map');
+    if (!mapContainer) {
+        console.warn('⚠️ Container do mapa não encontrado para mostrar erro');
+        return;
+    }
+
+    mapContainer.style.height = '500px';
+    mapContainer.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #6c757d; text-align: center; padding: 2rem; background: #f8f9fa;">
+            <div style="font-size: 4rem; margin-bottom: 1.5rem;">🗺️</div>
+            <h3 style="margin: 0 0 1rem 0; color: #dc3545;">Problema no Mapa</h3>
+            <p style="margin: 0 0 1.5rem 0; font-size: 1rem; max-width: 400px; line-height: 1.5;">${message}</p>
+            <button onclick="retryMapInitialization()" style="padding: 0.75rem 1.5rem; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: all 0.3s ease;">
+                🔄 Tentar Novamente
+            </button>
+        </div>
+    `;
+}
+
+// Função para retry do mapa - NOVA
+function retryMapInitialization() {
+    console.log('🔄 Tentando reinicializar mapa pelo usuário...');
+    
+    // Resetar estado se mapManager existir
+    if (window.mapManager && typeof window.mapManager.forceRetry === 'function') {
+        window.mapManager.forceRetry();
+    } else {
+        // Tentar recarregar a aba do mapa
+        handleMapTabActivation().catch(error => {
+            console.error('❌ Retry falhou:', error);
+            showMapError('Falha persistente. Recarregue a página completamente.');
+        });
+    }
+}
+
+console.log('✅ setupTabNavigation corrigido com tratamento robusto para mapa');
+
+
+// Configurar manipuladores de eventos
 function setupEventListeners() {
     try {
-        const fileInput = document.getElementById('fileInput');
-        const uploadArea = document.querySelector('.upload-area');
+        // Upload de arquivo
+        const fileInput = document.getElementById('file-input');
+        const uploadArea = document.getElementById('upload-area');
         
-        if (fileInput) {
-            fileInput.addEventListener('change', handleFileUpload);
-        }
-        
-        if (uploadArea) {
+        if (fileInput && uploadArea) {
+            // Click no upload area
+            uploadArea.addEventListener('click', () => fileInput.click());
+            
+            // Drag and drop
             uploadArea.addEventListener('dragover', handleDragOver);
-            uploadArea.addEventListener('drop', handleFileDrop);
             uploadArea.addEventListener('dragleave', handleDragLeave);
+            uploadArea.addEventListener('drop', handleDrop);
+            
+            // Mudança de arquivo
+            fileInput.addEventListener('change', handleFileSelect);
         }
-        
+
+        // Filtros
         const sortOption = document.getElementById('sortOption');
         if (sortOption) {
-            sortOption.addEventListener('change', applyFilters);
+            sortOption.addEventListener('change', () => {
+                if (window.clientManager) {
+                    window.clientManager.applyFiltersAndSort();
+                }
+            });
         }
-        
-        const observacoesTextarea = document.getElementById('observacoes');
-        if (observacoesTextarea) {
-            observacoesTextarea.addEventListener('input', updateCharCounter);
+
+        // Filtro de cidades
+        const cidadeSelector = document.getElementById('cidade-selector');
+        if (cidadeSelector) {
+            cidadeSelector.addEventListener('click', toggleCityFilter);
         }
-        
+
+        // Botão atualizar mapa
+        const atualizarMapaBtn = document.getElementById('atualizar-mapa');
+        if (atualizarMapaBtn) {
+            atualizarMapaBtn.addEventListener('click', () => {
+                if (window.mapManager) {
+                    window.mapManager.updateAllMarkers();
+                    switchToTab('mapa');
+                }
+            });
+        }
+
+        // Modal
         const modal = document.getElementById('modal');
         if (modal) {
             modal.addEventListener('click', (e) => {
@@ -137,671 +393,588 @@ function setupEventListeners() {
                 }
             });
         }
-        
-        console.log('👂 Event listeners configurados');
+
+        console.log('✅ Event listeners configurados');
         
     } catch (error) {
         console.error('❌ Erro ao configurar event listeners:', error);
     }
 }
 
-// Drag and Drop handlers
-function handleDragOver(e) {
-    e.preventDefault();
-    e.currentTarget.classList.add('dragover');
-}
-
-function handleFileDrop(e) {
-    e.preventDefault();
-    e.currentTarget.classList.remove('dragover');
+// Configurar handlers básicos
+function setupBasicEventListeners() {
+    const fileInput = document.getElementById('file-input');
+    const uploadArea = document.getElementById('upload-area');
     
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-        processFile(files[0]);
+    if (fileInput && uploadArea) {
+        uploadArea.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFileSelect);
     }
 }
 
-function handleDragLeave(e) {
-    e.currentTarget.classList.remove('dragover');
-}
-
-// Processar upload de arquivo
-function handleFileUpload(e) {
-    const file = e.target.files[0];
-    if (file) {
-        processFile(file);
-    }
-}
-
-// Processar arquivo Excel
-async function processFile(file) {
+// Processar arquivo Excel - FUNÇÃO COMPLETAMENTE CORRIGIDA
+async function processExcelFile(file) {
     try {
-        console.log('📁 Processando arquivo:', file.name);
-        showLoadingIndicator();
-        
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            try {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                
-                const firstSheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[firstSheetName];
-                
-                const jsonData = XLSX.utils.sheet_to_json(worksheet);
-                
-                if (jsonData.length === 0) {
-                    throw new Error('Planilha vazia ou sem dados válidos');
-                }
-                
-                console.log(`📊 ${jsonData.length} registros encontrados na planilha`);
-                
-                await processSpreadsheetData(jsonData);
-                
-                showSuccessMessage(`✅ Planilha processada! ${jsonData.length} registros carregados.`);
-                
-            } catch (error) {
-                console.error('❌ Erro ao processar planilha:', error);
-                showErrorMessage('Erro ao processar planilha: ' + error.message);
-            } finally {
-                hideLoadingIndicator();
-            }
-        };
-        
-        reader.onerror = () => {
-            hideLoadingIndicator();
-            showErrorMessage('Erro ao ler arquivo');
-        };
-        
-        reader.readAsArrayBuffer(file);
-        
-    } catch (error) {
-        console.error('❌ Erro no processamento do arquivo:', error);
-        showErrorMessage('Erro ao processar arquivo: ' + error.message);
-        hideLoadingIndicator();
-    }
-}
+        console.log('📊 Processando arquivo:', file.name);
+        showLoadingMessage('Processando planilha...');
 
-// Processar dados da planilha
-async function processSpreadsheetData(data) {
-    try {
-        if (!window.clientManager) {
-            throw new Error('ClientManager não inicializado');
+        if (!window.XLSX) {
+            throw new Error('Biblioteca XLSX não carregada');
         }
-        
-        console.log('🔄 Processando dados da planilha...');
-        
-        // Marcar que geocodificação será necessária para nova planilha
-        window.clientManager.markGeocodingNeeded();
-        
-        const processedData = window.clientManager.processarDadosPlanilha(data);
-        
+
+        // Ler arquivo
+        const data = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(new Error('Erro ao ler arquivo'));
+            reader.readAsArrayBuffer(file);
+        });
+
+        // Processar workbook
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+        if (!jsonData || jsonData.length === 0) {
+            throw new Error('Planilha vazia ou sem dados válidos');
+        }
+
+        console.log(`📋 ${jsonData.length} registros encontrados`);
+
+        // Categorizar dados CORRETAMENTE baseado na coluna Status
         const inativos = [];
         const ativos = [];
         const novos = [];
-        
-        processedData.forEach(item => {
-            switch (item.Status?.trim().toLowerCase()) {
-                case 'ativo':
-                    ativos.push(item);
-                    break;
-                case 'novo':
-                    novos.push(item);
-                    break;
-                default:
-                    inativos.push(item);
+
+        jsonData.forEach((row, index) => {
+            try {
+                // Gerar ID único se não existir
+                if (!row['ID Cliente'] && !row.id) {
+                    row.id = `gen_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 5)}`;
+                } else {
+                    row.id = row['ID Cliente'] || row.id || `row_${index}`;
+                }
+
+                // Padronizar campos obrigatórios
+                const cliente = {
+                    ...row,
+                    id: row.id,
+                    'ID Cliente': row['ID Cliente'] || row.id,
+                    'Nome Fantasia': row['Nome Fantasia'] || row['Cliente'] || 'N/A',
+                    'Contato': row['Contato'] || 'N/A',
+                    'Celular': row['Celular'] || 'N/A',
+                    'Endereço': row['Endereço'] || 'N/A',
+                    'Segmento': row['Segmento'] || 'N/A',
+                    'Status': row['Status'] || 'Inativo',
+                    'CNPJ / CPF': row['CNPJ / CPF'] || 'N/A'
+                };
+
+                // Categorizar CORRETAMENTE por status da coluna Status
+                const status = (cliente.Status || '').toString().trim().toLowerCase();
+                
+                if (status === 'ativo') {
+                    ativos.push(cliente);
+                    console.log(`✅ Cliente ATIVO: ${cliente['Nome Fantasia']}`);
+                } else if (status === 'novo') {
+                    novos.push(cliente);
+                    console.log(`🆕 Cliente NOVO: ${cliente['Nome Fantasia']}`);
+                } else {
+                    // Default para inativo (inclui 'inativo' e valores vazios)
+                    inativos.push(cliente);
+                    console.log(`🔴 Cliente INATIVO: ${cliente['Nome Fantasia']}`);
+                }
+
+            } catch (rowError) {
+                console.warn(`⚠️ Erro na linha ${index}:`, rowError);
             }
         });
-        
-        window.clientManager.data = inativos;
-        window.clientManager.ativos = ativos;
-        window.clientManager.novos = novos;
-        
-        await window.dbManager.saveData('clients', inativos);
-        await window.dbManager.saveData('ativos', ativos);
-        await window.dbManager.saveData('novos', novos);
-        
-        window.data = inativos;
-        window.ativos = ativos;
-        window.novos = novos;
-        
-        console.log(`📊 Dados processados:
-            🔴 Inativos: ${inativos.length}
-            🟢 Ativos: ${ativos.length}
-            🆕 Novos: ${novos.length}`);
-        
-        renderAllTabs();
-        updateCityFilter();
-        
-        // Atualizar mapa se estiver na aba mapa (forçar refresh para nova planilha)
-        if (currentTab === 'mapa' && window.mapManager) {
-            setTimeout(() => {
-                window.mapManager.updateMap(true);
-            }, 1000);
+
+        // Salvar dados usando ClientManager
+        const processedData = {
+            clients: inativos,
+            ativos: ativos,
+            novos: novos,
+            schedules: {}
+        };
+
+        if (window.clientManager) {
+            await window.clientManager.processNewData(processedData);
+        } else {
+            throw new Error('ClientManager não disponível');
         }
+
+        // Atualizar interface
+        await renderAllTabs();
+        updateTabCounts();
+        updateCityFilter();
+        updateDataInfo(file.name);
+
+        hideLoadingMessage();
         
+        showSuccessMessage(`✅ Planilha processada com sucesso!
+        🔴 Inativos: ${inativos.length}
+        🟢 Ativos: ${ativos.length}  
+        🆕 Novos: ${novos.length}`);
+
+        console.log('✅ Processamento concluído com sucesso');
+        
+        // Forçar atualização do mapa após processamento
+        setTimeout(() => {
+            if (window.mapManager && typeof window.mapManager.updateAllMarkers === 'function') {
+                window.mapManager.updateAllMarkers();
+            }
+        }, 1000);
+        
+        return true;
+
     } catch (error) {
-        console.error('❌ Erro ao processar dados da planilha:', error);
-        throw error;
+        console.error('❌ Erro ao processar Excel:', error);
+        hideLoadingMessage();
+        showErrorMessage('Erro ao processar planilha: ' + error.message);
+        return false;
     }
 }
 
+// Handlers de drag and drop
+function handleDragOver(e) {
+    e.preventDefault();
+    e.currentTarget.classList.add('drag-over');
+}
+
+function handleDragLeave(e) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        handleFile(files[0]);
+    }
+}
+
+function handleFileSelect(e) {
+    const file = e.target.files[0];
+    if (file) {
+        handleFile(file);
+    }
+}
+
+async function handleFile(file) {
+    if (!file.name.match(/\.(xlsx|xls)$/i)) {
+        showErrorMessage('Por favor, selecione um arquivo Excel (.xlsx ou .xls)');
+        return;
+    }
+    
+    await processExcelFile(file);
+}
+
 // Renderizar todas as abas
-function renderAllTabs() {
+async function renderAllTabs() {
     renderInativos();
     renderAtivos();
     renderNovos();
     renderAgenda();
+    updateTabCounts();
 }
 
-// Renderizar inativos
+// Renderizar clientes inativos
 function renderInativos() {
-    try {
-        const list = document.getElementById('client-list');
-        if (!list) {
-            console.error('❌ Lista de inativos não encontrada');
-            return;
-        }
-        
-        if (!window.clientManager || !Array.isArray(window.clientManager.filteredData)) {
-            list.innerHTML = '<p class="empty-state">Nenhum cliente inativo encontrado. Faça o upload de uma planilha.</p>';
-            return;
-        }
-        
-        const data = window.clientManager.filteredData;
-        list.innerHTML = '';
-        
-        if (data.length === 0) {
-            list.innerHTML = '<p class="empty-state">Nenhum cliente inativo encontrado com os filtros aplicados.</p>';
-            return;
-        }
-        
-        data.forEach(cliente => {
-            const div = document.createElement('div');
-            div.className = 'client-item';
-            div.setAttribute('data-status', 'inativo');
-            
-            const cidade = window.clientManager.extrairCidadeDoItem(cliente);
-            
-            div.innerHTML = `
-                <div class="client-info">
-                    <strong>Cliente:</strong> ${cliente['Nome Fantasia'] || cliente['Cliente'] || 'N/A'}
-                </div>
-                <div class="client-info">
-                    <strong>Contato:</strong> ${cliente['Contato'] || 'N/A'}
-                </div>
-                <div class="client-info">
-                    <strong>Celular:</strong> ${cliente['Celular'] || 'N/A'}
-                </div>
-                <div class="client-info">
-                    <strong>Cidade:</strong> ${cidade || 'N/A'}
-                </div>
-                <div class="client-info">
-                    <strong>Segmento:</strong> ${cliente['Segmento'] || 'N/A'}
-                </div>
-            `;
-            
-            div.onclick = () => {
-                if (window.clientManager) {
-                    window.clientManager.currentItem = cliente;
-                    window.clientManager.currentTab = 'inativos';
-                    window.clientManager.openModal(cliente, 'inativos');
-                }
-            };
-            
-            list.appendChild(div);
-        });
-        
-        console.log(`✅ ${window.clientManager.filteredData.length} clientes inativos renderizados`);
-    } catch (error) {
-        console.error('❌ Erro ao renderizar inativos:', error);
+    const list = document.getElementById('client-list');
+    if (!list) return;
+
+    if (!window.clientManager || !window.clientManager.filteredData || window.clientManager.filteredData.length === 0) {
+        list.innerHTML = '<div class="empty-state">Nenhum cliente inativo encontrado. Faça o upload de uma planilha.</div>';
+        return;
     }
+
+    list.innerHTML = '';
+    
+    window.clientManager.filteredData.forEach(item => {
+        const cidade = window.clientManager.extrairCidadeDoItem(item);
+        
+        const div = document.createElement('div');
+        div.className = 'client-item';
+        div.innerHTML = `
+            <h4>${item['Nome Fantasia'] || 'N/A'}</h4>
+            <p><strong>Contato:</strong> ${item['Contato'] || 'N/A'}</p>
+            <p><strong>Telefone:</strong> ${item['Celular'] || 'N/A'}</p>
+            <p><strong>Cidade:</strong> ${cidade || 'N/A'}</p>
+            <p><strong>Segmento:</strong> ${item['Segmento'] || 'N/A'}</p>
+            <p><strong>Status:</strong> ${item['Status'] || 'Inativo'}</p>
+        `;
+        
+        div.onclick = () => window.clientManager.showClientModal(item);
+        list.appendChild(div);
+    });
 }
 
-// Renderizar ativos
+// Renderizar clientes ativos  
 function renderAtivos() {
-    try {
-        const list = document.getElementById('ativos-list');
-        if (!list) {
-            console.error('❌ Lista de ativos não encontrada');
-            return;
-        }
-        
-        if (!window.clientManager || !Array.isArray(window.clientManager.ativos)) {
-            list.innerHTML = '<p class="empty-state">Nenhum cliente ativo encontrado.</p>';
-            return;
-        }
-        
-        const ativos = window.clientManager.ativos;
-        list.innerHTML = '';
-        
-        if (ativos.length === 0) {
-            list.innerHTML = '<p class="empty-state">Nenhum cliente ativo encontrado.</p>';
-            return;
-        }
-        
-        ativos.forEach(cliente => {
-            const div = document.createElement('div');
-            div.className = 'client-item';
-            div.setAttribute('data-status', 'ativo');
-            
-            const cidade = window.clientManager.extrairCidadeDoItem(cliente);
-            
-            div.innerHTML = `
-                <div class="client-info">
-                    <strong>Cliente:</strong> ${cliente['Nome Fantasia'] || cliente['Cliente'] || 'N/A'}
-                </div>
-                ${cliente['Data Ultimo Pedido'] ? `<div class="client-info">
-                    <strong>Último Pedido:</strong> ${cliente['Data Ultimo Pedido']}
-                </div>` : ''}
-                <div class="client-info">
-                    <strong>Contato:</strong> ${cliente['Contato'] || 'N/A'}
-                </div>
-                <div class="client-info">
-                    <strong>Celular:</strong> ${cliente['Celular'] || 'N/A'}
-                </div>
-                <div class="client-info">
-                    <strong>Cidade:</strong> ${cidade || 'N/A'}
-                </div>
-                <div class="client-info">
-                    <strong>Segmento:</strong> ${cliente['Segmento'] || 'N/A'}
-                </div>
-            `;
-            
-            div.onclick = () => {
-                if (window.clientManager) {
-                    window.clientManager.currentItem = cliente;
-                    window.clientManager.currentTab = 'ativos';
-                    window.clientManager.openModal(cliente, 'ativos');
-                }
-            };
-            
-            list.appendChild(div);
-        });
-        
-        console.log(`✅ ${window.clientManager.ativos.length} clientes ativos renderizados`);
-    } catch (error) {
-        console.error('❌ Erro ao renderizar ativos:', error);
+    const list = document.getElementById('ativos-list');
+    if (!list) return;
+
+    if (!window.clientManager || !window.clientManager.ativos || window.clientManager.ativos.length === 0) {
+        list.innerHTML = '<div class="empty-state">Nenhum cliente ativo encontrado.</div>';
+        return;
     }
+
+    list.innerHTML = '';
+    
+    window.clientManager.ativos.forEach(cliente => {
+        const cidade = window.clientManager.extrairCidadeDoItem(cliente);
+        
+        const div = document.createElement('div');
+        div.className = 'client-item';
+        div.innerHTML = `
+            <h4>${cliente['Nome Fantasia'] || 'N/A'}</h4>
+            <p><strong>Segmento:</strong> ${cliente['Segmento'] || 'N/A'}</p>
+            <p><strong>Contato:</strong> ${cliente['Contato'] || 'N/A'}</p>
+            <p><strong>Telefone:</strong> ${cliente['Celular'] || 'N/A'}</p>
+            <p><strong>Cidade:</strong> ${cidade || 'N/A'}</p>
+            <p><strong>Status:</strong> ${cliente['Status'] || 'Ativo'}</p>
+        `;
+        
+        div.onclick = () => window.clientManager.showClientModal(cliente);
+        list.appendChild(div);
+    });
 }
 
-// Renderizar novos
+// Renderizar clientes novos
 function renderNovos() {
-    try {
-        const list = document.getElementById('novos-list');
-        if (!list) {
-            console.error('❌ Lista de novos não encontrada');
-            return;
-        }
-        
-        if (!window.clientManager || !Array.isArray(window.clientManager.novos)) {
-            list.innerHTML = '<p class="empty-state">Nenhum cliente novo encontrado.</p>';
-            return;
-        }
-        
-        const novos = window.clientManager.novos;
-        list.innerHTML = '';
-        
-        if (novos.length === 0) {
-            list.innerHTML = '<p class="empty-state">Nenhum cliente novo encontrado.</p>';
-            return;
-        }
-        
-        novos.forEach(cliente => {
-            const div = document.createElement('div');
-            div.className = 'client-item';
-            div.setAttribute('data-status', 'novo');
-            
-            const cidade = window.clientManager.extrairCidadeDoItem(cliente);
-            
-            div.innerHTML = `
-                <div class="client-info">
-                    <strong>Cliente:</strong> ${cliente['Nome Fantasia'] || cliente['Cliente'] || 'N/A'}
-                </div>
-                ${cliente['Data Cadastro'] ? `<div class="client-info">
-                    <strong>Cadastrado em:</strong> ${cliente['Data Cadastro']}
-                </div>` : ''}
-                <div class="client-info">
-                    <strong>Contato:</strong> ${cliente['Contato'] || 'N/A'}
-                </div>
-                <div class="client-info">
-                    <strong>Celular:</strong> ${cliente['Celular'] || 'N/A'}
-                </div>
-                <div class="client-info">
-                    <strong>Cidade:</strong> ${cidade || 'N/A'}
-                </div>
-                <div class="client-info">
-                    <strong>Segmento:</strong> ${cliente['Segmento'] || 'N/A'}
-                </div>
-            `;
-            
-            div.onclick = () => {
-                if (window.clientManager) {
-                    window.clientManager.currentItem = cliente;
-                    window.clientManager.currentTab = 'novos';
-                    window.clientManager.openModal(cliente, 'novos');
-                }
-            };
-            
-            list.appendChild(div);
-        });
-        
-        console.log(`✅ ${window.clientManager.novos.length} clientes novos renderizados`);
-    } catch (error) {
-        console.error('❌ Erro ao renderizar novos:', error);
+    const list = document.getElementById('novos-list');
+    if (!list) return;
+
+    if (!window.clientManager || !window.clientManager.novos || window.clientManager.novos.length === 0) {
+        list.innerHTML = '<div class="empty-state">Nenhum cliente novo encontrado.</div>';
+        return;
     }
+
+    list.innerHTML = '';
+    
+    window.clientManager.novos.forEach(cliente => {
+        const cidade = window.clientManager.extrairCidadeDoItem(cliente);
+        
+        const div = document.createElement('div');
+        div.className = 'client-item';
+        div.innerHTML = `
+            <h4>${cliente['Nome Fantasia'] || 'N/A'}</h4>
+            <p><strong>Segmento:</strong> ${cliente['Segmento'] || 'N/A'}</p>
+            <p><strong>Contato:</strong> ${cliente['Contato'] || 'N/A'}</p>
+            <p><strong>Telefone:</strong> ${cliente['Celular'] || 'N/A'}</p>
+            <p><strong>Cidade:</strong> ${cidade || 'N/A'}</p>
+            <p><strong>Status:</strong> ${cliente['Status'] || 'Novo'}</p>
+        `;
+        
+        div.onclick = () => window.clientManager.showClientModal(cliente);
+        list.appendChild(div);
+    });
 }
 
 // Renderizar agenda
 function renderAgenda() {
-    try {
-        const list = document.getElementById('agenda-list');
-        if (!list) {
-            console.error('❌ Lista de agenda não encontrada');
-            return;
-        }
-        
-        if (!window.clientManager || !window.clientManager.schedules) {
-            list.innerHTML = '<p class="empty-state">Nenhum agendamento encontrado.</p>';
-            return;
-        }
-        
-        const schedules = window.clientManager.schedules;
-        const scheduleKeys = Object.keys(schedules);
-        list.innerHTML = '';
-        
-        if (scheduleKeys.length === 0) {
-            list.innerHTML = '<p class="empty-state">Nenhum agendamento encontrado.</p>';
-            return;
-        }
-        
-        scheduleKeys.forEach(scheduleId => {
-            const schedule = schedules[scheduleId];
-            const cliente = window.clientManager.data.find(c => c.id === schedule.clientId) ||
-                           window.clientManager.ativos.find(c => c.id === schedule.clientId) ||
-                           window.clientManager.novos.find(c => c.id === schedule.clientId);
-                           
-            if (!cliente) return;
-            
-            const div = document.createElement('div');
-            div.className = 'client-item';
-            
-            div.innerHTML = `
-                <div class="client-info">
-                    <strong>Cliente:</strong> ${schedule.clientName}
-                </div>
-                <div class="client-info">
-                    <strong>Tipo:</strong> ${schedule.type}
-                </div>
-                <div class="client-info">
-                    <strong>Dia:</strong> ${schedule.dayOfWeek}
-                </div>
-                <button onclick="removeSchedule('${scheduleId}')" 
-                        style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-top: 10px;">
-                    🗑️ Remover
-                </button>
-            `;
-            
-            list.appendChild(div);
-        });
-        
-        console.log(`✅ ${scheduleKeys.length} agendamentos renderizados`);
-    } catch (error) {
-        console.error('❌ Erro ao renderizar agenda:', error);
+    const list = document.getElementById('agenda-list');
+    if (!list) return;
+
+    if (!window.clientManager || !window.clientManager.schedules || Object.keys(window.clientManager.schedules).length === 0) {
+        list.innerHTML = '<div class="empty-state">Nenhum agendamento encontrado.</div>';
+        return;
     }
+
+    list.innerHTML = '';
+    
+    Object.entries(window.clientManager.schedules).forEach(([clienteId, schedule]) => {
+        const cliente = findClientById(clienteId);
+        if (!cliente) return;
+        
+        const div = document.createElement('div');
+        div.className = 'client-item';
+        div.innerHTML = `
+            <h4>${cliente['Nome Fantasia'] || 'N/A'}</h4>
+            <p><strong>Segmento:</strong> ${cliente['Segmento'] || 'N/A'}</p>
+            <p><strong>Data:</strong> ${new Date(schedule.date).toLocaleDateString('pt-BR')}</p>
+            <p><strong>Hora:</strong> ${schedule.time}</p>
+        `;
+        
+        div.onclick = () => window.clientManager.showClientModal(cliente);
+        list.appendChild(div);
+    });
+}
+
+// Encontrar cliente por ID
+function findClientById(id) {
+    if (!window.clientManager) return null;
+    
+    const allClients = [
+        ...(window.clientManager.data || []),
+        ...(window.clientManager.ativos || []),
+        ...(window.clientManager.novos || [])
+    ];
+    
+    return allClients.find(c => c.id === id);
+}
+
+// Atualizar contadores das abas
+function updateTabCounts() {
+    if (!window.clientManager) return;
+    
+    const inativosCount = document.getElementById('inativos-count');
+    const ativosCount = document.getElementById('ativos-count');
+    const novosCount = document.getElementById('novos-count');
+    const agendaCount = document.getElementById('agenda-count');
+    
+    if (inativosCount) inativosCount.textContent = window.clientManager.data?.length || 0;
+    if (ativosCount) ativosCount.textContent = window.clientManager.ativos?.length || 0;
+    if (novosCount) novosCount.textContent = window.clientManager.novos?.length || 0;
+    if (agendaCount) agendaCount.textContent = Object.keys(window.clientManager.schedules || {}).length;
+}
+
+// Atualizar info de dados
+function updateDataInfo(fileName) {
+    const dataInfo = document.getElementById('data-info');
+    if (dataInfo && fileName) {
+        dataInfo.textContent = `📁 ${fileName}`;
+    }
+}
+
+// Filtro de cidades
+function toggleCityFilter() {
+    const cidadeList = document.getElementById('cidade-list');
+    const cidadeSelector = document.getElementById('cidade-selector');
+    
+    if (cidadeList && cidadeSelector) {
+        if (cidadeList.classList.contains('escondido')) {
+            cidadeList.classList.remove('escondido');
+            cidadeList.classList.add('visivel');
+            cidadeSelector.classList.add('aberto');
+        } else {
+            cidadeList.classList.add('escondido');
+            cidadeList.classList.remove('visivel');
+            cidadeSelector.classList.remove('aberto');
+        }
+    }
+}
+
+function updateCityFilter() {
+    if (!window.clientManager || !window.clientManager.data) return;
+    
+    const cidadeList = document.getElementById('cidade-list');
+    const cidadeSelected = document.getElementById('cidade-selected');
+    
+    if (!cidadeList) return;
+    
+    // Extrair cidades únicas
+    const cidades = [...new Set(
+        window.clientManager.data.map(item => 
+            window.clientManager.extrairCidadeDoItem(item)
+        )
+    )].filter(cidade => cidade && cidade !== 'N/A').sort();
+    
+    cidadeList.innerHTML = '';
+    
+    // Adicionar opção "Todas"
+    const todasDiv = document.createElement('div');
+    todasDiv.innerHTML = `
+        <input type="checkbox" id="cidade-todas" value="todas" checked>
+        <label for="cidade-todas">Todas as cidades</label>
+    `;
+    cidadeList.appendChild(todasDiv);
+    
+    // Adicionar cidades
+    cidades.forEach(cidade => {
+        const div = document.createElement('div');
+        const inputId = `cidade-${cidade.replace(/\s+/g, '-').toLowerCase()}`;
+        div.innerHTML = `
+            <input type="checkbox" id="${inputId}" value="${cidade}">
+            <label for="${inputId}">${cidade}</label>
+        `;
+        cidadeList.appendChild(div);
+    });
+    
+    // Event listeners para checkboxes
+    cidadeList.addEventListener('change', (e) => {
+        if (e.target.value === 'todas') {
+            const allCheckboxes = cidadeList.querySelectorAll('input[type="checkbox"]');
+            allCheckboxes.forEach(cb => {
+                if (cb.value !== 'todas') {
+                    cb.checked = e.target.checked;
+                }
+            });
+        }
+        
+        // Atualizar texto selecionado
+        const selecionadas = Array.from(cidadeList.querySelectorAll('input:checked'))
+            .map(input => input.value)
+            .filter(value => value !== 'todas');
+            
+        if (selecionadas.length === 0 || selecionadas.length === cidades.length) {
+            cidadeSelected.textContent = 'Todas as cidades';
+        } else if (selecionadas.length === 1) {
+            cidadeSelected.textContent = selecionadas[0];
+        } else {
+            cidadeSelected.textContent = `${selecionadas.length} cidades selecionadas`;
+        }
+        
+        // Aplicar filtros
+        if (window.clientManager) {
+            window.clientManager.applyFiltersAndSort();
+        }
+    });
 }
 
 // Inicializar mapa
 function initializeMap() {
-    if (window.mapManager && typeof window.mapManager.initializeMap === 'function') {
-        console.log('🗺️ Inicializando mapa...');
-        window.mapManager.initializeMap();
-    }
-}
-
-// Handlers dos botões
-async function handleTornarAtivo() {
-    if (!window.clientManager.currentItem) return;
-    
-    const novaData = prompt('Digite a data do último pedido (dd/mm/aaaa):');
-    if (!novaData) return;
-    
     try {
-        await window.clientManager.tornarAtivo(window.clientManager.currentItem, novaData);
-        closeModal();
-        renderAllTabs();
-        showSuccessMessage('Cliente tornado ativo com sucesso!');
-    } catch (error) {
-        showErrorMessage('Erro ao tornar cliente ativo: ' + error.message);
-    }
-}
-
-async function handleExcluirAtivo() {
-    if (!window.clientManager.currentItem) return;
-    
-    if (!confirm('Deseja realmente remover este cliente dos ativos?')) return;
-    
-    try {
-        await window.clientManager.excluirAtivo(window.clientManager.currentItem);
-        closeModal();
-        renderAllTabs();
-        showSuccessMessage('Cliente removido dos ativos!');
-    } catch (error) {
-        showErrorMessage('Erro ao remover cliente: ' + error.message);
-    }
-}
-
-function handleEditarCliente() {
-    if (window.clientManager) {
-        window.clientManager.handleEditarCliente();
-    }
-}
-
-async function handleLimparDados() {
-    if (!confirm('Deseja realmente limpar todos os dados? Esta ação não pode ser desfeita.')) return;
-    
-    try {
-        window.clientManager.data = [];
-        window.clientManager.ativos = [];
-        window.clientManager.novos = [];
-        window.clientManager.schedules = {};
-        window.clientManager.filteredData = [];
-        
-        await window.dbManager.clearData('clients');
-        await window.dbManager.clearData('ativos');
-        await window.dbManager.clearData('novos');
-        await window.dbManager.clearData('schedules');
-        
-        if (window.mapManager) {
-            window.mapManager.clearGeocodingCache();
+        if (window.mapManager && typeof window.mapManager.init === 'function') {
+            console.log('🗺️ Inicializando mapa...');
+            window.mapManager.init();
+            console.log('✅ Mapa inicializado com sucesso');
+        } else {
+            console.warn('⚠️ mapManager não disponível, tentando novamente...');
+            setTimeout(initializeMap, 2000);
         }
-        
-        renderAllTabs();
-        updateCityFilter();
-        
-        showSuccessMessage('Todos os dados foram removidos!');
     } catch (error) {
-        showErrorMessage('Erro ao limpar dados: ' + error.message);
+        console.error('❌ Erro ao inicializar mapa:', error);
+        showMapError('Erro ao carregar mapa: ' + error.message);
     }
 }
 
-async function handleExportarDados() {
-    try {
-        await window.dbManager.exportAllData();
-        showSuccessMessage('Backup exportado com sucesso!');
-    } catch (error) {
-        showErrorMessage('Erro ao exportar dados: ' + error.message);
+// Mostrar erro no mapa
+function showMapError(message) {
+    const mapContainer = document.getElementById('map');
+    if (mapContainer) {
+        mapContainer.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #6c757d;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🗺️</div>
+                <p style="text-align: center; margin: 0;">${message}</p>
+                <button onclick="initializeMap()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    Tentar Novamente
+                </button>
+            </div>
+        `;
     }
 }
 
-function handleCadastrarCliente() {
-    showErrorMessage('Funcionalidade de cadastro em desenvolvimento.');
-}
-
-// Remover agendamento
-function removeSchedule(scheduleId) {
-    if (window.clientManager && window.clientManager.removeSchedule(scheduleId)) {
-        renderAgenda();
-        showSuccessMessage('Agendamento removido!');
+// Trocar de aba
+function switchToTab(tabName) {
+    const tabButton = document.querySelector(`[data-tab="${tabName}"]`);
+    if (tabButton) {
+        tabButton.click();
     }
 }
 
-// Mostrar mensagem de sucesso
-function showSuccessMessage(message) {
-    const successDiv = document.createElement('div');
-    successDiv.innerHTML = `
-        <div class="success-message">
-            ${message}
-        </div>
-    `;
-    document.body.appendChild(successDiv);
+// Mostrar interface de upload
+function showUploadInterface() {
+    // Interface básica já está no HTML
+    console.log('📁 Interface de upload ativa');
+}
+
+// Modal functions
+function closeModal() {
+    const modal = document.getElementById('modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// Utility functions
+function showLoadingIndicator() {
+    const indicator = document.getElementById('loading-indicator');
+    if (indicator) {
+        indicator.style.display = 'flex';
+    }
+}
+
+function hideLoadingIndicator() {
+    const indicator = document.getElementById('loading-indicator');
+    if (indicator) {
+        indicator.style.display = 'none';
+    }
+}
+
+function showLoadingMessage(message) {
+    const existing = document.getElementById('loading-message');
+    if (existing) existing.remove();
     
-    setTimeout(() => {
-        successDiv.remove();
-    }, 3000);
+    const div = document.createElement('div');
+    div.id = 'loading-message';
+    div.style.cssText = `
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        z-index: 10000; text-align: center; min-width: 300px;
+    `;
+    div.innerHTML = `
+        <div class="loading-spinner" style="margin: 0 auto 1rem; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        <p style="margin: 0; font-weight: 500;">${message}</p>
+    `;
+    document.body.appendChild(div);
 }
 
-// Mostrar mensagem de erro
+function hideLoadingMessage() {
+    const message = document.getElementById('loading-message');
+    if (message) {
+        message.remove();
+    }
+}
+
 function showErrorMessage(message) {
-    const errorDiv = document.createElement('div');
-    errorDiv.innerHTML = `
-        <div class="error-message">
-            ${message}
-        </div>
-    `;
-    document.body.appendChild(errorDiv);
+    showNotification(message, 'error');
+}
+
+function showSuccessMessage(message) {
+    showNotification(message, 'success');
+}
+
+function showNotification(message, type = 'info') {
+    const container = document.getElementById('error-container') || document.body;
     
+    const div = document.createElement('div');
+    div.className = `notification notification-${type}`;
+    div.style.cssText = `
+        background: ${type === 'error' ? '#f8d7da' : type === 'success' ? '#d4edda' : '#d1ecf1'};
+        color: ${type === 'error' ? '#721c24' : type === 'success' ? '#155724' : '#0c5460'};
+        padding: 1rem; margin: 0.5rem 0; border-radius: 6px; border-left: 4px solid;
+        border-left-color: ${type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#17a2b8'};
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 400px; white-space: pre-line;
+        position: fixed; top: 80px; right: 20px; z-index: 10001; animation: slideIn 0.3s ease-out;
+    `;
+    div.innerHTML = `
+        ${message}
+        <button onclick="this.parentElement.remove()" style="
+            position: absolute; top: 0.5rem; right: 0.5rem; background: none; border: none;
+            font-size: 1.2rem; cursor: pointer; color: inherit; opacity: 0.7;
+        ">&times;</button>
+    `;
+    
+    container.appendChild(div);
+    
+    // Auto-remover após 5 segundos
     setTimeout(() => {
-        errorDiv.remove();
+        if (div.parentElement) {
+            div.remove();
+        }
     }, 5000);
 }
 
-// Aplicar filtros
-function applyFilters() {
-    if (window.clientManager && typeof window.clientManager.applyFiltersAndSort === 'function') {
-        window.clientManager.applyFiltersAndSort();
+// CSS para animação das notificações
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
     }
-}
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    .drag-over {
+        border-color: #007bff !important;
+        background: rgba(0, 123, 255, 0.1) !important;
+    }
+`;
+document.head.appendChild(style);
 
-// Atualizar filtro de cidades com funcionalidade recolhível
-function updateCityFilter() {
-    try {
-        const cidadeList = document.getElementById('cidadeList');
-        const filterText = document.getElementById('cidade-filter-text');
-        const selectedCount = document.getElementById('cidade-selected-count');
-        
-        if (!cidadeList || !window.clientManager) return;
-        
-        const cidades = new Set();
-        
-        [...window.clientManager.data, ...window.clientManager.ativos, ...window.clientManager.novos].forEach(cliente => {
-            const cidade = window.clientManager.extrairCidadeDoItem(cliente);
-            if (cidade) cidades.add(cidade);
-        });
-        
-        const cidadesArray = Array.from(cidades).sort();
-        
-        cidadeList.innerHTML = '';
-        
-        if (cidadesArray.length === 0) {
-            cidadeList.innerHTML = '<p style="padding: 10px; color: #666;">Nenhuma cidade encontrada</p>';
-            return;
-        }
-        
-        cidadesArray.forEach(cidade => {
-            const label = document.createElement('label');
-            label.innerHTML = `
-                <input type="checkbox" value="${cidade}" onchange="updateCityFilterCount(); applyFilters();">
-                ${cidade}
-            `;
-            cidadeList.appendChild(label);
-        });
-        
-        // Atualizar contador
-        updateCityFilterCount();
-        
-        console.log(`🏙️ ${cidadesArray.length} cidades adicionadas ao filtro`);
-        
-    } catch (error) {
-        console.error('❌ Erro ao atualizar filtro de cidades:', error);
-    }
-}
-
-// Atualizar contador de cidades selecionadas
-function updateCityFilterCount() {
-    try {
-        const selectedCheckboxes = document.querySelectorAll('#cidadeList input:checked');
-        const selectedCount = document.getElementById('cidade-selected-count');
-        const filterText = document.getElementById('cidade-filter-text');
-        
-        if (selectedCheckboxes.length > 0) {
-            selectedCount.textContent = selectedCheckboxes.length;
-            selectedCount.style.display = 'inline-block';
-            filterText.textContent = `${selectedCheckboxes.length} cidade(s) selecionada(s)`;
-        } else {
-            selectedCount.style.display = 'none';
-            filterText.textContent = 'Selecionar cidades';
-        }
-    } catch (error) {
-        console.error('❌ Erro ao atualizar contador de cidades:', error);
-    }
-}
-
-// Controle de abas
-function showTab(tabName) {
-    const tabContents = document.querySelectorAll('.tab-content');
-    tabContents.forEach(content => content.classList.remove('active'));
-    
-    const tabs = document.querySelectorAll('.tab');
-    tabs.forEach(tab => tab.classList.remove('active'));
-    
-    const selectedTab = document.getElementById(tabName);
-    if (selectedTab) {
-        selectedTab.classList.add('active');
-    }
-    
-    if (event && event.target) {
-        event.target.classList.add('active');
-    }
-    
-    currentTab = tabName;
-    
-    // Inicializar mapa se necessário
-    if (tabName === 'mapa') {
-        setTimeout(initializeMap, 100);
-    }
-}
-
-// Controle do modal
-function closeModal() {
-    if (window.clientManager) {
-        window.clientManager.closeModal();
-    }
-}
-
-// Atualizar contador de caracteres
-function updateCharCounter() {
-    const textarea = document.getElementById('observacoes');
-    const counter = document.getElementById('observacoes-contador');
-    
-    if (textarea && counter) {
-        const currentLength = textarea.value.length;
-        counter.textContent = `${currentLength}/2000`;
-        
-        if (currentLength > 2000) {
-            counter.style.color = '#dc3545';
-            textarea.value = textarea.value.substring(0, 2000);
-            counter.textContent = '2000/2000';
-        } else {
-            counter.style.color = '#666';
-        }
-    }
-}
-
-// Expor funções globalmente para compatibilidade
-window.showSuccessMessage = showSuccessMessage;
-window.showErrorMessage = showErrorMessage;
-window.renderAllTabs = renderAllTabs;
-window.updateCityFilterCount = updateCityFilterCount;
-
-console.log('✅ script.js carregado - versão com filtros recolhíveis');
+console.log('✅ script.js carregado completamente corrigido');

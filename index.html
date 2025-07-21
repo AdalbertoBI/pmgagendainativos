@@ -3,815 +3,288 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PMG Agenda Inativos</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <title>PMG - Agenda Clientes</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#007bff">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" 
+          integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A==" 
+          crossorigin=""/>
+    
+    <!-- PWA Icons -->
+    <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icon-192.png">
+    
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-        }
-        
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            margin-top: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 10px;
-            color: white;
-        }
-        
-        .upload-area {
-            border: 2px dashed #667eea;
-            border-radius: 10px;
-            padding: 40px;
-            text-align: center;
-            margin-bottom: 30px;
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-        
-        .upload-area:hover {
-            border-color: #764ba2;
-            background-color: #f8f9ff;
-        }
-        
-        .upload-area.dragover {
-            border-color: #764ba2;
-            background-color: #f0f0ff;
-        }
-        
-        .filters {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-        
-        .filter-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-        
-        .filter-group label {
-            font-weight: 600;
-            color: #333;
-            font-size: 14px;
-        }
-        
-        select, input {
-            padding: 10px;
-            border: 2px solid #e1e5e9;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: border-color 0.3s ease;
-        }
-        
-        select:focus, input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        /* Filtro de cidade recolhível */
-        .cidade-filter-container {
-            position: relative;
-            min-width: 250px;
-        }
-        
-        .cidade-filter-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 10px;
-            border: 2px solid #e1e5e9;
-            border-radius: 8px;
-            background: white;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            user-select: none;
-        }
-        
-        .cidade-filter-header:hover {
-            border-color: #667eea;
-        }
-        
-        .cidade-filter-header.open {
-            border-color: #667eea;
-            border-bottom-left-radius: 0;
-            border-bottom-right-radius: 0;
-        }
-        
-        .filter-arrow {
-            transition: transform 0.3s ease;
-            font-size: 12px;
-        }
-        
-        .filter-arrow.rotated {
-            transform: rotate(180deg);
-        }
-        
-        .cidade-list {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            max-height: 200px;
-            overflow-y: auto;
-            border: 2px solid #667eea;
-            border-top: none;
-            border-radius: 0 0 8px 8px;
-            background: white;
-            z-index: 1000;
-            display: none;
-        }
-        
-        .cidade-list.open {
-            display: block;
-        }
-        
-        .cidade-list label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 10px;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-            font-weight: normal;
-        }
-        
-        .cidade-list label:hover {
-            background-color: #f8f9fa;
-        }
-        
-        .cidade-list input[type="checkbox"] {
-            width: auto;
-            margin: 0;
-        }
-        
-        .cidade-count {
-            background: #667eea;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-        
-        .tabs {
-            display: flex;
-            margin-bottom: 30px;
-            border-bottom: 2px solid #e1e5e9;
-        }
-        
-        .tab {
-            padding: 15px 25px;
-            cursor: pointer;
-            border-bottom: 3px solid transparent;
-            transition: all 0.3s ease;
-            font-weight: 600;
-            color: #666;
-        }
-        
-        .tab.active {
-            color: #667eea;
-            border-bottom-color: #667eea;
-            background-color: #f8f9ff;
-        }
-        
-        .tab:hover {
-            background-color: #f5f5f5;
-        }
-        
-        .tab-content {
-            display: none;
-        }
-        
-        .tab-content.active {
-            display: block;
-        }
-        
-        .client-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .client-item {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            border-radius: 12px;
-            padding: 20px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border-left: 5px solid #667eea;
-        }
-        
-        .client-item:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-        }
-        
-        .client-item[data-status="ativo"] {
-            border-left-color: #28a745;
-            background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
-        }
-        
-        .client-item[data-status="novo"] {
-            border-left-color: #17a2b8;
-            background: linear-gradient(135deg, #e6fffa 0%, #b2f5ea 100%);
-        }
-        
-        .client-info {
-            margin-bottom: 10px;
-        }
-        
-        .client-info strong {
-            color: #333;
-            display: block;
-            margin-bottom: 5px;
-        }
-        
-        .modal {
-            display: none;
+        /* Loading Screen */
+        #loading-indicator {
             position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-            backdrop-filter: blur(5px);
-        }
-        
-        .modal-content {
-            background-color: white;
-            margin: 2% auto;
-            padding: 30px;
-            border-radius: 15px;
-            width: 90%;
-            max-width: 800px;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-        }
-        
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #e1e5e9;
-        }
-        
-        .close {
-            color: #aaa;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: color 0.3s ease;
-        }
-        
-        .close:hover {
-            color: #333;
-        }
-        
-        .modal-body {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 25px;
-        }
-        
-        .field-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-        
-        .field-group label {
-            font-weight: 600;
-            color: #333;
-            font-size: 14px;
-        }
-        
-        .field-group span {
-            padding: 10px;
-            background-color: #f8f9fa;
-            border-radius: 6px;
-            border: 1px solid #e9ecef;
-            min-height: 20px;
-        }
-        
-        .observacoes-section {
-            margin-top: 25px;
-            padding-top: 25px;
-            border-top: 2px solid #e1e5e9;
-        }
-        
-        .observacoes-section textarea {
-            width: 100%;
-            min-height: 120px;
-            resize: vertical;
-            padding: 12px;
-            border: 2px solid #e1e5e9;
-            border-radius: 8px;
-            font-family: inherit;
-            font-size: 14px;
-            transition: border-color 0.3s ease;
-        }
-        
-        .observacoes-section textarea:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        .char-counter {
-            text-align: right;
-            color: #666;
-            font-size: 12px;
-            margin-top: 5px;
-        }
-        
-        .modal-footer {
-            display: flex;
-            gap: 15px;
-            justify-content: flex-end;
-            margin-top: 25px;
-            padding-top: 25px;
-            border-top: 2px solid #e1e5e9;
-        }
-        
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 14px;
-            transition: all 0.3s ease;
-        }
-        
-        .btn-primary {
-            background-color: #667eea;
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            background-color: #5a6fd8;
-            transform: translateY(-2px);
-        }
-        
-        .btn-success {
-            background-color: #28a745;
-            color: white;
-        }
-        
-        .btn-success:hover {
-            background-color: #218838;
-            transform: translateY(-2px);
-        }
-        
-        .btn-danger {
-            background-color: #dc3545;
-            color: white;
-        }
-        
-        .btn-danger:hover {
-            background-color: #c82333;
-            transform: translateY(-2px);
-        }
-        
-        .btn-secondary {
-            background-color: #6c757d;
-            color: white;
-        }
-        
-        .btn-secondary:hover {
-            background-color: #5a6268;
-            transform: translateY(-2px);
-        }
-        
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #666;
-        }
-        
-        .empty-state h3 {
-            color: #333;
-            margin-bottom: 10px;
-        }
-        
-        #map {
-            height: 500px;
-            border-radius: 10px;
-            border: 2px solid #e1e5e9;
-            margin-top: 20px;
-        }
-        
-        .map-stats {
-            background: white;
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-        
-        .stat-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 5px;
-            min-width: 120px;
-        }
-        
-        .stat-number {
-            font-size: 24px;
-            font-weight: bold;
-            color: #333;
-        }
-        
-        .stat-label {
-            font-size: 12px;
-            color: #666;
-            text-align: center;
-        }
-        
-        .stat-item.success .stat-number {
-            color: #28a745;
-        }
-        
-        .stat-item.error .stat-number {
-            color: #dc3545;
-        }
-        
-        .stat-item.info .stat-number {
-            color: #17a2b8;
-        }
-        
-        .loading-indicator {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(255, 255, 255, 0.9);
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(255,255,255,0.95);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            z-index: 9999;
-            backdrop-filter: blur(5px);
+            z-index: 99999;
         }
         
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #667eea;
+        .loading-spinner {
+            width: 40px; height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-bottom: 20px;
         }
         
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        
-        .success-message, .error-message {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 20px;
-            border-radius: 8px;
-            color: white;
-            font-weight: 600;
-            z-index: 10000;
-            animation: slideIn 0.3s ease;
-        }
-        
-        .success-message {
-            background-color: #28a745;
-        }
-        
-        .error-message {
-            background-color: #dc3545;
-        }
-        
-        @keyframes slideIn {
-            from { transform: translateX(100%); }
-            to { transform: translateX(0); }
-        }
-        
-        .controls {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
-        }
-        
-        @media (max-width: 768px) {
-            .container {
-                margin: 10px;
-                padding: 15px;
-            }
-            
-            .filters {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            .client-list {
-                grid-template-columns: 1fr;
-            }
-            
-            .tabs {
-                flex-wrap: wrap;
-            }
-            
-            .modal-content {
-                width: 95%;
-                margin: 5% auto;
-                padding: 20px;
-            }
-            
-            .modal-body {
-                grid-template-columns: 1fr;
-            }
-            
-            .modal-footer {
-                flex-direction: column;
-            }
-            
-            .controls {
-                flex-direction: column;
-            }
-            
-            .map-stats {
-                justify-content: space-around;
-            }
-            
-            .stat-item {
-                min-width: 80px;
-            }
-        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🎯 PMG Agenda de Clientes</h1>
-            <p>Sistema de gerenciamento de clientes inativos, ativos e novos</p>
-        </div>
+    <!-- Loading Screen -->
+    <div id="loading-indicator" style="display: none;">
+        <div class="loading-spinner"></div>
+        <p>Carregando sistema...</p>
+    </div>
 
-        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
-            <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;">
-            <h3>📁 Carregar Planilha de Clientes</h3>
-            <p>Arraste e solte o arquivo aqui ou clique para selecionar</p>
-        </div>
-
-        <div class="controls">
-            <button class="btn btn-secondary" onclick="handleLimparDados()">🗑️ Limpar Dados</button>
-            <button class="btn btn-primary" onclick="handleExportarDados()">💾 Exportar Backup</button>
-            <button class="btn btn-success" onclick="handleCadastrarCliente()">➕ Cadastrar Cliente</button>
-        </div>
-
-        <div class="tabs">
-            <div class="tab active" onclick="showTab('inativos')">🔴 Clientes Inativos</div>
-            <div class="tab" onclick="showTab('ativos')">🟢 Clientes Ativos</div>
-            <div class="tab" onclick="showTab('novos')">🆕 Clientes Novos</div>
-            <div class="tab" onclick="showTab('agenda')">📅 Agenda de Visitas</div>
-            <div class="tab" onclick="showTab('mapa')">🗺️ Mapa de Clientes</div>
-        </div>
-
-        <div id="inativos" class="tab-content active">
-            <h2>🔴 Clientes Inativos</h2>
-            
-            <div class="filters">
-                <div class="filter-group">
-                    <label for="sortOption">Ordenar por:</label>
-                    <select id="sortOption" onchange="applyFilters()">
-                        <option value="nome-az">Nome A-Z</option>
-                        <option value="nome-za">Nome Z-A</option>
-                        <option value="cidade-az">Cidade A-Z</option>
-                        <option value="cidade-za">Cidade Z-A</option>
-                    </select>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="header-title">
+                    <span class="header-icon">📋</span>
+                    <h1>PMG - Agenda Clientes</h1>
                 </div>
+                <div class="header-info">
+                    <span id="data-info"></span>
+                </div>
+            </div>
+        </header>
 
-                <div class="filter-group">
-                    <label>Filtro por Cidades:</label>
-                    <div class="cidade-filter-container">
-                        <div class="cidade-filter-header" onclick="toggleCidadeFilter()">
-                            <span id="cidade-filter-text">Selecionar cidades</span>
-                            <span id="cidade-selected-count" class="cidade-count" style="display: none;">0</span>
-                            <span class="filter-arrow" id="filter-arrow">▼</span>
+        <!-- Tab Navigation -->
+        <nav class="tab-navigation">
+            <button class="tab-button active" data-tab="inativos">
+                <span class="tab-icon">🔴</span>
+                <span class="tab-text">Inativos</span>
+                <span id="inativos-count" class="tab-count">0</span>
+            </button>
+            <button class="tab-button" data-tab="ativos">
+                <span class="tab-icon">🟢</span>
+                <span class="tab-text">Ativos</span>
+                <span id="ativos-count" class="tab-count">0</span>
+            </button>
+            <button class="tab-button" data-tab="novos">
+                <span class="tab-icon">🆕</span>
+                <span class="tab-text">Novos</span>
+                <span id="novos-count" class="tab-count">0</span>
+            </button>
+            <button class="tab-button" data-tab="agenda">
+                <span class="tab-icon">📅</span>
+                <span class="tab-text">Agenda</span>
+                <span id="agenda-count" class="tab-count">0</span>
+            </button>
+            <button class="tab-button" data-tab="mapa">
+                <span class="tab-icon">🗺️</span>
+                <span class="tab-text">Mapa</span>
+            </button>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Upload Section -->
+            <section class="upload-section">
+                <div class="upload-container">
+                    <div class="upload-area" id="upload-area">
+                        <div class="upload-icon">📁</div>
+                        <label for="file-input" class="upload-label">
+                            Selecionar Planilha Excel
+                        </label>
+                        <p class="upload-description">
+                            Arraste e solte o arquivo aqui ou clique para selecionar
+                        </p>
+                        <input type="file" id="file-input" class="file-input" accept=".xlsx,.xls">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab Content: Inativos -->
+            <div id="inativos-tab" class="tab-content active">
+                <div class="content-header">
+                    <h2 class="section-title">
+                        <span>🔴</span>
+                        Clientes Inativos
+                    </h2>
+                    
+                    <!-- Filters -->
+                    <div class="filters-container">
+                        <div class="filter-group">
+                            <label class="filter-label">Ordenar por:</label>
+                            <select id="sortOption" class="filter-select">
+                                <option value="nome-az">Nome A-Z</option>
+                                <option value="nome-za">Nome Z-A</option>
+                                <option value="cidade-az">Cidade A-Z</option>
+                                <option value="cidade-za">Cidade Z-A</option>
+                            </select>
                         </div>
-                        <div id="cidadeList" class="cidade-list">
-                            <!-- Cidades serão adicionadas dinamicamente -->
+                        
+                        <div class="filter-group cidade-filter">
+                            <label class="filter-label">Filtrar por cidade:</label>
+                            <div class="cidade-selector" id="cidade-selector">
+                                <span id="cidade-selected">Todas as cidades</span>
+                                <span class="selector-arrow">▼</span>
+                            </div>
+                            <div class="cidade-list escondido" id="cidade-list">
+                                <!-- Cidades serão preenchidas dinamicamente -->
+                            </div>
+                        </div>
+                        
+                        <div class="action-buttons">
+                            <button class="btn btn-primary" id="atualizar-mapa">
+                                <span>🗺️</span> Atualizar Mapa
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="client-list-container">
+                    <div id="client-list" class="client-list">
+                        <div class="empty-state">
+                            Nenhum cliente inativo encontrado. Faça o upload de uma planilha.
                         </div>
                     </div>
                 </div>
             </div>
-            
-            <div id="client-list" class="client-list">
-                <p class="empty-state">Nenhum cliente inativo encontrado. Faça o upload de uma planilha.</p>
-            </div>
-        </div>
 
-        <div id="ativos" class="tab-content">
-            <h2>🟢 Clientes Ativos</h2>
-            <div id="ativos-list" class="client-list">
-                <p class="empty-state">Nenhum cliente ativo encontrado.</p>
+            <!-- Tab Content: Ativos -->
+            <div id="ativos-tab" class="tab-content">
+                <div class="content-header">
+                    <h2 class="section-title">
+                        <span>🟢</span>
+                        Clientes Ativos
+                    </h2>
+                </div>
+                
+                <div class="client-list-container">
+                    <div id="ativos-list" class="client-list">
+                        <div class="empty-state">
+                            Nenhum cliente ativo encontrado.
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <div id="novos" class="tab-content">
-            <h2>🆕 Clientes Novos</h2>
-            <div id="novos-list" class="client-list">
-                <p class="empty-state">Nenhum cliente novo encontrado.</p>
+            <!-- Tab Content: Novos -->
+            <div id="novos-tab" class="tab-content">
+                <div class="content-header">
+                    <h2 class="section-title">
+                        <span>🆕</span>
+                        Clientes Novos
+                    </h2>
+                </div>
+                
+                <div class="client-list-container">
+                    <div id="novos-list" class="client-list">
+                        <div class="empty-state">
+                            Nenhum cliente novo encontrado.
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <div id="agenda" class="tab-content">
-            <h2>📅 Agenda de Visitas</h2>
-            <div id="agenda-list" class="client-list">
-                <p class="empty-state">Nenhum agendamento encontrado.</p>
+            <!-- Tab Content: Agenda -->
+            <div id="agenda-tab" class="tab-content">
+                <div class="content-header">
+                    <h2 class="section-title">
+                        <span>📅</span>
+                        Agenda de Visitas
+                    </h2>
+                </div>
+                
+                <div class="agenda-container">
+                    <div id="agenda-list" class="agenda-list">
+                        <div class="empty-state">
+                            Nenhum agendamento encontrado.
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <div id="mapa" class="tab-content">
-            <h2>🗺️ Mapa de Clientes</h2>
-            
-            <div id="map-stats" class="map-stats" style="display: none;">
-                <div class="stat-item success">
-                    <div class="stat-number" id="stat-success">0</div>
-                    <div class="stat-label">Endereços<br>Encontrados</div>
+            <!-- Tab Content: Mapa -->
+            <div id="mapa-tab" class="tab-content">
+                <div class="content-header">
+                    <h2 class="section-title">
+                        <span>🗺️</span>
+                        Mapa de Clientes
+                    </h2>
                 </div>
-                <div class="stat-item error">
-                    <div class="stat-number" id="stat-errors">0</div>
-                    <div class="stat-label">Endereços<br>com Erro</div>
-                </div>
-                <div class="stat-item info">
-                    <div class="stat-number" id="stat-cached">0</div>
-                    <div class="stat-label">Endereços<br>em Cache</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-number" id="stat-total">0</div>
-                    <div class="stat-label">Total de<br>Clientes</div>
+                
+                <div class="map-container">
+                    <div id="map" class="map-area">
+                        <div class="loading">
+                            <div class="loading-spinner"></div>
+                            <p>Carregando mapa...</p>
+                        </div>
+                    </div>
                 </div>
             </div>
-            
-            <div id="map">
-                <div style="padding: 50px; text-align: center; color: #666;">
-                    <div class="spinner"></div>
-                    <p>Carregando mapa...</p>
-                </div>
-            </div>
-        </div>
+        </main>
     </div>
 
     <!-- Modal -->
     <div id="modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>📄 Detalhes do Cliente</h2>
+                <h2 id="modalTitle">Detalhes do Cliente</h2>
                 <span class="close" onclick="closeModal()">&times;</span>
             </div>
-            <div class="modal-body">
-                <div class="field-group">
-                    <label>Nome Fantasia:</label>
-                    <span id="display-nome-fantasia">-</span>
-                </div>
-                <div class="field-group">
-                    <label>Cliente:</label>
-                    <span id="display-cliente">-</span>
-                </div>
-                <div class="field-group">
-                    <label>CNPJ/CPF:</label>
-                    <span id="display-cnpj-cpf">-</span>
-                </div>
-                <div class="field-group">
-                    <label>Contato:</label>
-                    <span id="display-contato">-</span>
-                </div>
-                <div class="field-group">
-                    <label>Telefone:</label>
-                    <span id="display-telefone-comercial">-</span>
-                </div>
-                <div class="field-group">
-                    <label>Celular:</label>
-                    <span id="display-celular">-</span>
-                </div>
-                <div class="field-group">
-                    <label>Email:</label>
-                    <span id="display-email">-</span>
-                </div>
-                <div class="field-group">
-                    <label>Endereço:</label>
-                    <span id="display-endereco">-</span>
-                </div>
-                <div class="field-group">
-                    <label>Número:</label>
-                    <span id="display-numero">-</span>
-                </div>
-                <div class="field-group">
-                    <label>Bairro:</label>
-                    <span id="display-bairro">-</span>
-                </div>
-                <div class="field-group">
-                    <label>Cidade:</label>
-                    <span id="display-cidade">-</span>
-                </div>
-                <div class="field-group">
-                    <label>UF:</label>
-                    <span id="display-uf">-</span>
-                </div>
-                <div class="field-group">
-                    <label>CEP:</label>
-                    <span id="display-cep">-</span>
-                </div>
-            </div>
-
-            <div class="observacoes-section">
-                <label for="observacoes"><strong>Observações:</strong></label>
-                <textarea id="observacoes" placeholder="Digite suas observações sobre este cliente..." maxlength="2000"></textarea>
-                <div class="char-counter">
-                    <span id="observacoes-contador">0/2000</span>
-                </div>
-            </div>
-
-            <div class="modal-footer">
-                <button id="tornarAtivo" class="btn btn-success" onclick="handleTornarAtivo()" style="display: none;">✅ Tornar Ativo</button>
-                <button id="excluirAtivo" class="btn btn-danger" onclick="handleExcluirAtivo()" style="display: none;">❌ Remover dos Ativos</button>
-                <button id="editarCliente" class="btn btn-primary" onclick="handleEditarCliente()" style="display: none;">✏️ Editar</button>
-                <button class="btn btn-secondary" onclick="closeModal()">Fechar</button>
+            <div class="modal-body" id="modalBody">
+                <!-- Conteúdo será preenchido dinamicamente -->
             </div>
         </div>
     </div>
 
+    <!-- Error Messages Container -->
+    <div id="error-container" style="position: fixed; top: 80px; right: 20px; z-index: 10001;"></div>
+
     <!-- Scripts -->
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- XLSX Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" 
+            integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" 
+            crossorigin="anonymous"></script>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js" 
+            integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA==" 
+            crossorigin=""></script>
+
+    <!-- App Scripts -->
     <script src="dbManager.js"></script>
     <script src="client-manager.js"></script>
     <script src="map.js"></script>
     <script src="script.js"></script>
 
     <script>
-        // Função para toggle do filtro de cidades
-        function toggleCidadeFilter() {
-            const header = document.querySelector('.cidade-filter-header');
-            const list = document.getElementById('cidadeList');
-            const arrow = document.getElementById('filter-arrow');
-            
-            if (list.classList.contains('open')) {
-                list.classList.remove('open');
-                header.classList.remove('open');
-                arrow.classList.remove('rotated');
-            } else {
-                list.classList.add('open');
-                header.classList.add('open');
-                arrow.classList.add('rotated');
-            }
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./service-worker.js')
+                .then(registration => console.log('SW registered:', registration))
+                .catch(error => console.log('SW registration failed:', error));
         }
-
-        // Fechar filtro quando clicar fora
-        document.addEventListener('click', function(event) {
-            const container = document.querySelector('.cidade-filter-container');
-            if (container && !container.contains(event.target)) {
-                const list = document.getElementById('cidadeList');
-                const header = document.querySelector('.cidade-filter-header');
-                const arrow = document.getElementById('filter-arrow');
-                
-                list.classList.remove('open');
-                header.classList.remove('open');
-                arrow.classList.remove('rotated');
-            }
+        
+        // Global error handling
+        window.addEventListener('error', (e) => {
+            console.error('Global error:', e.error);
+            showErrorMessage('Erro no sistema: ' + e.message);
+        });
+        
+        window.addEventListener('unhandledrejection', (e) => {
+            console.error('Unhandled promise rejection:', e.reason);
+            showErrorMessage('Erro de sistema não tratado');
         });
     </script>
 </body>
