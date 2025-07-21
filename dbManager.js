@@ -1,4 +1,4 @@
-// dbManager.js - Gerenciador unificado de banco de dados corrigido
+// dbManager.js - Gerenciador unificado de banco de dados
 
 class DBManager {
     constructor() {
@@ -6,13 +6,13 @@ class DBManager {
         this.dbVersion = 5;
         this.db = null;
         this.stores = [
-            'clients', // Clientes inativos
-            'ativos', // Clientes ativos
-            'novos', // Clientes novos
-            'schedules', // Agendamentos
-            'observations', // Observações
-            'filters', // Filtros salvos
-            'cache' // Cache de geocodificação
+            'clients',
+            'ativos', 
+            'novos',
+            'schedules',
+            'observations',
+            'filters',
+            'cache'
         ];
     }
 
@@ -46,7 +46,6 @@ class DBManager {
                 const db = event.target.result;
                 console.log(`🔄 Atualizando banco da versão ${event.oldVersion} para ${event.newVersion}`);
                 
-                // Criar todas as stores necessárias
                 this.stores.forEach(storeName => {
                     if (!db.objectStoreNames.contains(storeName)) {
                         db.createObjectStore(storeName);
@@ -66,11 +65,9 @@ class DBManager {
             const transaction = this.db.transaction([storeName], 'readwrite');
             const store = transaction.objectStore(storeName);
             
-            // Limpar store antes de salvar
             await this.clearStore(store);
             
             if (Array.isArray(data)) {
-                // Para arrays, salvar cada item com chave única
                 const promises = data.map((item, index) => {
                     return new Promise((resolve, reject) => {
                         const key = item.id || `item_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 5)}`;
@@ -81,7 +78,6 @@ class DBManager {
                 });
                 await Promise.all(promises);
             } else {
-                // Para objetos únicos
                 await new Promise((resolve, reject) => {
                     const request = store.put(data, 'data');
                     request.onsuccess = () => resolve();
@@ -111,7 +107,6 @@ class DBManager {
                 request.onsuccess = () => {
                     let result = request.result || [];
                     
-                    // Se não há resultados, tentar buscar por chave 'data'
                     if (result.length === 0) {
                         const dataRequest = store.get('data');
                         dataRequest.onsuccess = () => {
@@ -119,7 +114,6 @@ class DBManager {
                             if (dataResult) {
                                 result = dataResult;
                             } else {
-                                // Retornar estrutura padrão baseada no store
                                 result = (storeName === 'schedules' || storeName === 'observations' || storeName === 'filters' || storeName === 'cache') ? {} : [];
                             }
                             
@@ -128,7 +122,7 @@ class DBManager {
                         };
                         dataRequest.onerror = () => {
                             const defaultResult = (storeName === 'schedules' || storeName === 'observations' || storeName === 'filters' || storeName === 'cache') ? {} : [];
-                            console.log(`📖 Dados padrão retornados para '${storeName}': ${Array.isArray(defaultResult) ? defaultResult.length : typeof defaultResult} item(s)`);
+                            console.log(`📖 Dados padrão retornados para '${storeName}'`);
                             resolve(defaultResult);
                         };
                     } else {
@@ -171,7 +165,7 @@ class DBManager {
         });
     }
 
-    // Métodos específicos para observações (usando localStorage como backup)
+    // Métodos para observações
     saveObservation(clientId, observation) {
         try {
             const observations = this.loadAllObservations();
@@ -206,7 +200,7 @@ class DBManager {
         }
     }
 
-    // Métodos para filtros (removido campos de saldo)
+    // Métodos para filtros
     saveFilters(filters) {
         try {
             const filtersToSave = {
@@ -276,7 +270,6 @@ class DBManager {
         try {
             const data = typeof fileContent === 'string' ? JSON.parse(fileContent) : fileContent;
             
-            // Validar estrutura
             const requiredKeys = ['clients', 'ativos', 'novos', 'schedules'];
             const missingKeys = requiredKeys.filter(key => !data.hasOwnProperty(key));
             
@@ -284,13 +277,11 @@ class DBManager {
                 throw new Error(`Backup inválido. Chaves ausentes: ${missingKeys.join(', ')}`);
             }
 
-            // Importar dados do IndexedDB
             await this.saveData('clients', Array.isArray(data.clients) ? data.clients : []);
             await this.saveData('ativos', Array.isArray(data.ativos) ? data.ativos : []);
             await this.saveData('novos', Array.isArray(data.novos) ? data.novos : []);
             await this.saveData('schedules', data.schedules || {});
 
-            // Importar observações e filtros
             if (data.observations && typeof data.observations === 'object') {
                 localStorage.setItem('client-observations', JSON.stringify(data.observations));
             }
@@ -324,7 +315,6 @@ class DBManager {
                 issues: []
             };
 
-            // Verificar duplicatas
             const allClients = [...clients, ...ativos, ...novos];
             const ids = allClients.map(c => c.id).filter(id => id);
             const duplicateIds = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];
@@ -333,7 +323,6 @@ class DBManager {
                 stats.issues.push(`IDs duplicados: ${duplicateIds.join(', ')}`);
             }
 
-            // Verificar campos obrigatórios
             allClients.forEach((cliente, index) => {
                 if (!cliente['Nome Fantasia'] && !cliente['Cliente']) {
                     stats.issues.push(`Cliente sem nome no índice ${index}`);
@@ -358,4 +347,4 @@ if (typeof window !== 'undefined') {
     window.dbManager = new DBManager();
 }
 
-console.log('✅ dbManager.js carregado - versão corrigida sem campos de saldo');
+console.log('✅ dbManager.js carregado');
