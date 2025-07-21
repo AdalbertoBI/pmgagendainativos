@@ -1,4 +1,4 @@
-// clientManager.js - Versão com tratamento aprimorado de endereços e geocodificação inteligente
+// client-manager.js - Sistema robusto de cache e persistência com tratamento de erro
 class ClientManager {
     constructor() {
         this.data = [];
@@ -10,84 +10,441 @@ class ClientManager {
         this.currentTab = 'inativos';
         this.initialized = false;
         this.editMode = false;
-        this.geocodingNeeded = false; // Flag para controlar quando geocodificar
-        this.dataLoaded = false; // Flag para controlar se dados foram carregados
+        this.geocodingNeeded = false;
+        this.dataLoaded = false;
+        
+        // Sistema de cache robusto
+        this.cacheVersion = '1.0';
+        this.cacheKeys = {
+            clients: 'clients_cache_v' + this.cacheVersion,
+            ativos: 'ativos_cache_v' + this.cacheVersion,
+            novos: 'novos_cache_v' + this.cacheVersion,
+            schedules: 'schedules_cache_v' + this.cacheVersion,
+            markers: 'markers_cache_v' + this.cacheVersion,
+            observations: 'observations_cache_v' + this.cacheVersion,
+            filters: 'filters_cache_v' + this.cacheVersion
+        };
+        
+        // Controle de integridade dos dados
+        this.dataIntegrity = {
+            lastSaveTime: null,
+            checksumClients: null,
+            checksumAtivos: null,
+            checksumNovos: null
+        };
+        
+        // Sistema de retry para operações críticas
+        this.retryConfig = {
+            maxRetries: 3,
+            baseDelay: 1000,
+            maxDelay: 5000
+        };
+
+        // Bind methods para preservar contexto
+        this.handleStorageError = this.handleStorageError.bind(this);
+        this.validateDataIntegrity = this.validateDataIntegrity.bind(this);
+        this.retryOperation = this.retryOperation.bind(this);
     }
 
     async init() {
         try {
-            console.log('🚀 Inicializando ClientManager...');
+            console.log('🚀 Inicializando ClientManager com cache robusto...');
+            
+            // Verificar disponibilidade dos sistemas de storage
+            await this.checkStorageSupport();
             
             if (!window.dbManager) {
                 console.log('⏳ Aguardando dbManager...');
                 await this.waitForDbManager();
             }
 
-            await this.loadAllData();
+            // Tentar carregar dados com fallbacks múltiplos
+            await this.loadAllDataWithFallbacks();
+            
+            // Verificar integridade dos dados carregados
+            await this.validateDataIntegrity();
+            
+            // Configurar listeners para detectar problemas de storage
+            this.setupStorageListeners();
+            
             this.initialized = true;
             console.log('✅ ClientManager inicializado com sucesso');
-            this.applyFiltersAndSort();
+            
+            // Aplicar filtros de forma assíncrona para não bloquear a inicialização
+            setTimeout(() => {
+                this.applyFiltersAndSort();
+            }, 100);
+            
         } catch (error) {
-            console.error('❌ Erro ao inicializar ClientManager:', error);
-            throw error;
+            console.error('❌ Erro crítico ao inicializar ClientManager:', error);
+            await this.handleInitializationError(error);
         }
     }
 
-    async waitForDbManager() {
-        return new Promise((resolve) => {
-            const checkDbManager = () => {
-                if (window.dbManager && window.dbManager.db) {
-                    resolve();
-                } else {
-                    setTimeout(checkDbManager, 100);
+    async checkStorageSupport() {
+        const storageSupport = {
+            indexedDB: false,
+            localStorage: false,
+            sessionStorage: false
+        };
+
+        try {
+            // Testar IndexedDB
+            if ('indexedDB' in window) {
+                storageSupport.indexedDB = true;
+                console.log('✅ IndexedDB disponível');
+            }
+        } catch (error) {
+            console.warn('⚠️ IndexedDB não disponível:', error);
+        }
+
+        try {
+            // Testar localStorage
+            localStorage.setItem('test', 'test');
+            localStorage.removeItem('test');
+            storageSupport.localStorage = true;
+            console.log('✅ localStorage disponível');
+        } catch (error) {
+            console.warn('⚠️ localStorage não disponível:', error);
+        }
+
+        try {
+            // Testar sessionStorage
+            sessionStorage.setItem('test', 'test');
+            sessionStorage.removeItem('test');
+            storageSupport.sessionStorage = true;
+            console.log('✅ sessionStorage disponível');
+        } catch (error) {
+            console.warn('⚠️ sessionStorage não disponível:', error);
+        }
+
+        this.storageSupport = storageSupport;
+
+        if (!storageSupport.indexedDB && !storageSupport.localStorage) {
+            throw new Error('Nenhum sistema de armazenamento disponível');
+        }
+    }
+
+    async loadAllDataWithFallbacks() {
+        const fallbackMethods = [
+            () => this.loadFromIndexedDB(),
+            () => this.loadFromLocalStorage(),
+            () => this.loadFromSessionStorage(),
+            () => this.loadFromMemoryBackup()
+        ];
+
+        let lastError = null;
+
+        for (const method of fallbackMethods) {
+            try {
+                console.log(`📖 Tentando carregar dados com método: ${method.name}`);
+                await method();
+                
+                if (this.hasValidData()) {
+                    console.log(`✅ Dados carregados com sucesso via ${method.name}`);
+                    this.dataLoaded = true;
+                    return;
                 }
-            };
-            checkDbManager();
-        });
-    }
+            } catch (error) {
+                console.warn(`⚠️ Falha no método ${method.name}:`, error);
+                lastError = error;
+                continue;
+            }
+        }
 
-    async loadAllData() {
-        try {
-            console.log('📖 Carregando dados salvos...');
-            
-            const clients = await window.dbManager.loadData('clients');
-            this.data = Array.isArray(clients) ? clients : [];
-            
-            const ativos = await window.dbManager.loadData('ativos');
-            this.ativos = Array.isArray(ativos) ? ativos : [];
-            
-            const novos = await window.dbManager.loadData('novos');
-            this.novos = Array.isArray(novos) ? novos : [];
-            
-            const schedules = await window.dbManager.loadData('schedules');
-            this.schedules = (typeof schedules === 'object' && schedules !== null) ? schedules : {};
-
-            // Atualizar variáveis globais
-            window.data = this.data;
-            window.ativos = this.ativos;
-            window.novos = this.novos;
-
-            this.dataLoaded = true;
-
-            console.log(`📊 Dados carregados: 🔴 Inativos: ${this.data.length} 🟢 Ativos: ${this.ativos.length} 🆕 Novos: ${this.novos.length} 📅 Agendamentos: ${Object.keys(this.schedules).length}`);
-            
-        } catch (error) {
-            console.error('❌ Erro ao carregar dados:', error);
-            this.data = [];
-            this.ativos = [];
-            this.novos = [];
-            this.schedules = {};
-            window.data = this.data;
-            window.ativos = this.ativos;
-            window.novos = this.novos;
-            this.dataLoaded = false;
+        // Se chegou aqui, todos os métodos falharam
+        console.warn('⚠️ Todos os métodos de carregamento falharam, inicializando com dados vazios');
+        this.initializeEmptyData();
+        
+        if (lastError) {
+            throw new Error(`Falha ao carregar dados: ${lastError.message}`);
         }
     }
 
-    // Limpar todos os dados anteriores (chamado ao carregar novo arquivo)
-    async clearAllPreviousData() {
+    async loadFromIndexedDB() {
+        if (!this.storageSupport.indexedDB || !window.dbManager) {
+            throw new Error('IndexedDB não disponível');
+        }
+
+        const data = await Promise.all([
+            window.dbManager.loadData('clients'),
+            window.dbManager.loadData('ativos'),
+            window.dbManager.loadData('novos'),
+            window.dbManager.loadData('schedules'),
+            window.dbManager.loadData('markers'),
+            window.dbManager.loadData('observations')
+        ]);
+
+        this.data = Array.isArray(data[0]) ? data[0] : [];
+        this.ativos = Array.isArray(data[1]) ? data[1] : [];
+        this.novos = Array.isArray(data[2]) ? data[2] : [];
+        this.schedules = (typeof data[3] === 'object' && data[3] !== null) ? data[3] : {};
+        
+        // Restaurar marcadores se disponível
+        if (data[4] && window.mapManager && typeof window.mapManager.restoreMarkers === 'function') {
+            await window.mapManager.restoreMarkers(data[4]);
+        }
+
+        this.updateGlobalVariables();
+    }
+
+    async loadFromLocalStorage() {
+        if (!this.storageSupport.localStorage) {
+            throw new Error('localStorage não disponível');
+        }
+
+        const loadFromLS = (key, defaultValue) => {
+            try {
+                const stored = localStorage.getItem(key);
+                return stored ? JSON.parse(stored) : defaultValue;
+            } catch (error) {
+                console.warn(`Erro ao carregar ${key} do localStorage:`, error);
+                return defaultValue;
+            }
+        };
+
+        this.data = loadFromLS(this.cacheKeys.clients, []);
+        this.ativos = loadFromLS(this.cacheKeys.ativos, []);
+        this.novos = loadFromLS(this.cacheKeys.novos, []);
+        this.schedules = loadFromLS(this.cacheKeys.schedules, {});
+
+        // Restaurar marcadores
+        const markersData = loadFromLS(this.cacheKeys.markers, null);
+        if (markersData && window.mapManager && typeof window.mapManager.restoreMarkers === 'function') {
+            await window.mapManager.restoreMarkers(markersData);
+        }
+
+        this.updateGlobalVariables();
+    }
+
+    async loadFromSessionStorage() {
+        if (!this.storageSupport.sessionStorage) {
+            throw new Error('sessionStorage não disponível');
+        }
+
+        const loadFromSS = (key, defaultValue) => {
+            try {
+                const stored = sessionStorage.getItem(key);
+                return stored ? JSON.parse(stored) : defaultValue;
+            } catch (error) {
+                console.warn(`Erro ao carregar ${key} do sessionStorage:`, error);
+                return defaultValue;
+            }
+        };
+
+        this.data = loadFromSS(this.cacheKeys.clients, []);
+        this.ativos = loadFromSS(this.cacheKeys.ativos, []);
+        this.novos = loadFromSS(this.cacheKeys.novos, []);
+        this.schedules = loadFromSS(this.cacheKeys.schedules, {});
+
+        this.updateGlobalVariables();
+    }
+
+    async loadFromMemoryBackup() {
+        // Último recurso: tentar recuperar de backup na memória
+        if (window._clientDataBackup) {
+            console.log('📦 Restaurando de backup na memória');
+            const backup = window._clientDataBackup;
+            
+            this.data = backup.data || [];
+            this.ativos = backup.ativos || [];
+            this.novos = backup.novos || [];
+            this.schedules = backup.schedules || {};
+            
+            this.updateGlobalVariables();
+        } else {
+            throw new Error('Nenhum backup disponível na memória');
+        }
+    }
+
+    updateGlobalVariables() {
+        window.data = this.data;
+        window.ativos = this.ativos;
+        window.novos = this.novos;
+    }
+
+    hasValidData() {
+        return (Array.isArray(this.data) && Array.isArray(this.ativos) && 
+                Array.isArray(this.novos) && typeof this.schedules === 'object') &&
+               (this.data.length > 0 || this.ativos.length > 0 || this.novos.length > 0);
+    }
+
+    initializeEmptyData() {
+        this.data = [];
+        this.ativos = [];
+        this.novos = [];
+        this.schedules = {};
+        this.updateGlobalVariables();
+        this.dataLoaded = false;
+    }
+
+    async validateDataIntegrity() {
         try {
-            console.log('🧹 Limpando todos os dados anteriores...');
+            const currentChecksums = {
+                clients: this.calculateChecksum(this.data),
+                ativos: this.calculateChecksum(this.ativos),
+                novos: this.calculateChecksum(this.novos)
+            };
+
+            // Se há checksums anteriores, verificar integridade
+            if (this.dataIntegrity.checksumClients) {
+                if (currentChecksums.clients !== this.dataIntegrity.checksumClients ||
+                    currentChecksums.ativos !== this.dataIntegrity.checksumAtivos ||
+                    currentChecksums.novos !== this.dataIntegrity.checksumNovos) {
+                    
+                    console.warn('⚠️ Possível corrupção de dados detectada');
+                    await this.handleDataCorruption();
+                }
+            }
+
+            // Atualizar checksums
+            this.dataIntegrity = {
+                lastSaveTime: Date.now(),
+                checksumClients: currentChecksums.clients,
+                checksumAtivos: currentChecksums.ativos,
+                checksumNovos: currentChecksums.novos
+            };
+
+        } catch (error) {
+            console.error('❌ Erro na validação de integridade:', error);
+        }
+    }
+
+    calculateChecksum(data) {
+        // Função simples de hash para detectar mudanças nos dados
+        const str = JSON.stringify(data);
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Converter para 32 bits
+        }
+        return hash.toString();
+    }
+
+    async handleDataCorruption() {
+        console.log('🔧 Tentando recuperar dados corrompidos...');
+        
+        try {
+            // Tentar recarregar de uma fonte alternativa
+            await this.loadAllDataWithFallbacks();
+        } catch (error) {
+            console.error('❌ Falha na recuperação de dados:', error);
+            // Como último recurso, notificar o usuário
+            if (typeof window.showErrorMessage === 'function') {
+                window.showErrorMessage('Dados corrompidos detectados. Por favor, recarregue a planilha.');
+            }
+        }
+    }
+
+    setupStorageListeners() {
+        // Listener para mudanças no localStorage de outras abas
+        if (this.storageSupport.localStorage) {
+            window.addEventListener('storage', (e) => {
+                if (Object.values(this.cacheKeys).includes(e.key)) {
+                    console.log('🔄 Detectada mudança no storage de outra aba');
+                    // Recarregar dados após breve delay
+                    setTimeout(() => {
+                        this.loadAllDataWithFallbacks().catch(console.error);
+                    }, 500);
+                }
+            });
+        }
+
+        // Listener para erros de quota excedida
+        window.addEventListener('error', (e) => {
+            if (e.message && e.message.toLowerCase().includes('quota')) {
+                this.handleStorageQuotaError();
+            }
+        });
+
+        // Backup periódico na memória
+        setInterval(() => {
+            this.createMemoryBackup();
+        }, 30000); // A cada 30 segundos
+    }
+
+    createMemoryBackup() {
+        try {
+            window._clientDataBackup = {
+                data: [...this.data],
+                ativos: [...this.ativos],
+                novos: [...this.novos],
+                schedules: {...this.schedules},
+                timestamp: Date.now()
+            };
+        } catch (error) {
+            console.warn('⚠️ Falha ao criar backup na memória:', error);
+        }
+    }
+
+    async handleStorageQuotaError() {
+        console.warn('⚠️ Quota de armazenamento excedida, limpando dados antigos...');
+        
+        try {
+            // Limpar caches antigos
+            await this.clearOldCacheVersions();
+            
+            // Comprimir dados se possível
+            await this.compressStoredData();
+            
+        } catch (error) {
+            console.error('❌ Erro ao lidar com quota de armazenamento:', error);
+        }
+    }
+
+    async clearOldCacheVersions() {
+        if (this.storageSupport.localStorage) {
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (key.includes('_cache_v') && !key.includes(this.cacheVersion))) {
+                    keysToRemove.push(key);
+                }
+            }
+            
+            keysToRemove.forEach(key => {
+                localStorage.removeItem(key);
+                console.log(`🧹 Cache antigo removido: ${key}`);
+            });
+        }
+    }
+
+    async retryOperation(operation, context = 'Operação') {
+        let lastError = null;
+        
+        for (let attempt = 1; attempt <= this.retryConfig.maxRetries; attempt++) {
+            try {
+                console.log(`🔄 ${context} - Tentativa ${attempt}/${this.retryConfig.maxRetries}`);
+                const result = await operation();
+                
+                if (attempt > 1) {
+                    console.log(`✅ ${context} bem-sucedida na tentativa ${attempt}`);
+                }
+                
+                return result;
+            } catch (error) {
+                lastError = error;
+                console.warn(`⚠️ ${context} falhou na tentativa ${attempt}:`, error.message);
+                
+                if (attempt < this.retryConfig.maxRetries) {
+                    const delay = Math.min(
+                        this.retryConfig.baseDelay * Math.pow(2, attempt - 1),
+                        this.retryConfig.maxDelay
+                    );
+                    
+                    console.log(`⏳ Aguardando ${delay}ms antes da próxima tentativa...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        }
+        
+        throw new Error(`${context} falhou após ${this.retryConfig.maxRetries} tentativas: ${lastError.message}`);
+    }
+
+    async clearAllPreviousData() {
+        await this.retryOperation(async () => {
+            console.log('🧹 Limpando todos os dados anteriores com método robusto...');
             
             // Limpar dados em memória
             this.data = [];
@@ -96,112 +453,252 @@ class ClientManager {
             this.schedules = {};
             this.filteredData = [];
             
-            // Limpar variáveis globais
-            window.data = this.data;
-            window.ativos = this.ativos;
-            window.novos = this.novos;
+            this.updateGlobalVariables();
             
-            // Limpar dados no IndexedDB
-            await window.dbManager.clearData('clients');
-            await window.dbManager.clearData('ativos');
-            await window.dbManager.clearData('novos');
-            await window.dbManager.clearData('schedules');
+            // Limpar em paralelo todos os sistemas de storage
+            const clearPromises = [];
             
-            // Limpar cache de geocodificação
-            if (window.mapManager && typeof window.mapManager.clearGeocodingCache === 'function') {
-                window.mapManager.clearGeocodingCache();
+            // IndexedDB
+            if (this.storageSupport.indexedDB && window.dbManager) {
+                clearPromises.push(
+                    window.dbManager.clearData('clients'),
+                    window.dbManager.clearData('ativos'),
+                    window.dbManager.clearData('novos'),
+                    window.dbManager.clearData('schedules'),
+                    window.dbManager.clearData('markers'),
+                    window.dbManager.clearData('observations')
+                );
             }
             
-            // Limpar observações do localStorage
-            localStorage.removeItem('client-observations');
+            // localStorage
+            if (this.storageSupport.localStorage) {
+                clearPromises.push(Promise.resolve().then(() => {
+                    Object.values(this.cacheKeys).forEach(key => {
+                        localStorage.removeItem(key);
+                    });
+                    localStorage.removeItem('client-observations');
+                }));
+            }
+            
+            // sessionStorage
+            if (this.storageSupport.sessionStorage) {
+                clearPromises.push(Promise.resolve().then(() => {
+                    Object.values(this.cacheKeys).forEach(key => {
+                        sessionStorage.removeItem(key);
+                    });
+                }));
+            }
+            
+            await Promise.allSettled(clearPromises);
+            
+            // Limpar cache do mapa
+            if (window.mapManager) {
+                if (typeof window.mapManager.clearGeocodingCache === 'function') {
+                    window.mapManager.clearGeocodingCache();
+                }
+                if (typeof window.mapManager.clearAllMarkers === 'function') {
+                    window.mapManager.clearAllMarkers();
+                }
+            }
+            
+            // Limpar backup da memória
+            delete window._clientDataBackup;
             
             this.geocodingNeeded = true;
             this.dataLoaded = false;
             
-            console.log('✅ Todos os dados anteriores foram limpos');
+            // Resetar integridade
+            this.dataIntegrity = {
+                lastSaveTime: null,
+                checksumClients: null,
+                checksumAtivos: null,
+                checksumNovos: null
+            };
             
-        } catch (error) {
-            console.error('❌ Erro ao limpar dados anteriores:', error);
-            throw error;
-        }
+            console.log('✅ Todos os dados anteriores foram limpos com sucesso');
+            
+        }, 'Limpeza de dados');
     }
 
-    // Salvar todos os dados no IndexedDB (chamado após carregar novos dados)
-    async saveAllData() {
-        try {
-            console.log('💾 Salvando todos os dados...');
+    async saveAllDataRobust() {
+        await this.retryOperation(async () => {
+            console.log('💾 Salvando todos os dados com método robusto...');
             
-            await window.dbManager.saveData('clients', this.data);
-            await window.dbManager.saveData('ativos', this.ativos);
-            await window.dbManager.saveData('novos', this.novos);
-            await window.dbManager.saveData('schedules', this.schedules);
+            const savePromises = [];
+            const currentTime = Date.now();
+            
+            // Preparar dados para salvar
+            const dataToSave = {
+                clients: this.data,
+                ativos: this.ativos,
+                novos: this.novos,
+                schedules: this.schedules,
+                timestamp: currentTime
+            };
+            
+            // Salvar no IndexedDB (prioridade)
+            if (this.storageSupport.indexedDB && window.dbManager) {
+                savePromises.push(
+                    window.dbManager.saveData('clients', this.data),
+                    window.dbManager.saveData('ativos', this.ativos),
+                    window.dbManager.saveData('novos', this.novos),
+                    window.dbManager.saveData('schedules', this.schedules)
+                );
+                
+                // Salvar dados dos marcadores se disponível
+                if (window.mapManager && typeof window.mapManager.getMarkersData === 'function') {
+                    const markersData = window.mapManager.getMarkersData();
+                    savePromises.push(window.dbManager.saveData('markers', markersData));
+                }
+            }
+            
+            // Salvar no localStorage (backup)
+if (this.storageSupport.localStorage) {
+    savePromises.push(Promise.resolve().then(async () => {
+        try {
+            localStorage.setItem(this.cacheKeys.clients, JSON.stringify(this.data));
+            localStorage.setItem(this.cacheKeys.ativos, JSON.stringify(this.ativos));
+            localStorage.setItem(this.cacheKeys.novos, JSON.stringify(this.novos));
+            localStorage.setItem(this.cacheKeys.schedules, JSON.stringify(this.schedules));
+            
+            if (window.mapManager && typeof window.mapManager.getMarkersData === 'function') {
+                const markersData = window.mapManager.getMarkersData();
+                localStorage.setItem(this.cacheKeys.markers, JSON.stringify(markersData));
+            }
+        } catch (error) {
+            if (error.name === 'QuotaExceededError') {
+                await this.handleStorageQuotaError();
+                throw error;
+            }
+            throw error;
+        }
+    }));
+}
+
+            
+            // Salvar no sessionStorage (backup secundário)
+            if (this.storageSupport.sessionStorage) {
+                savePromises.push(Promise.resolve().then(() => {
+                    try {
+                        sessionStorage.setItem(this.cacheKeys.clients, JSON.stringify(this.data));
+                        sessionStorage.setItem(this.cacheKeys.ativos, JSON.stringify(this.ativos));
+                        sessionStorage.setItem(this.cacheKeys.novos, JSON.stringify(this.novos));
+                        sessionStorage.setItem(this.cacheKeys.schedules, JSON.stringify(this.schedules));
+                    } catch (error) {
+                        console.warn('⚠️ Falha ao salvar no sessionStorage:', error);
+                    }
+                }));
+            }
+            
+            const results = await Promise.allSettled(savePromises);
+            
+            // Verificar se pelo menos uma operação foi bem-sucedida
+            const successCount = results.filter(r => r.status === 'fulfilled').length;
+            
+            if (successCount === 0) {
+                throw new Error('Falha em todos os métodos de salvamento');
+            }
+            
+            // Atualizar informações de integridade
+            await this.validateDataIntegrity();
             
             this.dataLoaded = true;
             
-            console.log('✅ Todos os dados foram salvos com sucesso');
+            console.log(`✅ Dados salvos com sucesso (${successCount}/${savePromises.length} métodos)`);
             
-        } catch (error) {
-            console.error('❌ Erro ao salvar dados:', error);
-            throw error;
-        }
+        }, 'Salvamento de dados');
     }
 
-    // Processar novos dados (chamado ao carregar planilha)
     async processNewData(newData) {
-        try {
-            console.log('📊 Processando novos dados...');
+        await this.retryOperation(async () => {
+            console.log('📊 Processando novos dados com método robusto...');
             
             // Primeiro, limpar todos os dados anteriores
             await this.clearAllPreviousData();
             
-            // Processar e validar novos dados
+            // Validar e processar novos dados
             if (newData.clients && Array.isArray(newData.clients)) {
-                this.data = newData.clients;
+                this.data = [...newData.clients]; // Criar cópia para evitar referências
             }
             
             if (newData.ativos && Array.isArray(newData.ativos)) {
-                this.ativos = newData.ativos;
+                this.ativos = [...newData.ativos];
             }
             
             if (newData.novos && Array.isArray(newData.novos)) {
-                this.novos = newData.novos;
+                this.novos = [...newData.novos];
             }
             
             if (newData.schedules && typeof newData.schedules === 'object') {
-                this.schedules = newData.schedules;
+                this.schedules = {...newData.schedules};
             }
             
-            // Atualizar variáveis globais
-            window.data = this.data;
-            window.ativos = this.ativos;
-            window.novos = this.novos;
+            this.updateGlobalVariables();
             
             // Salvar novos dados
-            await this.saveAllData();
+            await this.saveAllDataRobust();
             
             // Marcar que geocodificação é necessária
             this.markGeocodingNeeded();
             
-            // Aplicar filtros e renderizar
-            this.applyFiltersAndSort();
+            // Criar backup imediato na memória
+            this.createMemoryBackup();
+            
+            // Aplicar filtros de forma assíncrona
+            setTimeout(() => {
+                this.applyFiltersAndSort();
+            }, 100);
             
             console.log(`✅ Novos dados processados: 🔴 Inativos: ${this.data.length} 🟢 Ativos: ${this.ativos.length} 🆕 Novos: ${this.novos.length}`);
             
-        } catch (error) {
-            console.error('❌ Erro ao processar novos dados:', error);
-            throw error;
-        }
+        }, 'Processamento de novos dados');
     }
 
-    // Marcar que geocodificação é necessária (nova planilha carregada)
     markGeocodingNeeded() {
         this.geocodingNeeded = true;
-        if (window.mapManager && typeof window.mapManager.clearGeocodingCache === 'function') {
-            window.mapManager.clearGeocodingCache();
-            console.log('🧹 Cache de geocodificação limpo devido à nova planilha');
+        if (window.mapManager) {
+            if (typeof window.mapManager.clearGeocodingCache === 'function') {
+                window.mapManager.clearGeocodingCache();
+            }
+            if (typeof window.mapManager.clearAllMarkers === 'function') {
+                window.mapManager.clearAllMarkers();
+            }
+            console.log('🧹 Cache de geocodificação e marcadores limpos devido à nova planilha');
         }
     }
 
+    async handleStorageError(error, operation) {
+        console.error(`❌ Erro de armazenamento em ${operation}:`, error);
+        
+        if (error.name === 'QuotaExceededError') {
+            await this.handleStorageQuotaError();
+        } else if (error.name === 'DataError' || error.message.includes('corrupted')) {
+            await this.handleDataCorruption();
+        }
+        
+        if (typeof window.showErrorMessage === 'function') {
+            window.showErrorMessage(`Erro no sistema de cache: ${error.message}`);
+        }
+    }
+
+    async handleInitializationError(error) {
+        console.error('❌ Erro de inicialização crítico:', error);
+        
+        // Tentar recuperação de emergência
+        try {
+            console.log('🚨 Tentando recuperação de emergência...');
+            this.initializeEmptyData();
+            
+            if (typeof window.showErrorMessage === 'function') {
+                window.showErrorMessage('Sistema iniciado em modo de recuperação. Alguns dados podem não estar disponíveis.');
+            }
+        } catch (recoveryError) {
+            console.error('❌ Falha na recuperação de emergência:', recoveryError);
+            throw new Error(`Falha crítica na inicialização: ${error.message}`);
+        }
+    }
+
+    // Métodos existentes mantidos (applyFiltersAndSort, renderList, etc.)
     applyFiltersAndSort() {
         try {
             if (!Array.isArray(this.data)) {
@@ -265,6 +762,10 @@ class ClientManager {
                 cidadesSelecionadas: Array.from(document.querySelectorAll('#cidadeList input:checked'))
                     .map(input => input.value)
             };
+
+            if (this.storageSupport.localStorage) {
+                localStorage.setItem(this.cacheKeys.filters, JSON.stringify(filters));
+            }
 
             if (window.dbManager && typeof window.dbManager.saveFilters === 'function') {
                 window.dbManager.saveFilters(filters);
@@ -408,7 +909,6 @@ class ClientManager {
             </div>
         `;
 
-        // Atualizar contador de caracteres
         setTimeout(() => {
             if (typeof updateCharCounter === 'function') {
                 updateCharCounter();
@@ -437,7 +937,7 @@ class ClientManager {
             return;
         }
 
-        try {
+        await this.retryOperation(async () => {
             const agendamento = {
                 clientId: this.currentItem.id,
                 cliente: this.currentItem['Nome Fantasia'] || this.currentItem['Cliente'],
@@ -449,7 +949,7 @@ class ClientManager {
             const scheduleId = `${this.currentItem.id}_${Date.now()}`;
             this.schedules[scheduleId] = agendamento;
 
-            await window.dbManager.saveData('schedules', this.schedules);
+            await this.saveAllDataRobust();
 
             if (typeof window.showSuccessMessage === 'function') {
                 window.showSuccessMessage('Agendamento salvo com sucesso!');
@@ -461,10 +961,7 @@ class ClientManager {
                 window.renderAllTabs();
             }
 
-        } catch (error) {
-            console.error('❌ Erro ao salvar agendamento:', error);
-            alert('Erro ao salvar agendamento');
-        }
+        }, 'Salvamento de agendamento');
     }
 
     salvarObservacao() {
@@ -472,25 +969,41 @@ class ClientManager {
 
         const observacao = document.getElementById('observacoes')?.value || '';
         
-        try {
+        this.retryOperation(async () => {
             if (window.dbManager && typeof window.dbManager.saveObservation === 'function') {
                 window.dbManager.saveObservation(this.currentItem.id, observacao);
-                
-                if (typeof window.showSuccessMessage === 'function') {
-                    window.showSuccessMessage('Observação salva com sucesso!');
-                }
             }
-        } catch (error) {
+            
+            // Backup no localStorage também
+            if (this.storageSupport.localStorage) {
+                const observations = JSON.parse(localStorage.getItem(this.cacheKeys.observations) || '{}');
+                observations[this.currentItem.id] = observacao;
+                localStorage.setItem(this.cacheKeys.observations, JSON.stringify(observations));
+            }
+            
+            if (typeof window.showSuccessMessage === 'function') {
+                window.showSuccessMessage('Observação salva com sucesso!');
+            }
+        }, 'Salvamento de observação').catch(error => {
             console.error('❌ Erro ao salvar observação:', error);
             alert('Erro ao salvar observação');
-        }
+        });
     }
 
     loadObservacao(clientId) {
         try {
+            // Tentar carregar do dbManager primeiro
             if (window.dbManager && typeof window.dbManager.loadObservation === 'function') {
-                return window.dbManager.loadObservation(clientId);
+                const observation = window.dbManager.loadObservation(clientId);
+                if (observation) return observation;
             }
+            
+            // Fallback para localStorage
+            if (this.storageSupport.localStorage) {
+                const observations = JSON.parse(localStorage.getItem(this.cacheKeys.observations) || '{}');
+                return observations[clientId] || '';
+            }
+            
             return '';
         } catch (error) {
             console.error('❌ Erro ao carregar observação:', error);
@@ -516,20 +1029,37 @@ class ClientManager {
         return endereco.replace(/\r?\n/g, ', ').replace(/,\s*,/g, ',').trim();
     }
 
-    // Verificar se há dados carregados
     hasData() {
         return this.dataLoaded && (this.data.length > 0 || this.ativos.length > 0 || this.novos.length > 0);
     }
 
-    // Obter estatísticas dos dados
     getDataStats() {
         return {
             inativos: this.data.length,
             ativos: this.ativos.length,
             novos: this.novos.length,
             agendamentos: Object.keys(this.schedules).length,
-            total: this.data.length + this.ativos.length + this.novos.length
+            total: this.data.length + this.ativos.length + this.novos.length,
+            cacheHealth: this.storageSupport,
+            lastSave: this.dataIntegrity.lastSaveTime
         };
+    }
+
+    // Método para diagnóstico do sistema
+    async diagnoseSystem() {
+        console.log('🔍 Executando diagnóstico do sistema...');
+        
+        const diagnosis = {
+            storage: this.storageSupport,
+            dataLoaded: this.dataLoaded,
+            dataStats: this.getDataStats(),
+            integrity: this.dataIntegrity,
+            hasMapManager: !!window.mapManager,
+            hasDbManager: !!window.dbManager
+        };
+        
+        console.table(diagnosis);
+        return diagnosis;
     }
 }
 
@@ -538,4 +1068,4 @@ if (typeof window !== 'undefined') {
     window.clientManager = new ClientManager();
 }
 
-console.log('✅ client-manager.js carregado');
+console.log('✅ client-manager.js carregado com sistema robusto de cache');
