@@ -1,65 +1,47 @@
 {
-    "name": "PMG - Sistema de Gestão de Clientes",
-    "short_name": "PMG System",
-    "description": "Sistema completo para gestão de clientes com mapa, agenda e análises",
-    "start_url": "/index.html",
+    "name": "Prospecção de Clientes Inativos",
+    "short_name": "Clientes Inativos",
+    "description": "Aplicativo para gerenciar prospecção de clientes inativos",
+    "start_url": "/pmgagendainativos/",
+    "scope": "/pmgagendainativos/",
     "display": "standalone",
+    "orientation": "portrait-primary",
     "background_color": "#ffffff",
     "theme_color": "#007bff",
-    "orientation": "portrait-primary",
-    "scope": "/",
     "lang": "pt-BR",
     "categories": ["business", "productivity"],
     "icons": [
         {
-            "src": "icon-192x192.png",
+            "src": "icon-192.png",
             "sizes": "192x192",
             "type": "image/png",
-            "purpose": "any maskable"
+            "purpose": "any"
         },
         {
-            "src": "icon-512x512.png",
+            "src": "icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icon-512.png",
             "sizes": "512x512",
             "type": "image/png",
-            "purpose": "any maskable"
+            "purpose": "any"
+        },
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
         }
     ],
-    "shortcuts": [
+    "screenshots": [
         {
-            "name": "Clientes Ativos",
-            "short_name": "Ativos",
-            "description": "Visualizar clientes ativos",
-            "url": "/index.html#ativos",
-            "icons": [
-                {
-                    "src": "icon-192x192.png",
-                    "sizes": "192x192"
-                }
-            ]
-        },
-        {
-            "name": "Agenda",
-            "short_name": "Agenda",
-            "description": "Visualizar agenda de visitas",
-            "url": "/index.html#agenda",
-            "icons": [
-                {
-                    "src": "icon-192x192.png",
-                    "sizes": "192x192"
-                }
-            ]
-        },
-        {
-            "name": "Mapa",
-            "short_name": "Mapa",
-            "description": "Visualizar clientes no mapa",
-            "url": "/index.html#mapa",
-            "icons": [
-                {
-                    "src": "icon-192x192.png",
-                    "sizes": "192x192"
-                }
-            ]
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "form_factor": "narrow"
         }
     ]
 }
