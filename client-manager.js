@@ -12,9 +12,10 @@ class ClientManager {
         this.editMode = false;
         this.geocodingNeeded = false;
         this.dataLoaded = false;
+        this.newDataProcessed = false; // Flag para controlar se novos dados foram processados
         
         // Sistema de cache robusto
-        this.cacheVersion = '1.0';
+        this.cacheVersion = '1.1'; // Incrementado para forçar limpeza
         this.cacheKeys = {
             clients: 'clients_cache_v' + this.cacheVersion,
             ativos: 'ativos_cache_v' + this.cacheVersion,
@@ -22,7 +23,8 @@ class ClientManager {
             schedules: 'schedules_cache_v' + this.cacheVersion,
             markers: 'markers_cache_v' + this.cacheVersion,
             observations: 'observations_cache_v' + this.cacheVersion,
-            filters: 'filters_cache_v' + this.cacheVersion
+            filters: 'filters_cache_v' + this.cacheVersion,
+            sessionFlag: 'session_flag_v' + this.cacheVersion
         };
         
         // Controle de integridade dos dados
@@ -125,7 +127,33 @@ class ClientManager {
         }
     }
 
+    async waitForDbManager() {
+        return new Promise((resolve) => {
+            const checkDbManager = () => {
+                if (window.dbManager && window.dbManager.db) {
+                    resolve();
+                } else {
+                    setTimeout(checkDbManager, 100);
+                }
+            };
+            checkDbManager();
+        });
+    }
+
     async loadAllDataWithFallbacks() {
+        // CORREÇÃO: Verificar se novos dados foram processados nesta sessão
+        if (this.newDataProcessed) {
+            console.log('✅ Usando dados processados na sessão atual (novos dados têm prioridade)');
+            this.dataLoaded = true;
+            return;
+        }
+
+        // Verificar se há flag de sessão indicando novos dados
+        const sessionFlag = sessionStorage.getItem(this.cacheKeys.sessionFlag);
+        if (sessionFlag) {
+            console.log('📋 Flag de sessão detectada, carregando dados mais recentes...');
+        }
+
         const fallbackMethods = [
             () => this.loadFromIndexedDB(),
             () => this.loadFromLocalStorage(),
@@ -134,6 +162,7 @@ class ClientManager {
         ];
 
         let lastError = null;
+        let dataLoaded = false;
 
         for (const method of fallbackMethods) {
             try {
@@ -143,7 +172,8 @@ class ClientManager {
                 if (this.hasValidData()) {
                     console.log(`✅ Dados carregados com sucesso via ${method.name}`);
                     this.dataLoaded = true;
-                    return;
+                    dataLoaded = true;
+                    break;
                 }
             } catch (error) {
                 console.warn(`⚠️ Falha no método ${method.name}:`, error);
@@ -152,12 +182,13 @@ class ClientManager {
             }
         }
 
-        // Se chegou aqui, todos os métodos falharam
-        console.warn('⚠️ Todos os métodos de carregamento falharam, inicializando com dados vazios');
-        this.initializeEmptyData();
-        
-        if (lastError) {
-            throw new Error(`Falha ao carregar dados: ${lastError.message}`);
+        if (!dataLoaded) {
+            console.warn('⚠️ Todos os métodos de carregamento falharam, inicializando com dados vazios');
+            this.initializeEmptyData();
+            
+            if (lastError) {
+                throw new Error(`Falha ao carregar dados: ${lastError.message}`);
+            }
         }
     }
 
@@ -265,8 +296,7 @@ class ClientManager {
 
     hasValidData() {
         return (Array.isArray(this.data) && Array.isArray(this.ativos) && 
-                Array.isArray(this.novos) && typeof this.schedules === 'object') &&
-               (this.data.length > 0 || this.ativos.length > 0 || this.novos.length > 0);
+                Array.isArray(this.novos) && typeof this.schedules === 'object');
     }
 
     initializeEmptyData() {
@@ -276,6 +306,7 @@ class ClientManager {
         this.schedules = {};
         this.updateGlobalVariables();
         this.dataLoaded = false;
+        this.newDataProcessed = false;
     }
 
     async validateDataIntegrity() {
@@ -444,7 +475,7 @@ class ClientManager {
 
     async clearAllPreviousData() {
         await this.retryOperation(async () => {
-            console.log('🧹 Limpando todos os dados anteriores com método robusto...');
+            console.log('🧹 Limpando TODOS os dados anteriores (cache completo)...');
             
             // Limpar dados em memória
             this.data = [];
@@ -455,10 +486,10 @@ class ClientManager {
             
             this.updateGlobalVariables();
             
-            // Limpar em paralelo todos os sistemas de storage
+            // Limpar TODAS as versões de cache (não apenas a atual)
             const clearPromises = [];
             
-            // IndexedDB
+            // IndexedDB - limpar completamente
             if (this.storageSupport.indexedDB && window.dbManager) {
                 clearPromises.push(
                     window.dbManager.clearData('clients'),
@@ -470,22 +501,40 @@ class ClientManager {
                 );
             }
             
-            // localStorage
+            // localStorage - limpar TUDO relacionado a cache de clientes
             if (this.storageSupport.localStorage) {
                 clearPromises.push(Promise.resolve().then(() => {
-                    Object.values(this.cacheKeys).forEach(key => {
+                    // Limpar todas as versões de cache
+                    const keysToRemove = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key && (
+                            key.includes('clients_cache') ||
+                            key.includes('ativos_cache') ||
+                            key.includes('novos_cache') ||
+                            key.includes('schedules_cache') ||
+                            key.includes('markers_cache') ||
+                            key.includes('observations_cache') ||
+                            key.includes('filters_cache') ||
+                            key.includes('session_flag')
+                        )) {
+                            keysToRemove.push(key);
+                        }
+                    }
+                    
+                    keysToRemove.forEach(key => {
                         localStorage.removeItem(key);
+                        console.log(`🧹 Cache removido: ${key}`);
                     });
+                    
                     localStorage.removeItem('client-observations');
                 }));
             }
             
-            // sessionStorage
+            // sessionStorage - limpar completamente
             if (this.storageSupport.sessionStorage) {
                 clearPromises.push(Promise.resolve().then(() => {
-                    Object.values(this.cacheKeys).forEach(key => {
-                        sessionStorage.removeItem(key);
-                    });
+                    sessionStorage.clear();
                 }));
             }
             
@@ -506,6 +555,7 @@ class ClientManager {
             
             this.geocodingNeeded = true;
             this.dataLoaded = false;
+            this.newDataProcessed = false;
             
             // Resetar integridade
             this.dataIntegrity = {
@@ -515,9 +565,9 @@ class ClientManager {
                 checksumNovos: null
             };
             
-            console.log('✅ Todos os dados anteriores foram limpos com sucesso');
+            console.log('✅ TODOS os dados e cache foram completamente limpos');
             
-        }, 'Limpeza de dados');
+        }, 'Limpeza completa de dados');
     }
 
     async saveAllDataRobust() {
@@ -553,28 +603,31 @@ class ClientManager {
             }
             
             // Salvar no localStorage (backup)
-if (this.storageSupport.localStorage) {
-    savePromises.push(Promise.resolve().then(async () => {
-        try {
-            localStorage.setItem(this.cacheKeys.clients, JSON.stringify(this.data));
-            localStorage.setItem(this.cacheKeys.ativos, JSON.stringify(this.ativos));
-            localStorage.setItem(this.cacheKeys.novos, JSON.stringify(this.novos));
-            localStorage.setItem(this.cacheKeys.schedules, JSON.stringify(this.schedules));
-            
-            if (window.mapManager && typeof window.mapManager.getMarkersData === 'function') {
-                const markersData = window.mapManager.getMarkersData();
-                localStorage.setItem(this.cacheKeys.markers, JSON.stringify(markersData));
+            if (this.storageSupport.localStorage) {
+                savePromises.push(Promise.resolve().then(async () => {
+                    try {
+                        localStorage.setItem(this.cacheKeys.clients, JSON.stringify(this.data));
+                        localStorage.setItem(this.cacheKeys.ativos, JSON.stringify(this.ativos));
+                        localStorage.setItem(this.cacheKeys.novos, JSON.stringify(this.novos));
+                        localStorage.setItem(this.cacheKeys.schedules, JSON.stringify(this.schedules));
+                        
+                        if (window.mapManager && typeof window.mapManager.getMarkersData === 'function') {
+                            const markersData = window.mapManager.getMarkersData();
+                            localStorage.setItem(this.cacheKeys.markers, JSON.stringify(markersData));
+                        }
+                        
+                        // Marcar que novos dados foram salvos nesta sessão
+                        sessionStorage.setItem(this.cacheKeys.sessionFlag, currentTime.toString());
+                        
+                    } catch (error) {
+                        if (error.name === 'QuotaExceededError') {
+                            await this.handleStorageQuotaError();
+                            throw error;
+                        }
+                        throw error;
+                    }
+                }));
             }
-        } catch (error) {
-            if (error.name === 'QuotaExceededError') {
-                await this.handleStorageQuotaError();
-                throw error;
-            }
-            throw error;
-        }
-    }));
-}
-
             
             // Salvar no sessionStorage (backup secundário)
             if (this.storageSupport.sessionStorage) {
@@ -611,10 +664,13 @@ if (this.storageSupport.localStorage) {
 
     async processNewData(newData) {
         await this.retryOperation(async () => {
-            console.log('📊 Processando novos dados com método robusto...');
+            console.log('📊 Processando novos dados com limpeza completa...');
             
-            // Primeiro, limpar todos os dados anteriores
+            // Primeiro, limpar COMPLETAMENTE todos os dados anteriores
             await this.clearAllPreviousData();
+            
+            // Aguardar um momento para garantir que a limpeza foi efetiva
+            await new Promise(resolve => setTimeout(resolve, 500));
             
             // Validar e processar novos dados
             if (newData.clients && Array.isArray(newData.clients)) {
@@ -634,6 +690,9 @@ if (this.storageSupport.localStorage) {
             }
             
             this.updateGlobalVariables();
+            
+            // Marcar que novos dados foram processados
+            this.newDataProcessed = true;
             
             // Salvar novos dados
             await this.saveAllDataRobust();
@@ -698,7 +757,6 @@ if (this.storageSupport.localStorage) {
         }
     }
 
-    // Métodos existentes mantidos (applyFiltersAndSort, renderList, etc.)
     applyFiltersAndSort() {
         try {
             if (!Array.isArray(this.data)) {
@@ -964,30 +1022,32 @@ if (this.storageSupport.localStorage) {
         }, 'Salvamento de agendamento');
     }
 
-    salvarObservacao() {
+    async salvarObservacao() {
         if (!this.currentItem) return;
 
         const observacao = document.getElementById('observacoes')?.value || '';
         
-        this.retryOperation(async () => {
-            if (window.dbManager && typeof window.dbManager.saveObservation === 'function') {
-                window.dbManager.saveObservation(this.currentItem.id, observacao);
-            }
-            
-            // Backup no localStorage também
-            if (this.storageSupport.localStorage) {
-                const observations = JSON.parse(localStorage.getItem(this.cacheKeys.observations) || '{}');
-                observations[this.currentItem.id] = observacao;
-                localStorage.setItem(this.cacheKeys.observations, JSON.stringify(observations));
-            }
-            
-            if (typeof window.showSuccessMessage === 'function') {
-                window.showSuccessMessage('Observação salva com sucesso!');
-            }
-        }, 'Salvamento de observação').catch(error => {
+        try {
+            await this.retryOperation(async () => {
+                if (window.dbManager && typeof window.dbManager.saveObservation === 'function') {
+                    window.dbManager.saveObservation(this.currentItem.id, observacao);
+                }
+                
+                // Backup no localStorage também
+                if (this.storageSupport.localStorage) {
+                    const observations = JSON.parse(localStorage.getItem(this.cacheKeys.observations) || '{}');
+                    observations[this.currentItem.id] = observacao;
+                    localStorage.setItem(this.cacheKeys.observations, JSON.stringify(observations));
+                }
+                
+                if (typeof window.showSuccessMessage === 'function') {
+                    window.showSuccessMessage('Observação salva com sucesso!');
+                }
+            }, 'Salvamento de observação');
+        } catch (error) {
             console.error('❌ Erro ao salvar observação:', error);
             alert('Erro ao salvar observação');
-        });
+        }
     }
 
     loadObservacao(clientId) {
@@ -1041,7 +1101,8 @@ if (this.storageSupport.localStorage) {
             agendamentos: Object.keys(this.schedules).length,
             total: this.data.length + this.ativos.length + this.novos.length,
             cacheHealth: this.storageSupport,
-            lastSave: this.dataIntegrity.lastSaveTime
+            lastSave: this.dataIntegrity.lastSaveTime,
+            newDataProcessed: this.newDataProcessed
         };
     }
 
@@ -1052,10 +1113,12 @@ if (this.storageSupport.localStorage) {
         const diagnosis = {
             storage: this.storageSupport,
             dataLoaded: this.dataLoaded,
+            newDataProcessed: this.newDataProcessed,
             dataStats: this.getDataStats(),
             integrity: this.dataIntegrity,
             hasMapManager: !!window.mapManager,
-            hasDbManager: !!window.dbManager
+            hasDbManager: !!window.dbManager,
+            cacheVersion: this.cacheVersion
         };
         
         console.table(diagnosis);
@@ -1068,4 +1131,4 @@ if (typeof window !== 'undefined') {
     window.clientManager = new ClientManager();
 }
 
-console.log('✅ client-manager.js carregado com sistema robusto de cache');
+console.log('✅ client-manager.js carregado com sistema robusto de cache v1.1');
