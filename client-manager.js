@@ -865,116 +865,174 @@ class ClientManager {
     }
 
     showClientModal(cliente) {
-        this.currentItem = cliente;
-        const modal = document.getElementById('modal');
-        
-        if (!modal) {
-            console.error('Modal não encontrado');
-            return;
-        }
+    this.currentItem = cliente;
+    const modal = document.getElementById('modal');
+    if (!modal) {
+        console.error('Modal não encontrado');
+        return;
+    }
 
-        const modalTitle = document.getElementById('modalTitle');
-        const modalBody = document.getElementById('modalBody');
-        
-        if (!modalTitle || !modalBody) {
-            console.error('Elementos do modal não encontrados');
-            return;
-        }
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+    if (!modalTitle || !modalBody) {
+        console.error('Elementos do modal não encontrados');
+        return;
+    }
 
-        modalTitle.textContent = cliente['Nome Fantasia'] || cliente['Cliente'] || 'Cliente';
-        
-        const cidade = this.extrairCidadeDoItem(cliente);
-        const endereco = this.formatarEndereco(cliente['Endereço'] || '');
-        
-        modalBody.innerHTML = `
-            <div class="client-details">
-                <div class="detail-grid">
-                    <div class="detail-item">
-                        <label>Nome Fantasia:</label>
-                        <div class="detail-value">${cliente['Nome Fantasia'] || 'N/A'}</div>
-                    </div>
-                    <div class="detail-item">
-                        <label>Contato:</label>
-                        <div class="detail-value">${cliente['Contato'] || 'N/A'}</div>
-                    </div>
-                    <div class="detail-item">
-                        <label>Telefone:</label>
-                        <div class="detail-value">${cliente['Celular'] || 'N/A'}</div>
-                    </div>
-                    <div class="detail-item">
-                        <label>CNPJ/CPF:</label>
-                        <div class="detail-value">${cliente['CNPJ / CPF'] || 'N/A'}</div>
-                    </div>
-                    <div class="detail-item">
-                        <label>Cidade:</label>
-                        <div class="detail-value">${cidade || 'N/A'}</div>
-                    </div>
-                    <div class="detail-item">
-                        <label>Segmento:</label>
-                        <div class="detail-value">${cliente['Segmento'] || 'N/A'}</div>
-                    </div>
-                    <div class="detail-item full-width">
-                        <label>Endereço:</label>
-                        <div class="detail-value">${endereco || 'N/A'}</div>
-                    </div>
+    modalTitle.textContent = cliente['Nome Fantasia'] || cliente['Cliente'] || 'Cliente';
+
+    const cidade = this.extrairCidadeDoItem(cliente);
+    const endereco = this.formatarEndereco(cliente['Endereço'] || '');
+    const telefone = cliente['Celular'] || 'N/A';
+    const telefoneClean = telefone.replace(/\D/g, ''); // Remove tudo exceto números
+    
+    modalBody.innerHTML = `
+        <!-- Ações Rápidas -->
+        <div class="modal-actions">
+            <button class="btn btn-success" onclick="abrirWhatsApp('${telefoneClean}', '${(cliente['Nome Fantasia'] || cliente['Cliente'] || '').replace(/'/g, "\\'")}')">
+                <span>💬</span> WhatsApp
+            </button>
+            <button class="btn btn-primary" onclick="abrirRota('${endereco.replace(/'/g, "\\'")}')">
+                <span>🗺️</span> Abrir Rota
+            </button>
+            <button class="btn btn-secondary" onclick="window.clientManager.toggleEditMode()">
+                <span>✏️</span> Editar
+            </button>
+        </div>
+
+        <!-- Detalhes do Cliente -->
+        <div class="client-details">
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <label>Nome Fantasia:</label>
+                    <div class="detail-value" id="detail-nome">${cliente['Nome Fantasia'] || cliente['Cliente'] || 'N/A'}</div>
+                    <input type="text" class="edit-input d-none" id="edit-nome" value="${cliente['Nome Fantasia'] || cliente['Cliente'] || ''}">
+                </div>
+                
+                <div class="detail-item">
+                    <label>Contato:</label>
+                    <div class="detail-value" id="detail-contato">${cliente['Contato'] || 'N/A'}</div>
+                    <input type="text" class="edit-input d-none" id="edit-contato" value="${cliente['Contato'] || ''}">
+                </div>
+                
+                <div class="detail-item">
+                    <label>Telefone:</label>
+                    <div class="detail-value" id="detail-telefone">${telefone}</div>
+                    <input type="tel" class="edit-input d-none" id="edit-telefone" value="${telefone}">
+                </div>
+                
+                <div class="detail-item">
+                    <label>Segmento:</label>
+                    <div class="detail-value" id="detail-segmento">${cliente['Segmento'] || 'N/A'}</div>
+                    <input type="text" class="edit-input d-none" id="edit-segmento" value="${cliente['Segmento'] || ''}">
+                </div>
+                
+                <div class="detail-item">
+                    <label>Cidade:</label>
+                    <div class="detail-value" id="detail-cidade">${cidade || 'N/A'}</div>
+                    <input type="text" class="edit-input d-none" id="edit-cidade" value="${cidade || ''}">
+                </div>
+                
+                <div class="detail-item">
+                    <label>ID Cliente:</label>
+                    <div class="detail-value">${cliente['ID Cliente'] || cliente.id || 'N/A'}</div>
+                </div>
+                
+                <div class="detail-item">
+                    <label>Status:</label>
+                    <div class="detail-value" id="detail-status">${cliente['Status'] || 'N/A'}</div>
+                    <select class="edit-input d-none" id="edit-status">
+                        <option value="Ativo" ${cliente['Status'] === 'Ativo' ? 'selected' : ''}>Ativo</option>
+                        <option value="Inativo" ${cliente['Status'] === 'Inativo' ? 'selected' : ''}>Inativo</option>
+                        <option value="Novo" ${cliente['Status'] === 'Novo' ? 'selected' : ''}>Novo</option>
+                    </select>
+                </div>
+                
+                <div class="detail-item">
+                    <label>CNPJ/CPF:</label>
+                    <div class="detail-value" id="detail-documento">${cliente['CNPJ / CPF'] || 'N/A'}</div>
+                    <input type="text" class="edit-input d-none" id="edit-documento" value="${cliente['CNPJ / CPF'] || ''}">
+                </div>
+                
+                <div class="detail-item full-width">
+                    <label>Endereço:</label>
+                    <div class="detail-value" id="detail-endereco">${endereco || 'N/A'}</div>
+                    <textarea class="edit-input d-none" id="edit-endereco" rows="3">${cliente['Endereço'] || ''}</textarea>
                 </div>
             </div>
-            
-            <div class="modal-section">
-                <h3>🗓️ Agendamento</h3>
-                <div class="agenda-form">
-                    <div>
-                        <label>Data:</label>
-                        <input type="date" id="agendaData" class="agenda-select">
-                    </div>
-                    <div>
-                        <label>Hora:</label>
-                        <select id="agendaHora" class="agenda-select">
-                            <option value="">Selecione</option>
-                            <option value="08:00">08:00</option>
-                            <option value="09:00">09:00</option>
-                            <option value="10:00">10:00</option>
-                            <option value="11:00">11:00</option>
-                            <option value="14:00">14:00</option>
-                            <option value="15:00">15:00</option>
-                            <option value="16:00">16:00</option>
-                            <option value="17:00">17:00</option>
-                        </select>
-                    </div>
-                    <button class="btn btn-success" onclick="window.clientManager.salvarAgendamento()">
-                        📅 Agendar
+        </div>
+
+        <!-- Seção de Agendamento -->
+        <div class="modal-section">
+            <h3>📅 Agendamento</h3>
+            <div class="agenda-form">
+                <div>
+                    <label for="agendaData">Data:</label>
+                    <input type="date" id="agendaData" class="agenda-select">
+                </div>
+                <div>
+                    <label for="agendaHora">Horário:</label>
+                    <select id="agendaHora" class="agenda-select">
+                        <option value="">Selecionar</option>
+                        <option value="08:00">08:00</option>
+                        <option value="09:00">09:00</option>
+                        <option value="10:00">10:00</option>
+                        <option value="11:00">11:00</option>
+                        <option value="13:00">13:00</option>
+                        <option value="14:00">14:00</option>
+                        <option value="15:00">15:00</option>
+                        <option value="16:00">16:00</option>
+                        <option value="17:00">17:00</option>
+                    </select>
+                </div>
+                <div>
+                    <button class="btn btn-success" onclick="window.clientManager.salvarAgenda()">
+                        <span>💾</span> Salvar Agenda
                     </button>
                 </div>
             </div>
-            
-            <div class="modal-section">
-                <h3>📝 Observações</h3>
-                <div class="observacoes-container">
-                    <textarea 
-                        id="observacoes" 
-                        class="observacoes-textarea" 
-                        placeholder="Digite suas observações sobre este cliente..."
-                        oninput="updateCharCounter()"
-                        maxlength="2000"
-                    >${this.loadObservacao(cliente.id) || ''}</textarea>
-                    <div class="observacoes-footer">
-                        <button class="btn btn-primary" onclick="window.clientManager.salvarObservacao()">
-                            💾 Salvar Observação
-                        </button>
-                        <div id="observacoes-contador" class="char-counter">0/2000</div>
-                    </div>
+        </div>
+
+        <!-- Seção de Observações -->
+        <div class="modal-section">
+            <h3>📝 Observações</h3>
+            <div class="observacoes-container">
+                <textarea 
+                    id="observacoes" 
+                    class="observacoes-textarea" 
+                    placeholder="Digite suas observações sobre este cliente..."
+                    maxlength="2000"
+                    oninput="updateCharCounter()"
+                >${window.dbManager ? window.dbManager.loadObservation(cliente.id || cliente['ID Cliente']) : ''}</textarea>
+                <div class="observacoes-footer">
+                    <button class="btn btn-primary" onclick="window.clientManager.salvarObservacao()">
+                        <span>💾</span> Salvar Observações
+                    </button>
+                    <span id="observacoes-contador" class="char-counter">0/2000</span>
                 </div>
             </div>
-        `;
+        </div>
 
-        setTimeout(() => {
-            if (typeof updateCharCounter === 'function') {
-                updateCharCounter();
-            }
-        }, 100);
+        <!-- Botões de Ação -->
+        <div class="modal-action-buttons">
+            <button class="btn btn-secondary d-none" id="btn-cancelar-edit" onclick="window.clientManager.cancelEditMode()">
+                <span>❌</span> Cancelar
+            </button>
+            <button class="btn btn-success d-none" id="btn-salvar-edit" onclick="window.clientManager.saveChanges()">
+                <span>💾</span> Salvar Alterações
+            </button>
+            <button class="btn btn-primary" onclick="closeModal()">
+                <span>👍</span> Fechar
+            </button>
+        </div>
+    `;
 
-        modal.style.display = 'block';
-    }
+    // Atualizar contador de caracteres
+    setTimeout(updateCharCounter, 100);
+
+    modal.style.display = 'block';
+}
+
 
     closeModal() {
         const modal = document.getElementById('modal');
@@ -1130,5 +1188,41 @@ class ClientManager {
 if (typeof window !== 'undefined') {
     window.clientManager = new ClientManager();
 }
+
+// Funções globais para WhatsApp e Rota
+window.abrirWhatsApp = function(telefone, nomeCliente) {
+    if (!telefone || telefone === 'N/A') {
+        alert('Número de telefone não disponível');
+        return;
+    }
+    
+    // Limpar e formatar telefone
+    const telefoneClean = telefone.replace(/\D/g, '');
+    
+    // Verificar se tem código do país (Brasil +55)
+    let telefoneFormatado = telefoneClean;
+    if (!telefoneFormatado.startsWith('55') && telefoneFormatado.length >= 10) {
+        telefoneFormatado = '55' + telefoneFormatado;
+    }
+    
+    const mensagem = encodeURIComponent(`Olá ${nomeCliente || ''}! Sou da equipe PMG e gostaria de conversar sobre nossos produtos.`);
+    const urlWhatsApp = `https://wa.me/${telefoneFormatado}?text=${mensagem}`;
+    
+    window.open(urlWhatsApp, '_blank');
+};
+
+window.abrirRota = function(endereco) {
+    if (!endereco || endereco === 'N/A') {
+        alert('Endereço não disponível');
+        return;
+    }
+    
+    // Criar URL do Google Maps
+    const enderecoFormatado = encodeURIComponent(endereco);
+    const urlMaps = `https://www.google.com/maps/dir/?api=1&destination=${enderecoFormatado}`;
+    
+    window.open(urlMaps, '_blank');
+};
+
 
 console.log('✅ client-manager.js carregado com sistema robusto de cache v1.1');
