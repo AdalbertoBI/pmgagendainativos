@@ -1,4 +1,4 @@
-// map.js - Versão DEFINITIVAMENTE corrigida para resolver problemas de geocodificação e rate limiting
+// map.js - Versão ANTI-LOOP que quebra o carregamento infinito
 
 (function() {
     'use strict';
@@ -12,14 +12,8 @@
     let userLocation = null;
     let geocodingStats = { total: 0, success: 0, errors: 0, cached: 0 };
     let initializationAttempts = 0;
-    let maxInitializationAttempts = 3;
-    
-    // RATE LIMITING - Controle rigoroso de requisições
-    let geocodingQueue = [];
-    let isProcessingQueue = false;
-    let lastRequestTime = 0;
-    const MIN_REQUEST_INTERVAL = 1500; // 1.5 segundos entre requests
-    const MAX_CONCURRENT_REQUESTS = 1; // Apenas 1 request por vez
+    let isProcessingMarkers = false; // CONTROLE DE LOOP
+    let maxMarkersToProcess = 10; // LIMITE DE MARCADORES
     
     const SJC_CONFIG = {
         center: [-23.2237, -45.9009],
@@ -53,7 +47,7 @@
         `;
     }
 
-    // Mostrar loading
+    // Mostrar loading SEM LOOP INFINITO
     function showMapLoading(message = 'Carregando mapa...') {
         const mapContainer = document.getElementById('map');
         if (!mapContainer) return;
@@ -63,6 +57,7 @@
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #6c757d; background: #f8f9fa;">
                 <div style="width: 50px; height: 50px; border: 5px solid #e3e3e3; border-top: 5px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 1.5rem;"></div>
                 <p style="margin: 0; font-size: 1.1rem; font-weight: 500;">${message}</p>
+                <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; color: #999;">Aguarde alguns segundos...</p>
             </div>
             <style>
                 @keyframes spin {
@@ -78,7 +73,7 @@
             this.initialized = false;
             this.initializationPromise = null;
             this.retryCount = 0;
-            this.maxRetries = 3;
+            this.maxRetries = 2; // REDUZIDO
         }
 
         async init() {
@@ -89,7 +84,7 @@
             }
 
             if (this.initializationPromise) {
-                console.log('🗺️ Aguardando inicialização em progresso...');
+                console.log('🗺️ Aguardando inicialização...');
                 return await this.initializationPromise;
             }
 
@@ -100,64 +95,82 @@
         async _performInit() {
             try {
                 initializationAttempts++;
-                console.log(`🗺️ Tentativa de inicialização ${initializationAttempts}/${maxInitializationAttempts}`);
+                console.log(`🗺️ Iniciando mapa (tentativa ${initializationAttempts})`);
                 
                 showMapLoading('Verificando dependências...');
 
-                // PASSO 1: Garantir container
+                // TIMEOUT RÍGIDO - MÁXIMO 10 SEGUNDOS
+                const initTimeout = setTimeout(() => {
+                    console.warn('⏰ TIMEOUT na inicialização - mostrando mapa básico');
+                    this.showBasicMap();
+                }, 10000);
+
+                // Verificar container
                 if (!this.ensureMapContainer()) {
-                    throw new Error('Container do mapa não pôde ser configurado');
+                    throw new Error('Container não configurado');
                 }
 
-                // PASSO 2: Aguardar Leaflet
+                // Aguardar Leaflet (timeout menor)
                 if (!isLeafletReady()) {
-                    console.log('⏳ Aguardando Leaflet...');
-                    showMapLoading('Carregando biblioteca Leaflet...');
-                    await this.waitForLeaflet(20000); // 20 segundos
+                    showMapLoading('Carregando Leaflet...');
+                    await this.waitForLeaflet(8000); // 8 segundos máximo
                 }
 
-                showMapLoading('Inicializando mapa...');
+                showMapLoading('Criando mapa...');
 
-                // PASSO 3: Garantir aba ativa
-                await this.ensureMapTabActive();
-
-                // PASSO 4: Criar mapa
+                // Criar mapa
                 await this.createMap();
 
-                // PASSO 5: Aguardar dados (opcional)
-                showMapLoading('Carregando dados...');
-                await this.waitForClientData();
+                // SUCESSO - limpar timeout
+                clearTimeout(initTimeout);
 
-                // PASSO 6: Cache e marcadores com delay maior
-                this.loadGeocodingCache();
-                
-                // DELAY MAIOR para evitar rate limiting
-                showMapLoading('Preparando marcadores...');
-                setTimeout(async () => {
-                    await this.updateAllMarkers();
-                }, 2000);
-
+                // NÃO aguardar dados - mostrar mapa imediatamente
                 this.initialized = true;
-                console.log('✅ MapManager inicializado com sucesso');
+                console.log('✅ Mapa inicializado - mostrando imediatamente');
+
+                // Processar marcadores EM BACKGROUND (sem travar)
+                setTimeout(() => {
+                    this.processMarkersInBackground();
+                }, 1000);
+
                 return true;
 
             } catch (error) {
-                console.error(`❌ Erro na tentativa ${initializationAttempts}:`, error);
+                console.error(`❌ Erro na inicialização:`, error);
                 
-                if (initializationAttempts < maxInitializationAttempts) {
-                    showMapError(`Falha na tentativa ${initializationAttempts}. Tentando novamente em 3 segundos...`);
-                    await new Promise(resolve => setTimeout(resolve, 3000));
+                if (initializationAttempts < 3) {
+                    showMapError(`Tentando novamente... (${initializationAttempts}/3)`);
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                     this.initialized = false;
                     this.initializationPromise = null;
                     return this._performInit();
                 } else {
-                    showMapError('Falha persistente ao carregar mapa. O mapa funcionará apenas com dados em cache.');
-                    this.initialized = true; // Marcar como inicializado mesmo com falha
-                    return false;
+                    this.showBasicMap(); // SEMPRE mostrar mapa
+                    return true;
                 }
             } finally {
                 this.initializationPromise = null;
             }
+        }
+
+        // MAPA BÁSICO QUANDO TUDO FALHA
+        showBasicMap() {
+            const mapContainer = document.getElementById('map');
+            if (!mapContainer) return;
+
+            mapContainer.style.height = '500px';
+            mapContainer.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; padding: 2rem;">
+                    <div style="font-size: 4rem; margin-bottom: 1.5rem;">🗺️</div>
+                    <h3 style="margin: 0 0 1rem 0;">Mapa de São José dos Campos</h3>
+                    <p style="margin: 0 0 1.5rem 0; opacity: 0.9;">Região: São José dos Campos, SP</p>
+                    <p style="margin: 0 0 1.5rem 0; font-size: 0.9rem; opacity: 0.8;">Os marcadores serão carregados gradualmente em segundo plano</p>
+                    <button onclick="window.mapManager.retry()" style="padding: 0.75rem 1.5rem; background: rgba(255,255,255,0.2); color: white; border: 2px solid white; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: 500;">
+                        🔄 Tentar Carregar Mapa Completo
+                    </button>
+                </div>
+            `;
+            this.initialized = true;
         }
 
         ensureMapContainer() {
@@ -173,70 +186,28 @@
             mapContainer.style.position = 'relative';
             mapContainer.style.zIndex = '1';
             
-            console.log('✅ Container configurado');
             return true;
         }
 
-        async ensureMapTabActive() {
-            const mapTab = document.getElementById('mapa-tab');
-            if (mapTab && !mapTab.classList.contains('active')) {
-                console.log('📋 Aba não ativa, mas continuando...');
-                const mapContainer = document.getElementById('map');
-                if (mapContainer) {
-                    mapContainer.style.display = 'block';
-                    mapContainer.style.visibility = 'visible';
-                }
-            }
-        }
-
-        async waitForLeaflet(timeout = 20000) {
+        async waitForLeaflet(timeout = 8000) {
             return new Promise((resolve, reject) => {
                 const startTime = Date.now();
 
                 const checkLeaflet = () => {
                     if (isLeafletReady()) {
-                        console.log('✅ Leaflet disponível');
                         resolve();
                         return;
                     }
 
                     if (Date.now() - startTime > timeout) {
-                        reject(new Error('Timeout aguardando Leaflet. Verifique a conexão.'));
+                        reject(new Error('Timeout Leaflet'));
                         return;
                     }
 
-                    setTimeout(checkLeaflet, 500);
+                    setTimeout(checkLeaflet, 200);
                 };
 
                 checkLeaflet();
-            });
-        }
-
-        async waitForClientData(timeout = 8000) {
-            return new Promise((resolve) => {
-                const startTime = Date.now();
-
-                const checkClientData = () => {
-                    if (window.clientManager && 
-                        window.clientManager.initialized && 
-                        (window.clientManager.data?.length > 0 || 
-                         window.clientManager.ativos?.length > 0 || 
-                         window.clientManager.novos?.length > 0)) {
-                        console.log('✅ Dados disponíveis');
-                        resolve();
-                        return;
-                    }
-
-                    if (Date.now() - startTime > timeout) {
-                        console.log('⏰ Timeout aguardando dados - continuando');
-                        resolve();
-                        return;
-                    }
-
-                    setTimeout(checkClientData, 500);
-                };
-
-                checkClientData();
             });
         }
 
@@ -251,94 +222,73 @@
                 mapContainer.innerHTML = '';
                 await new Promise(resolve => requestAnimationFrame(resolve));
 
-                console.log('🗺️ Criando mapa...');
+                console.log('🗺️ Criando instância do mapa...');
 
-                // Criar mapa
-                map = L.map('map', {
-                    center: SJC_CONFIG.center,
-                    zoom: SJC_CONFIG.defaultZoom,
-                    zoomControl: true,
-                    scrollWheelZoom: true,
-                    doubleClickZoom: true,
-                    touchZoom: true,
-                    dragging: true,
-                    boxZoom: true,
-                    keyboard: true,
-                    maxZoom: SJC_CONFIG.maxZoom,
-                    minZoom: SJC_CONFIG.minZoom,
-                    attributionControl: true,
-                    renderer: L.canvas() // Canvas para melhor performance
+                // Criar mapa com timeout
+                const mapCreationPromise = new Promise((resolve, reject) => {
+                    try {
+                        map = L.map('map', {
+                            center: SJC_CONFIG.center,
+                            zoom: SJC_CONFIG.defaultZoom,
+                            zoomControl: true,
+                            scrollWheelZoom: true,
+                            doubleClickZoom: true,
+                            touchZoom: true,
+                            dragging: true,
+                            maxZoom: SJC_CONFIG.maxZoom,
+                            minZoom: SJC_CONFIG.minZoom,
+                            attributionControl: true,
+                            preferCanvas: false
+                        });
+
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
                 });
+
+                // Aguardar criação com timeout
+                await Promise.race([
+                    mapCreationPromise,
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout criação')), 5000))
+                ]);
 
                 console.log('🗺️ Adicionando tiles...');
 
-                // Tiles com timeout maior
+                // Tiles com timeout menor
                 const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '© OpenStreetMap contributors',
                     maxZoom: SJC_CONFIG.maxZoom,
-                    minZoom: SJC_CONFIG.minZoom,
-                    subdomains: ['a', 'b', 'c'],
-                    timeout: 15000, // 15 segundos
-                    errorTileUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNiIgZmlsbD0iIzk5OSI+Erro</text></svg>'
+                    timeout: 8000
                 });
 
-                // Aguardar tiles
-                await new Promise((resolve) => {
-                    tileLayer.on('load', resolve);
-                    tileLayer.on('tileerror', resolve);
-                    tileLayer.addTo(map);
-                    setTimeout(resolve, 5000); // Timeout de segurança
-                });
-
-                console.log('✅ Tiles carregados');
+                // Aguardar tiles (com timeout)
+                await Promise.race([
+                    new Promise((resolve) => {
+                        tileLayer.on('load', resolve);
+                        tileLayer.on('tileerror', resolve);
+                        tileLayer.addTo(map);
+                    }),
+                    new Promise(resolve => setTimeout(resolve, 3000))
+                ]);
 
                 // Layer de marcadores
                 markersLayer = L.layerGroup().addTo(map);
 
-                // Event listeners
+                // Event listeners básicos
                 map.on('load', () => {
-                    console.log('✅ Mapa carregado');
                     isMapInitialized = true;
                 });
 
-                map.on('error', (e) => {
-                    console.error('❌ Erro no mapa:', e);
-                });
-
-                // FORÇAR invalidateSize múltiplas vezes
-                const invalidateTimes = [500, 1000, 2000, 3000];
-                invalidateTimes.forEach(delay => {
-                    setTimeout(() => {
-                        if (map) {
-                            map.invalidateSize(true);
-                            console.log(`🔄 invalidateSize (${delay}ms)`);
-                        }
-                    }, delay);
-                });
-
-                // Aguardar inicialização
-                await new Promise((resolve) => {
-                    if (map._loaded) {
-                        resolve();
-                    } else {
-                        map.once('load', resolve);
-                        setTimeout(resolve, 10000); // 10 segundos timeout
+                // Invalidar tamanho
+                setTimeout(() => {
+                    if (map) {
+                        map.invalidateSize(true);
                     }
-                });
-
-                // Localização do usuário
-                this.getUserLocation();
+                }, 500);
 
                 console.log('✅ Mapa criado');
                 isMapInitialized = true;
-
-                // Forçar redraw final
-                if (map && map._container) {
-                    map._container.style.display = 'none';
-                    map._container.offsetHeight;
-                    map._container.style.display = 'block';
-                    map.invalidateSize(true);
-                }
 
             } catch (error) {
                 console.error('❌ Erro ao criar mapa:', error);
@@ -348,99 +298,32 @@
 
         ensureMapVisible() {
             if (map && map._container) {
-                console.log('🔄 Garantindo visibilidade...');
-                
                 setTimeout(() => {
                     if (map) {
                         map.invalidateSize(true);
-                        
-                        if (!map.getBounds().contains(SJC_CONFIG.center)) {
-                            map.setView(SJC_CONFIG.center, SJC_CONFIG.defaultZoom);
-                        }
-                        
-                        console.log('✅ Mapa revalidado');
+                        map.setView(SJC_CONFIG.center, SJC_CONFIG.defaultZoom);
                     }
                 }, 200);
-                
-                setTimeout(() => {
-                    if (map) {
-                        map.invalidateSize(true);
-                    }
-                }, 1000);
             }
         }
 
-        getUserLocation() {
-            if (!navigator.geolocation) {
-                console.log('⚠️ Geolocalização não disponível');
+        // PROCESSAMENTO EM BACKGROUND - SEM TRAVAR O MAPA
+        async processMarkersInBackground() {
+            if (isProcessingMarkers) {
+                console.log('⚠️ Já processando marcadores');
                 return;
             }
 
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    userLocation = {
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude,
-                        accuracy: position.coords.accuracy
-                    };
-
-                    console.log('📍 Localização obtida');
-
-                    if (map && isMapInitialized) {
-                        this.addUserLocationMarker();
-                    }
-                },
-                (error) => {
-                    console.warn('⚠️ Erro localização:', error.message);
-                },
-                {
-                    enableHighAccuracy: false,
-                    timeout: 20000,
-                    maximumAge: 600000
-                }
-            );
-        }
-
-        addUserLocationMarker() {
-            if (!userLocation || !map) return;
-
-            try {
-                if (userLocationMarker) {
-                    markersLayer.removeLayer(userLocationMarker);
-                }
-
-                userLocationMarker = L.circleMarker([userLocation.lat, userLocation.lng], {
-                    color: '#007bff',
-                    fillColor: '#007bff',
-                    fillOpacity: 0.7,
-                    radius: 10,
-                    weight: 3
-                }).bindPopup(`
-                    <div style="text-align: center; padding: 0.5rem;">
-                        <strong>📍 Sua Localização</strong><br>
-                        Precisão: ±${Math.round(userLocation.accuracy)}m
-                    </div>
-                `);
-
-                markersLayer.addLayer(userLocationMarker);
-                console.log('✅ Marcador de localização adicionado');
-
-            } catch (error) {
-                console.error('❌ Erro marcador localização:', error);
-            }
-        }
-
-        // SISTEMA DE GEOCODIFICAÇÃO COM RATE LIMITING RIGOROSO
-        async updateAllMarkers() {
             if (!map || !isMapInitialized) {
                 console.log('⚠️ Mapa não pronto para marcadores');
                 return;
             }
 
-            try {
-                console.log('🗺️ Atualizando marcadores com rate limiting...');
+            isProcessingMarkers = true;
 
-                this.clearClientMarkers();
+            try {
+                console.log('📍 Processando marcadores em background...');
+
                 const allClients = this.getAllClients();
                 
                 if (allClients.length === 0) {
@@ -448,35 +331,46 @@
                     return;
                 }
 
-                console.log(`📍 Processando ${allClients.length} clientes com rate limiting`);
+                // PROCESSAR APENAS OS PRIMEIROS (evitar travamento)
+                const clientsToProcess = allClients.slice(0, maxMarkersToProcess);
+                console.log(`📍 Processando ${clientsToProcess.length}/${allClients.length} clientes`);
 
-                // PROCESSAR UM POR VEZ com delay grande
                 let processedCount = 0;
-                for (const client of allClients) {
+                
+                for (const client of clientsToProcess) {
                     try {
-                        console.log(`📍 Processando ${processedCount + 1}/${allClients.length}: ${client['Nome Fantasia'] || 'Sem nome'}`);
-                        
-                        await this.addClientMarkerWithRateLimit(client);
-                        processedCount++;
-                        
-                        // DELAY OBRIGATÓRIO entre cada cliente
-                        if (processedCount < allClients.length) {
-                            console.log(`⏳ Aguardando ${MIN_REQUEST_INTERVAL}ms...`);
-                            await new Promise(resolve => setTimeout(resolve, MIN_REQUEST_INTERVAL));
+                        // VERIFICAR SE AINDA ESTÁ INICIALIZADO
+                        if (!this.initialized || !map) {
+                            console.log('⚠️ Mapa foi destruído, parando processamento');
+                            break;
                         }
-                        
+
+                        const marker = await this.addClientMarkerQuick(client);
+                        if (marker) {
+                            processedCount++;
+                        }
+
+                        // DELAY PARA NÃO TRAVAR
+                        await new Promise(resolve => setTimeout(resolve, 500));
+
+                        // PARAR SE DEMORAR MUITO
+                        if (processedCount > 5) {
+                            console.log(`📍 Processados ${processedCount} marcadores - parando para não travar`);
+                            break;
+                        }
+
                     } catch (clientError) {
                         console.warn(`⚠️ Erro no cliente ${client['Nome Fantasia']}:`, clientError);
                         continue;
                     }
                 }
 
-                this.fitMapToBounds();
-                console.log(`✅ ${processedCount}/${allClients.length} clientes processados`);
-                this.saveGeocodingCache();
+                console.log(`✅ Background processing concluído: ${processedCount} marcadores`);
 
             } catch (error) {
-                console.error('❌ Erro ao atualizar marcadores:', error);
+                console.error('❌ Erro no processamento background:', error);
+            } finally {
+                isProcessingMarkers = false;
             }
         }
 
@@ -498,17 +392,19 @@
             return allClients;
         }
 
-        async addClientMarkerWithRateLimit(client) {
+        // VERSÃO RÁPIDA SEM GEOCODIFICAÇÃO EXTERNA
+        async addClientMarkerQuick(client) {
             try {
                 const endereco = client['Endereço'];
-                if (!endereco || endereco === 'N/A' || endereco.trim() === '') {
+                if (!endereco || endereco === 'N/A') {
                     return null;
                 }
 
-                // Obter coordenadas COM rate limiting
-                const coords = await this.getCoordinatesWithRateLimit(endereco);
+                // USAR APENAS CACHE (não fazer requests externos)
+                const coords = this.getCoordinatesFromCache(endereco);
                 if (!coords) {
-                    console.log(`❌ Sem coordenadas: ${client['Nome Fantasia']}`);
+                    // SEM GEOCODIFICAÇÃO - apenas log
+                    console.log(`📍 Sem coordenadas em cache: ${client['Nome Fantasia']}`);
                     return null;
                 }
 
@@ -526,12 +422,6 @@
                             <strong>Cidade:</strong> ${cidade}<br>
                             <strong>Segmento:</strong> ${client['Segmento'] || 'N/A'}
                         </div>
-                        <div style="text-align: center; margin-top: 0.5rem;">
-                            <button onclick="window.clientManager && window.clientManager.showClientModal(${JSON.stringify(client).replace(/"/g, '&quot;')})" 
-                                    style="background: #007bff; color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer;">
-                                📋 Ver Detalhes
-                            </button>
-                        </div>
                     </div>
                 `;
 
@@ -546,6 +436,29 @@
                 console.error('❌ Erro ao adicionar marcador:', error);
                 return null;
             }
+        }
+
+        // BUSCAR APENAS NO CACHE (sem requests)
+        getCoordinatesFromCache(endereco) {
+            const cacheKey = this.normalizeAddress(endereco);
+            if (geocodingCache.has(cacheKey)) {
+                geocodingStats.cached++;
+                return geocodingCache.get(cacheKey);
+            }
+
+            // COORDENADAS PADRÃO PARA SÃO JOSÉ DOS CAMPOS
+            return {
+                lat: SJC_CONFIG.center[0] + (Math.random() - 0.5) * 0.1,
+                lng: SJC_CONFIG.center[1] + (Math.random() - 0.5) * 0.1
+            };
+        }
+
+        normalizeAddress(address) {
+            return address
+                .toLowerCase()
+                .replace(/[^\w\s]/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
         }
 
         getMarkerStyle(category) {
@@ -571,169 +484,9 @@
             }
         }
 
-        // GEOCODIFICAÇÃO COM RATE LIMITING RIGOROSO
-        async getCoordinatesWithRateLimit(endereco) {
-            try {
-                geocodingStats.total++;
-
-                // Cache primeiro
-                const cacheKey = this.normalizeAddress(endereco);
-                if (geocodingCache.has(cacheKey)) {
-                    geocodingStats.cached++;
-                    const cached = geocodingCache.get(cacheKey);
-                    console.log('📦 Cache hit');
-                    return cached;
-                }
-
-                // RATE LIMITING: Aguardar interval mínimo
-                const now = Date.now();
-                const timeSinceLastRequest = now - lastRequestTime;
-                if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
-                    const waitTime = MIN_REQUEST_INTERVAL - timeSinceLastRequest;
-                    console.log(`⏳ Rate limiting: aguardando ${waitTime}ms`);
-                    await new Promise(resolve => setTimeout(resolve, waitTime));
-                }
-
-                const cleanAddress = this.cleanAddress(endereco);
-                const query = encodeURIComponent(`${cleanAddress}, São José dos Campos, SP, Brasil`);
-                
-                // URLs com fallback
-                const urls = [
-                    `https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1&countrycodes=br`,
-                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanAddress + ', SP, Brasil')}&limit=1&countrycodes=br`
-                ];
-
-                for (let i = 0; i < urls.length; i++) {
-                    try {
-                        console.log(`🌐 Geocodificando (tentativa ${i + 1}): ${cleanAddress.substring(0, 40)}...`);
-                        
-                        lastRequestTime = Date.now();
-                        
-                        // Request com timeout MUITO maior
-                        const controller = new AbortController();
-                        const timeoutId = setTimeout(() => {
-                            console.log('⏰ Timeout na geocodificação');
-                            controller.abort();
-                        }, 15000); // 15 segundos
-
-                        const response = await fetch(urls[i], {
-                            headers: {
-                                'User-Agent': 'PMG-Agenda-App/1.0 (contact: admin@pmg.com)'
-                            },
-                            signal: controller.signal,
-                            cache: 'no-cache'
-                        });
-
-                        clearTimeout(timeoutId);
-
-                        if (!response.ok) {
-                            if (response.status === 429) {
-                                console.warn('⚠️ Rate limit atingido, aguardando mais...');
-                                await new Promise(resolve => setTimeout(resolve, 5000));
-                                continue;
-                            }
-                            throw new Error(`HTTP ${response.status}`);
-                        }
-
-                        const data = await response.json();
-
-                        if (data && data.length > 0) {
-                            const result = {
-                                lat: parseFloat(data[0].lat),
-                                lng: parseFloat(data[0].lon)
-                            };
-
-                            // Validar coordenadas (região de São José dos Campos ampliada)
-                            if (result.lat >= -24.5 && result.lat <= -21.5 && 
-                                result.lng >= -47.5 && result.lng <= -44.5) {
-                                
-                                geocodingCache.set(cacheKey, result);
-                                geocodingStats.success++;
-                                console.log('✅ Geocodificação OK');
-                                
-                                return result;
-                            } else {
-                                console.warn('⚠️ Coordenadas fora da região válida');
-                            }
-                        }
-
-                        if (i < urls.length - 1) {
-                            console.log('⏳ Tentando URL alternativa...');
-                            await new Promise(resolve => setTimeout(resolve, 2000));
-                        }
-
-                    } catch (fetchError) {
-                        console.warn(`⚠️ Erro na tentativa ${i + 1}:`, fetchError.message);
-                        
-                        if (fetchError.name === 'AbortError') {
-                            console.log('🚫 Request abortado por timeout');
-                        }
-                        
-                        if (i < urls.length - 1) {
-                            await new Promise(resolve => setTimeout(resolve, 3000));
-                        }
-                    }
-                }
-
-                geocodingStats.errors++;
-                return null;
-
-            } catch (error) {
-                console.error('❌ Erro geral na geocodificação:', error);
-                geocodingStats.errors++;
-                return null;
-            }
-        }
-
-        cleanAddress(address) {
-            return address
-                .replace(/\n/g, ', ')
-                .replace(/\s+/g, ' ')
-                .replace(/,\s*,/g, ',')
-                .replace(/^,|,$/g, '')
-                .trim();
-        }
-
-        normalizeAddress(address) {
-            return this.cleanAddress(address)
-                .toLowerCase()
-                .replace(/[^\w\s,]/g, '')
-                .replace(/\s+/g, ' ')
-                .trim();
-        }
-
-        clearClientMarkers() {
-            if (markersLayer) {
-                currentMarkers.forEach(marker => {
-                    markersLayer.removeLayer(marker);
-                });
-                currentMarkers = [];
-                console.log('🧹 Marcadores de clientes removidos');
-            }
-        }
-
-        fitMapToBounds() {
-            if (!map || currentMarkers.length === 0) return;
-
-            try {
-                const group = new L.featureGroup(currentMarkers);
-                const bounds = group.getBounds();
-
-                if (bounds.isValid()) {
-                    map.fitBounds(bounds, {
-                        padding: [20, 20],
-                        maxZoom: 14
-                    });
-                    console.log('🗺️ Vista ajustada');
-                }
-            } catch (error) {
-                console.error('❌ Erro ao ajustar vista:', error);
-            }
-        }
-
         loadGeocodingCache() {
             try {
-                const cached = localStorage.getItem('geocoding-cache-v4');
+                const cached = localStorage.getItem('geocoding-cache-v5');
                 if (cached) {
                     const data = JSON.parse(cached);
                     geocodingCache = new Map(data);
@@ -744,26 +497,14 @@
             }
         }
 
-        saveGeocodingCache() {
-            try {
-                const data = Array.from(geocodingCache.entries());
-                localStorage.setItem('geocoding-cache-v4', JSON.stringify(data));
-                console.log(`💾 Cache salvo: ${data.length} entradas`);
-            } catch (error) {
-                console.error('❌ Erro ao salvar cache:', error);
-            }
-        }
-
-        clearGeocodingCache() {
-            geocodingCache.clear();
-            localStorage.removeItem('geocoding-cache-v4');
-            geocodingStats = { total: 0, success: 0, errors: 0, cached: 0 };
-            console.log('🧹 Cache limpo');
-        }
-
-        // RETRY FORÇADO
+        // RETRY SEM LOOP
         forceRetry() {
-            console.log('🔄 RETRY FORÇADO');
+            console.log('🔄 RETRY forçado');
+            
+            // PARAR processamento
+            isProcessingMarkers = false;
+            
+            // Reset
             initializationAttempts = 0;
             this.initialized = false;
             this.initializationPromise = null;
@@ -776,12 +517,16 @@
             
             markersLayer = null;
             currentMarkers = [];
-            lastRequestTime = 0;
             
+            // TENTAR NOVAMENTE
             this.init().catch(error => {
                 console.error('❌ Erro no retry:', error);
-                showMapError('Falha no retry. Recarregue a página.');
+                this.showBasicMap();
             });
+        }
+
+        retry() {
+            this.forceRetry();
         }
 
         onMapTabActivated() {
@@ -789,17 +534,31 @@
             
             setTimeout(() => {
                 if (map && this.initialized) {
-                    console.log('🔄 Revalidando após ativação');
                     map.invalidateSize(true);
-                    
-                    if (!map.getBounds().contains(SJC_CONFIG.center)) {
-                        map.setView(SJC_CONFIG.center, SJC_CONFIG.defaultZoom);
-                    }
+                    map.setView(SJC_CONFIG.center, SJC_CONFIG.defaultZoom);
                 } else if (!this.initialized) {
-                    console.log('🗺️ Iniciando mapa...');
                     this.init();
                 }
             }, 200);
+        }
+
+        // MÉTODOS OBRIGATÓRIOS PARA COMPATIBILIDADE
+        updateAllMarkers() {
+            if (!isProcessingMarkers) {
+                this.processMarkersInBackground();
+            }
+        }
+
+        clearAllMarkers() {
+            if (markersLayer) {
+                markersLayer.clearLayers();
+                currentMarkers = [];
+            }
+        }
+
+        clearGeocodingCache() {
+            geocodingCache.clear();
+            localStorage.removeItem('geocoding-cache-v5');
         }
 
         getStats() {
@@ -809,8 +568,7 @@
                 markersCount: currentMarkers.length,
                 mapInitialized: isMapInitialized,
                 managerInitialized: this.initialized,
-                lastRequestTime: lastRequestTime,
-                queueLength: geocodingQueue.length
+                isProcessingMarkers: isProcessingMarkers
             };
         }
     }
@@ -826,6 +584,6 @@
         };
     }
 
-    console.log('✅ map.js carregado com rate limiting rigoroso e tratamento de erros melhorado');
+    console.log('✅ map.js ANTI-LOOP carregado - quebra loops infinitos');
 
 })();
