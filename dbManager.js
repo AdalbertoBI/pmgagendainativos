@@ -1,267 +1,188 @@
-// dbManager.js - Versão CORRIGIDA sem reset automático de dados
+// dbManager.js - Gerenciador unificado de banco de dados
+
 class DBManager {
     constructor() {
-        this.dbName = 'PMG_AgendaClientes_DB_PERSISTENT';
-        this.dbVersion = 1; // Versão fixa para evitar conflitos
+        this.dbName = 'PMG_AgendaClientes_DB';
+        this.dbVersion = 5;
         this.db = null;
-        this.isInitialized = false;
-        
-        this.stores = ['clients', 'ativos', 'novos', 'schedules', 'observations', 'cache'];
-        this.retryConfig = { maxRetries: 2, baseDelay: 1000 };
-        
-        console.log('✅ DBManager inicializado - modo persistente');
+        this.stores = [
+            'clients',
+            'ativos', 
+            'novos',
+            'schedules',
+            'observations',
+            'filters',
+            'cache'
+        ];
     }
 
     async init() {
-        if (this.isInitialized) {
-            console.log('✅ DBManager já inicializado');
-            return true;
-        }
-
         try {
-            console.log('🔧 Inicializando DBManager persistente...');
-            
-            // NÃO fazer limpeza automática - apenas abrir o banco
-            this.db = await this.openDatabase();
-            this.setupHandlers();
-            this.isInitialized = true;
-            
-            console.log('✅ DBManager inicializado (dados preservados)');
+            console.log('🔧 Inicializando DBManager...');
+            this.db = await this.openDB();
+            console.log('✅ DBManager inicializado com sucesso');
             return true;
-            
         } catch (error) {
-            console.error('❌ Erro DBManager:', error);
-            
-            // Só resetar se realmente for necessário
-            if (error.name === 'VersionError') {
-                console.log('🔄 Tentando resolver conflito de versão...');
-                await this.handleVersionConflict();
-                return await this.init();
-            }
-            
+            console.error('❌ Erro ao inicializar DBManager:', error);
             throw error;
         }
     }
 
-    async handleVersionConflict() {
-        try {
-            console.log('🔧 Resolvendo conflito de versão...');
-            
-            if (this.db) {
-                this.db.close();
-                this.db = null;
-            }
-            
-            // Apenas incrementar versão, NÃO deletar dados
-            this.dbVersion++;
-            this.isInitialized = false;
-            
-            console.log(`🔄 Nova versão: ${this.dbVersion}`);
-            
-        } catch (error) {
-            console.error('❌ Erro ao resolver conflito:', error);
-        }
-    }
-
-    async openDatabase() {
+    openDB() {
         return new Promise((resolve, reject) => {
-            console.log(`📡 Abrindo ${this.dbName} v${this.dbVersion}`);
-            
             const request = indexedDB.open(this.dbName, this.dbVersion);
             
             request.onerror = () => {
-                console.error('❌ Erro IndexedDB:', request.error);
+                console.error('❌ Erro ao abrir IndexedDB:', request.error);
                 reject(request.error);
             };
             
-            request.onblocked = () => {
-                console.warn('🚧 Operação bloqueada');
-                setTimeout(() => reject(new Error('Bloqueado')), 3000);
+            request.onsuccess = () => {
+                console.log('✅ IndexedDB aberto com sucesso');
+                resolve(request.result);
             };
             
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
-                const oldVersion = event.oldVersion;
-                const newVersion = event.newVersion;
+                console.log(`🔄 Atualizando banco da versão ${event.oldVersion} para ${event.newVersion}`);
                 
-                console.log(`🔄 Upgrade ${oldVersion} → ${newVersion}`);
-                
-                // Criar stores que não existem (preservar dados existentes)
                 this.stores.forEach(storeName => {
                     if (!db.objectStoreNames.contains(storeName)) {
-                        const store = db.createObjectStore(storeName);
-                        console.log(`📁 Store ${storeName} criada`);
-                        
-                        // Adicionar índices se necessário
-                        if (['clients', 'ativos', 'novos'].includes(storeName)) {
-                            try {
-                                store.createIndex('nome', 'Nome Fantasia', { unique: false });
-                                store.createIndex('status', 'Status', { unique: false });
-                            } catch (indexError) {
-                                console.warn(`⚠️ Índice em ${storeName}:`, indexError);
-                            }
-                        }
+                        db.createObjectStore(storeName);
+                        console.log(`📁 Store '${storeName}' criada`);
                     }
                 });
-            };
-            
-            request.onsuccess = () => {
-                const db = request.result;
-                console.log(`✅ Database aberto v${db.version}`);
-                resolve(db);
             };
         });
     }
 
-    setupHandlers() {
-        if (!this.db) return;
-        
-        this.db.onversionchange = () => {
-            console.log('🔄 Versão alterada por outra aba');
-            this.db.close();
-            this.isInitialized = false;
-            
-            // Recarregar apenas se necessário
-            setTimeout(() => {
-                window.location.reload();
-            }, 2000);
-        };
-        
-        this.db.onerror = (event) => {
-            console.error('❌ Erro DB:', event);
-        };
-    }
-
     async saveData(storeName, data) {
-        if (!this.isInitialized) await this.init();
-        
+        if (!this.db) {
+            throw new Error('Banco de dados não inicializado');
+        }
+
         try {
-            console.log(`💾 Salvando em ${storeName}...`);
-            
             const transaction = this.db.transaction([storeName], 'readwrite');
             const store = transaction.objectStore(storeName);
             
-            // Limpar store atual
-            await new Promise((resolve, reject) => {
-                const clearRequest = store.clear();
-                clearRequest.onsuccess = () => resolve();
-                clearRequest.onerror = () => reject(clearRequest.error);
-            });
+            await this.clearStore(store);
             
-            // Salvar novos dados
             if (Array.isArray(data)) {
-                for (let i = 0; i < data.length; i++) {
-                    const item = data[i];
-                    const key = item.id || item['ID Cliente'] || `item_${i}_${Date.now()}`;
-                    
-                    await new Promise((resolve, reject) => {
-                        const putRequest = store.put(item, key);
-                        putRequest.onsuccess = () => resolve();
-                        putRequest.onerror = () => reject(putRequest.error);
+                const promises = data.map((item, index) => {
+                    return new Promise((resolve, reject) => {
+                        const key = item.id || `item_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 5)}`;
+                        const request = store.put(item, key);
+                        request.onsuccess = () => resolve();
+                        request.onerror = () => reject(request.error);
                     });
-                }
-                console.log(`✅ ${data.length} itens salvos em ${storeName}`);
+                });
+                await Promise.all(promises);
             } else {
                 await new Promise((resolve, reject) => {
-                    const putRequest = store.put(data, 'data');
-                    putRequest.onsuccess = () => resolve();
-                    putRequest.onerror = () => reject(putRequest.error);
+                    const request = store.put(data, 'data');
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
                 });
-                console.log(`✅ Objeto salvo em ${storeName}`);
             }
-            
+
+            console.log(`💾 Dados salvos em '${storeName}': ${Array.isArray(data) ? data.length : 'objeto'} item(s)`);
             return true;
-            
         } catch (error) {
-            console.error(`❌ Erro ao salvar ${storeName}:`, error);
-            return false;
+            console.error(`❌ Erro ao salvar em '${storeName}':`, error);
+            throw error;
         }
     }
 
     async loadData(storeName) {
-        if (!this.isInitialized) await this.init();
-        
+        if (!this.db) {
+            throw new Error('Banco de dados não inicializado');
+        }
+
         try {
             const transaction = this.db.transaction([storeName], 'readonly');
             const store = transaction.objectStore(storeName);
             
-            // Tentar carregar todos os itens
-            const allRequest = store.getAll();
-            const result = await new Promise((resolve, reject) => {
-                allRequest.onsuccess = () => resolve(allRequest.result);
-                allRequest.onerror = () => reject(allRequest.error);
+            return new Promise((resolve, reject) => {
+                const request = store.getAll();
+                request.onsuccess = () => {
+                    let result = request.result || [];
+                    
+                    if (result.length === 0) {
+                        const dataRequest = store.get('data');
+                        dataRequest.onsuccess = () => {
+                            const dataResult = dataRequest.result;
+                            if (dataResult) {
+                                result = dataResult;
+                            } else {
+                                result = (storeName === 'schedules' || storeName === 'observations' || storeName === 'filters' || storeName === 'cache') ? {} : [];
+                            }
+                            
+                            console.log(`📖 Dados carregados de '${storeName}': ${Array.isArray(result) ? result.length : typeof result} item(s)`);
+                            resolve(result);
+                        };
+                        dataRequest.onerror = () => {
+                            const defaultResult = (storeName === 'schedules' || storeName === 'observations' || storeName === 'filters' || storeName === 'cache') ? {} : [];
+                            console.log(`📖 Dados padrão retornados para '${storeName}'`);
+                            resolve(defaultResult);
+                        };
+                    } else {
+                        console.log(`📖 Dados carregados de '${storeName}': ${result.length} item(s)`);
+                        resolve(result);
+                    }
+                };
+                request.onerror = () => {
+                    console.error(`❌ Erro ao carregar de '${storeName}':`, request.error);
+                    reject(request.error);
+                };
             });
-            
-            if (result && result.length > 0) {
-                console.log(`📖 ${result.length} itens carregados de ${storeName}`);
-                return result;
-            }
-            
-            // Tentar item único
-            const singleRequest = store.get('data');
-            const singleResult = await new Promise((resolve, reject) => {
-                singleRequest.onsuccess = () => resolve(singleRequest.result);
-                singleRequest.onerror = () => reject(singleRequest.error);
-            });
-            
-            if (singleResult !== undefined) {
-                console.log(`📖 Item único carregado de ${storeName}`);
-                return singleResult;
-            }
-            
-            // Retornar valor padrão
-            const defaultValue = ['schedules', 'observations', 'cache'].includes(storeName) ? {} : [];
-            console.log(`📖 Valor padrão para ${storeName}`);
-            return defaultValue;
-            
         } catch (error) {
-            console.error(`❌ Erro ao carregar ${storeName}:`, error);
-            return ['schedules', 'observations', 'cache'].includes(storeName) ? {} : [];
+            console.error(`❌ Erro ao carregar dados de '${storeName}':`, error);
+            throw error;
         }
     }
 
     async clearData(storeName) {
-        if (!this.isInitialized) await this.init();
-        
+        if (!this.db) {
+            throw new Error('Banco de dados não inicializado');
+        }
+
         try {
-            console.log(`🧹 Limpando ${storeName}...`);
-            
             const transaction = this.db.transaction([storeName], 'readwrite');
             const store = transaction.objectStore(storeName);
-            
-            await new Promise((resolve, reject) => {
-                const clearRequest = store.clear();
-                clearRequest.onsuccess = () => resolve();
-                clearRequest.onerror = () => reject(clearRequest.error);
-            });
-            
-            console.log(`✅ ${storeName} limpo`);
-            return true;
-            
+            await this.clearStore(store);
+            console.log(`🧹 Store '${storeName}' limpa com sucesso`);
         } catch (error) {
-            console.error(`❌ Erro ao limpar ${storeName}:`, error);
-            return false;
+            console.error(`❌ Erro ao limpar '${storeName}':`, error);
+            throw error;
         }
     }
 
-    // Métodos de conveniência para observações
-    async saveObservation(clientId, observation) {
+    clearStore(store) {
+        return new Promise((resolve, reject) => {
+            const request = store.clear();
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    // Métodos para observações
+    saveObservation(clientId, observation) {
         try {
-            const observations = await this.loadData('observations');
+            const observations = this.loadAllObservations();
             observations[clientId] = {
                 text: observation,
                 updatedAt: new Date().toISOString()
             };
-            return await this.saveData('observations', observations);
+            localStorage.setItem('client-observations', JSON.stringify(observations));
+            console.log(`📝 Observação salva para cliente ${clientId}`);
         } catch (error) {
             console.error('❌ Erro ao salvar observação:', error);
-            return false;
         }
     }
 
-    async loadObservation(clientId) {
+    loadObservation(clientId) {
         try {
-            const observations = await this.loadData('observations');
+            const observations = this.loadAllObservations();
             return observations[clientId]?.text || '';
         } catch (error) {
             console.error('❌ Erro ao carregar observação:', error);
@@ -269,57 +190,161 @@ class DBManager {
         }
     }
 
-    // Método para forçar reset (apenas quando explicitamente solicitado)
-    async forceReset() {
+    loadAllObservations() {
         try {
-            console.log('🚨 RESET FORÇADO do banco de dados...');
-            
-            if (this.db) {
-                this.db.close();
-                this.db = null;
-            }
-            
-            await this.deleteDatabase();
-            this.isInitialized = false;
-            
-            console.log('✅ Reset forçado concluído');
-            
+            const stored = localStorage.getItem('client-observations');
+            return stored ? JSON.parse(stored) : {};
         } catch (error) {
-            console.error('❌ Erro no reset forçado:', error);
+            console.error('❌ Erro ao carregar observações:', error);
+            return {};
         }
     }
 
-    async deleteDatabase() {
-        return new Promise((resolve) => {
-            console.log('🗑️ Deletando database...');
-            const request = indexedDB.deleteDatabase(this.dbName);
-            
-            request.onsuccess = () => {
-                console.log('✅ Database deletado');
-                resolve(true);
+    // Métodos para filtros
+    saveFilters(filters) {
+        try {
+            const filtersToSave = {
+                cidadesSelecionadas: Array.isArray(filters.cidadesSelecionadas) ? filters.cidadesSelecionadas : [],
+                sort: filters.sort || 'nome-az',
+                savedAt: new Date().toISOString()
             };
-            
-            request.onerror = () => {
-                console.warn('⚠️ Erro ao deletar');
-                resolve(false);
-            };
-            
-            request.onblocked = () => {
-                console.warn('🚧 Delete bloqueado');
-                setTimeout(() => resolve(false), 2000);
-            };
-        });
+            localStorage.setItem('agenda-filters', JSON.stringify(filtersToSave));
+            console.log('💾 Filtros salvos:', filtersToSave);
+        } catch (error) {
+            console.error('❌ Erro ao salvar filtros:', error);
+        }
     }
 
-    destroy() {
-        if (this.db) {
-            this.db.close();
-            this.db = null;
+    loadFilters() {
+        try {
+            const stored = localStorage.getItem('agenda-filters');
+            const filters = stored ? JSON.parse(stored) : {};
+            return {
+                cidadesSelecionadas: Array.isArray(filters.cidadesSelecionadas) ? filters.cidadesSelecionadas : [],
+                sort: filters.sort || 'nome-az'
+            };
+        } catch (error) {
+            console.error('❌ Erro ao carregar filtros:', error);
+            return {
+                cidadesSelecionadas: [],
+                sort: 'nome-az'
+            };
         }
-        this.isInitialized = false;
-        console.log('🔧 DBManager destruído');
+    }
+
+    // Backup e restauração
+    async exportAllData() {
+        try {
+            const allData = {
+                clients: await this.loadData('clients'),
+                ativos: await this.loadData('ativos'),
+                novos: await this.loadData('novos'),
+                schedules: await this.loadData('schedules'),
+                observations: this.loadAllObservations(),
+                filters: this.loadFilters(),
+                exportedAt: new Date().toISOString(),
+                version: this.dbVersion
+            };
+
+            const dataStr = JSON.stringify(allData, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `pmg-agenda-backup-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            console.log('📤 Backup exportado com sucesso');
+            return true;
+        } catch (error) {
+            console.error('❌ Erro ao exportar backup:', error);
+            throw error;
+        }
+    }
+
+    async importAllData(fileContent) {
+        try {
+            const data = typeof fileContent === 'string' ? JSON.parse(fileContent) : fileContent;
+            
+            const requiredKeys = ['clients', 'ativos', 'novos', 'schedules'];
+            const missingKeys = requiredKeys.filter(key => !data.hasOwnProperty(key));
+            
+            if (missingKeys.length > 0) {
+                throw new Error(`Backup inválido. Chaves ausentes: ${missingKeys.join(', ')}`);
+            }
+
+            await this.saveData('clients', Array.isArray(data.clients) ? data.clients : []);
+            await this.saveData('ativos', Array.isArray(data.ativos) ? data.ativos : []);
+            await this.saveData('novos', Array.isArray(data.novos) ? data.novos : []);
+            await this.saveData('schedules', data.schedules || {});
+
+            if (data.observations && typeof data.observations === 'object') {
+                localStorage.setItem('client-observations', JSON.stringify(data.observations));
+            }
+
+            if (data.filters) {
+                this.saveFilters(data.filters);
+            }
+
+            console.log('📥 Backup importado com sucesso');
+            return true;
+        } catch (error) {
+            console.error('❌ Erro ao importar backup:', error);
+            throw error;
+        }
+    }
+
+    // Verificação de integridade
+    async checkDataIntegrity() {
+        try {
+            const clients = await this.loadData('clients');
+            const ativos = await this.loadData('ativos');
+            const novos = await this.loadData('novos');
+            const schedules = await this.loadData('schedules');
+
+            const stats = {
+                clients: Array.isArray(clients) ? clients.length : 0,
+                ativos: Array.isArray(ativos) ? ativos.length : 0,
+                novos: Array.isArray(novos) ? novos.length : 0,
+                schedules: typeof schedules === 'object' ? Object.keys(schedules).length : 0,
+                observations: Object.keys(this.loadAllObservations()).length,
+                issues: []
+            };
+
+            const allClients = [...clients, ...ativos, ...novos];
+            const ids = allClients.map(c => c.id).filter(id => id);
+            const duplicateIds = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];
+            
+            if (duplicateIds.length > 0) {
+                stats.issues.push(`IDs duplicados: ${duplicateIds.join(', ')}`);
+            }
+
+            allClients.forEach((cliente, index) => {
+                if (!cliente['Nome Fantasia'] && !cliente['Cliente']) {
+                    stats.issues.push(`Cliente sem nome no índice ${index}`);
+                }
+
+                if (!cliente.id) {
+                    stats.issues.push(`Cliente sem ID no índice ${index}`);
+                }
+            });
+
+            console.log('🔍 Verificação de integridade concluída:', stats);
+            return stats;
+        } catch (error) {
+            console.error('❌ Erro na verificação de integridade:', error);
+            throw error;
+        }
     }
 }
 
-window.dbManager = new DBManager();
-console.log('✅ dbManager.js PERSISTENTE carregado');
+// Inicializar instância global
+if (typeof window !== 'undefined') {
+    window.dbManager = new DBManager();
+}
+
+console.log('✅ dbManager.js carregado');

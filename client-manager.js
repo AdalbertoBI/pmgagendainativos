@@ -1,885 +1,759 @@
-// client-manager.js - Sistema COMPLETO com modal avançado e persistência garantida
+// client-manager.js - Gerenciamento de clientes com exclusão robusta
+
 class ClientManager {
     constructor() {
         this.data = [];
         this.ativos = [];
-        this.novos = [];
+        this.filteredData = [];
         this.schedules = {};
-        this.observations = {};
         this.currentItem = null;
-        this.initialized = false;
-        this.editMode = false;
-        
-        // Sistema de cache otimizado - NÃO LIMPAR automaticamente
-        this.cacheKey = 'pmg_clients_v2_persistent';
-        this.observationsKey = 'pmg_observations_v2';
-        this.schedulesKey = 'pmg_schedules_v2';
-        
-        console.log('✅ ClientManager inicializado com persistência garantida');
+        this.currentTab = 'inativos';
+        this.savedFilters = {};
+        this.today = new Date();
+        this.BATCH_SIZE = 500;
+        this.MAX_RECORDS = 10000;
     }
 
+    // Inicializar gerenciador
     async init() {
         try {
-            console.log('🚀 Inicializando ClientManager...');
-            
-            // SEMPRE carregar dados existentes primeiro
-            await this.loadExistingData();
-            
-            // Aguardar DBManager se necessário
-            if (!window.dbManager?.isInitialized && this.getTotalCount() === 0) {
-                await this.waitForDbManager();
-                await this.loadFromDatabase();
-            }
-            
-            this.initialized = true;
-            this.updateGlobals();
-            
-            const totalLoaded = this.getTotalCount();
-            console.log(`✅ ClientManager inicializado - ${totalLoaded} clientes carregados`);
-            
-            // Se não há dados, mostrar estado vazio
-            if (totalLoaded === 0) {
-                console.log('ℹ️ Nenhum dado existente encontrado');
-            }
-            
+            this.data = await window.dbManager.loadData('clients') || [];
+            this.ativos = await window.dbManager.loadData('ativos') || [];
+            this.schedules = await window.dbManager.loadData('schedules') || {};
+            this.savedFilters = window.dbManager.loadFilters();
+
+            // Disponibilizar globalmente
+            window.data = this.data;
+            window.ativos = this.ativos;
+            window.filteredData = this.filteredData;
+
+            console.log('✅ ClientManager inicializado');
+            console.log(`📊 Dados carregados: ${this.data.length} inativos, ${this.ativos.length} ativos`);
         } catch (error) {
-            console.error('❌ Erro ClientManager:', error);
-            this.initializeEmpty();
+            console.error('❌ Erro ao inicializar ClientManager:', error);
         }
     }
 
-    async loadExistingData() {
+    // Gerar ID único para cliente
+    generateClientId() {
+        return `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    // Validar dados do cliente
+    validateClientData(clientData) {
+        const errors = [];
+
+        if (!clientData['Nome Fantasia'] || clientData['Nome Fantasia'].trim() === '') {
+            errors.push('Nome Fantasia é obrigatório');
+        }
+
+        if (clientData['CNPJ / CPF'] && !this.validateCNPJCPF(clientData['CNPJ / CPF'])) {
+            errors.push('CNPJ/CPF inválido');
+        }
+
+        if (clientData.Email && !this.validateEmail(clientData.Email)) {
+            errors.push('Email inválido');
+        }
+
+        if (clientData.CEP && !this.validateCEP(clientData.CEP)) {
+            errors.push('CEP inválido');
+        }
+
+        return errors;
+    }
+
+    // Validar email
+    validateEmail(email) {
+        const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return regex.test(email);
+    }
+
+    // Validar CEP
+    validateCEP(cep) {
+        const cleanCep = cep.replace(/\D/g, '');
+        return cleanCep.length === 8;
+    }
+
+    // Validar CNPJ/CPF (básico)
+    validateCNPJCPF(doc) {
+        const cleanDoc = doc.replace(/\D/g, '');
+        return cleanDoc.length === 11 || cleanDoc.length === 14;
+    }
+
+    // Cadastrar novo cliente
+    async cadastrarCliente(formData) {
         try {
-            console.log('📖 Carregando dados existentes...');
-            
-            // Tentar localStorage primeiro (mais rápido)
-            const stored = localStorage.getItem(this.cacheKey);
-            if (stored) {
-                const data = JSON.parse(stored);
-                if (this.isValidDataStructure(data)) {
-                    this.data = data.clients || [];
-                    this.ativos = data.ativos || [];
-                    this.novos = data.novos || [];
-                    this.schedules = data.schedules || {};
-                    
-                    const total = this.getTotalCount();
-                    if (total > 0) {
-                        console.log(`📦 ${total} clientes carregados do localStorage`);
-                        
-                        // Carregar observações e agendamentos
-                        await this.loadObservations();
-                        await this.loadSchedules();
-                        
-                        return; // Sucesso, não precisa do IndexedDB
-                    }
-                }
+            const clientData = {
+                id: this.generateClientId(),
+                'Nome Fantasia': formData.nomeFantasia,
+                'Cliente': formData.cliente,
+                'CNPJ / CPF': formData.cnpjCpf,
+                'Contato': formData.contato,
+                'Telefone Comercial': formData.telefoneComercial,
+                'Celular': formData.celular,
+                'Email': formData.email,
+                'Endereco': formData.endereco,
+                'Numero': formData.numero,
+                'Bairro': formData.bairro,
+                'Cidade': formData.cidade,
+                'UF': formData.uf,
+                'CEP': formData.cep,
+                'Saldo de Credito': formData.saldoCredito || 0,
+                'Data Ultimo Pedido': formData.dataUltimoPedido || this.formatDate(new Date()),
+                'Data Cadastro': this.formatDate(new Date())
+            };
+
+            // Validar dados
+            const errors = this.validateClientData(clientData);
+            if (errors.length > 0) {
+                throw new Error(errors.join('\n'));
             }
-            
-            console.log('📖 Nenhum dado válido no localStorage');
-            
+
+            // Adicionar à lista de inativos
+            this.data.push(clientData);
+            window.data = this.data;
+
+            // Salvar no banco usando método robusto
+            await window.dbManager.saveArrayData('clients', this.data);
+
+            console.log('✅ Cliente cadastrado:', clientData['Nome Fantasia']);
+            return clientData;
+
         } catch (error) {
-            console.error('❌ Erro ao carregar dados existentes:', error);
-        }
-    }
-
-    async loadFromDatabase() {
-        try {
-            if (!window.dbManager?.isInitialized) return;
-            
-            console.log('📖 Carregando do IndexedDB...');
-            
-            const [clients, ativos, novos, schedules] = await Promise.all([
-                window.dbManager.loadData('clients'),
-                window.dbManager.loadData('ativos'),
-                window.dbManager.loadData('novos'),
-                window.dbManager.loadData('schedules')
-            ]);
-            
-            this.data = Array.isArray(clients) ? clients : [];
-            this.ativos = Array.isArray(ativos) ? ativos : [];
-            this.novos = Array.isArray(novos) ? novos : [];
-            this.schedules = schedules || {};
-            
-            const total = this.getTotalCount();
-            console.log(`📊 IndexedDB: ${total} clientes carregados`);
-            
-            if (total > 0) {
-                await this.saveToLocalStorage(); // Sync com localStorage
-            }
-            
-        } catch (error) {
-            console.error('❌ Erro ao carregar do IndexedDB:', error);
-        }
-    }
-
-    async loadObservations() {
-        try {
-            const stored = localStorage.getItem(this.observationsKey);
-            if (stored) {
-                this.observations = JSON.parse(stored);
-                console.log(`📝 ${Object.keys(this.observations).length} observações carregadas`);
-            }
-        } catch (error) {
-            console.error('❌ Erro ao carregar observações:', error);
-            this.observations = {};
-        }
-    }
-
-    async loadSchedules() {
-        try {
-            const stored = localStorage.getItem(this.schedulesKey);
-            if (stored) {
-                this.schedules = { ...this.schedules, ...JSON.parse(stored) };
-                console.log(`📅 ${Object.keys(this.schedules).length} agendamentos carregados`);
-            }
-        } catch (error) {
-            console.error('❌ Erro ao carregar agendamentos:', error);
-        }
-    }
-
-    isValidDataStructure(data) {
-        return data && 
-               typeof data === 'object' && 
-               (Array.isArray(data.clients) || Array.isArray(data.ativos) || Array.isArray(data.novos));
-    }
-
-    async waitForDbManager() {
-        let attempts = 0;
-        while (!window.dbManager?.isInitialized && attempts < 30) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            attempts++;
-        }
-    }
-
-    updateGlobals() {
-        window.data = this.data;
-        window.ativos = this.ativos;
-        window.novos = this.novos;
-    }
-
-    initializeEmpty() {
-        this.data = [];
-        this.ativos = [];
-        this.novos = [];
-        this.schedules = {};
-        this.observations = {};
-        this.updateGlobals();
-    }
-
-    getTotalCount() {
-        return this.data.length + this.ativos.length + this.novos.length;
-    }
-
-    async processNewData(newData) {
-        try {
-            console.log('📊 Processando NOVOS dados (substituindo anteriores)...');
-            
-            const inputTotal = (newData.clients?.length || 0) + 
-                             (newData.ativos?.length || 0) + 
-                             (newData.novos?.length || 0);
-            
-            if (inputTotal === 0) {
-                throw new Error('Dados de entrada vazios');
-            }
-            
-            // LIMPAR dados anteriores apenas com novo upload
-            console.log('🧹 Limpando dados anteriores devido a novo upload...');
-            await this.clearAllData();
-            
-            // Processar novos dados
-            this.data = Array.isArray(newData.clients) ? [...newData.clients] : [];
-            this.ativos = Array.isArray(newData.ativos) ? [...newData.ativos] : [];
-            this.novos = Array.isArray(newData.novos) ? [...newData.novos] : [];
-            this.schedules = {};
-            this.observations = {};
-            
-            this.updateGlobals();
-            
-            const finalTotal = this.getTotalCount();
-            
-            if (finalTotal !== inputTotal) {
-                throw new Error(`Perda de dados: ${inputTotal} → ${finalTotal}`);
-            }
-            
-            // Salvar dados
-            await this.saveAllData();
-            
-            console.log(`✅ Novos dados processados: 🔴${this.data.length} 🟢${this.ativos.length} 🆕${this.novos.length}`);
-            
-        } catch (error) {
-            console.error('❌ Erro ao processar novos dados:', error);
+            console.error('❌ Erro ao cadastrar cliente:', error);
             throw error;
         }
     }
 
-    async clearAllData() {
+    // Editar cliente - FUNÇÃO CORRIGIDA
+    async editarCliente(clienteId, dadosEditados) {
         try {
-            // Limpar IndexedDB
-            if (window.dbManager?.isInitialized) {
-                await Promise.all([
-                    window.dbManager.clearData('clients'),
-                    window.dbManager.clearData('ativos'),
-                    window.dbManager.clearData('novos'),
-                    window.dbManager.clearData('schedules')
-                ]);
+            // Validar dados
+            const errors = this.validateClientData(dadosEditados);
+            if (errors.length > 0) {
+                throw new Error(errors.join('\n'));
             }
-            
-            // Limpar localStorage
-            localStorage.removeItem(this.cacheKey);
-            localStorage.removeItem(this.observationsKey);
-            localStorage.removeItem(this.schedulesKey);
-            
-            this.initializeEmpty();
-            
-            console.log('🧹 Todos os dados limpos');
-            
+
+            let clienteEditado = false;
+
+            // Encontrar cliente na lista de inativos
+            const indexInativo = this.data.findIndex(c => c.id === clienteId);
+            if (indexInativo !== -1) {
+                // Atualizar dados mantendo ID e data de cadastro
+                this.data[indexInativo] = {
+                    ...this.data[indexInativo],
+                    ...dadosEditados
+                };
+                await window.dbManager.saveArrayData('clients', this.data);
+                window.data = this.data;
+                clienteEditado = true;
+                console.log('✅ Cliente inativo editado:', dadosEditados['Nome Fantasia']);
+            }
+
+            // Encontrar cliente na lista de ativos
+            const indexAtivo = this.ativos.findIndex(c => c.id === clienteId);
+            if (indexAtivo !== -1) {
+                // Atualizar dados mantendo ID e data de cadastro
+                this.ativos[indexAtivo] = {
+                    ...this.ativos[indexAtivo],
+                    ...dadosEditados
+                };
+                await window.dbManager.saveArrayData('ativos', this.ativos);
+                window.ativos = this.ativos;
+                clienteEditado = true;
+                console.log('✅ Cliente ativo editado:', dadosEditados['Nome Fantasia']);
+            }
+
+            if (!clienteEditado) {
+                throw new Error('Cliente não encontrado');
+            }
+
         } catch (error) {
-            console.error('❌ Erro ao limpar dados:', error);
+            console.error('❌ Erro ao editar cliente:', error);
+            throw error;
         }
     }
 
-    async saveAllData() {
+    // Tornar cliente ativo - CORRIGIDA
+    async tornarAtivo(cliente, novaData = null) {
         try {
-            const saveData = {
-                clients: this.data,
-                ativos: this.ativos,
-                novos: this.novos,
-                schedules: this.schedules,
-                timestamp: Date.now(),
-                version: '2.0'
-            };
-            
-            // Salvar no localStorage (prioridade)
-            await this.saveToLocalStorage(saveData);
-            
-            // Salvar no IndexedDB (backup)
-            if (window.dbManager?.isInitialized) {
-                await Promise.all([
-                    window.dbManager.saveData('clients', this.data),
-                    window.dbManager.saveData('ativos', this.ativos),
-                    window.dbManager.saveData('novos', this.novos),
-                    window.dbManager.saveData('schedules', this.schedules)
-                ]);
-                console.log('✅ Dados salvos no IndexedDB');
+            console.log('🔄 Tornando cliente ativo:', cliente['Nome Fantasia']);
+
+            // Remover da lista de inativos
+            const index = this.data.findIndex(c => c.id === cliente.id);
+            if (index !== -1) {
+                this.data.splice(index, 1);
+                console.log('✅ Cliente removido dos inativos');
             }
+
+            // Adicionar à lista de ativos
+            if (novaData) {
+                cliente['Data Ultimo Pedido'] = novaData;
+            }
+            cliente.isAtivo = true;
             
-            // Salvar observações e agendamentos
-            await this.saveObservations();
-            await this.saveSchedules();
+            // Verificar se já existe nos ativos para evitar duplicatas
+            const existeAtivo = this.ativos.findIndex(c => c.id === cliente.id);
+            if (existeAtivo === -1) {
+                this.ativos.push(cliente);
+                console.log('✅ Cliente adicionado aos ativos');
+            }
+
+            // Salvar ambas as listas usando método robusto
+            await window.dbManager.saveArrayData('clients', this.data);
+            await window.dbManager.saveArrayData('ativos', this.ativos);
+
+            // Atualizar variáveis globais
+            window.data = this.data;
+            window.ativos = this.ativos;
+
+            console.log(`✅ Cliente "${cliente['Nome Fantasia']}" tornado ativo com sucesso`);
+            console.log(`📊 Estado atual: ${this.data.length} inativos, ${this.ativos.length} ativos`);
             
-            console.log('✅ Todos os dados salvos com segurança');
-            
+            return cliente;
+
         } catch (error) {
-            console.error('❌ Erro ao salvar dados:', error);
+            console.error('❌ Erro ao tornar cliente ativo:', error);
+            throw error;
         }
     }
 
-    async saveToLocalStorage(saveData = null) {
+    // Excluir cliente dos ativos - MÉTODO ROBUSTO CORRIGIDO
+    async excluirAtivo(cliente) {
         try {
-            const data = saveData || {
-                clients: this.data,
-                ativos: this.ativos,
-                novos: this.novos,
-                schedules: this.schedules,
-                timestamp: Date.now(),
-                version: '2.0'
-            };
-            
-            localStorage.setItem(this.cacheKey, JSON.stringify(data));
-            console.log('💾 Dados salvos no localStorage');
-            
-        } catch (error) {
-            if (error.name === 'QuotaExceededError') {
-                console.warn('⚠️ Quota localStorage excedida, tentando limpar...');
-                this.clearOldCache();
-                // Tentar novamente
-                localStorage.setItem(this.cacheKey, JSON.stringify(data));
-            } else {
-                throw error;
-            }
-        }
-    }
+            const clienteNome = cliente['Nome Fantasia'] || 'Cliente sem nome';
+            console.log('🗑️ Excluindo cliente ativo:', clienteNome);
+            console.log('📊 Estado antes da exclusão:', {
+                totalAtivos: this.ativos.length,
+                clienteId: cliente.id
+            });
 
-    async saveObservations() {
-        try {
-            if (Object.keys(this.observations).length > 0) {
-                localStorage.setItem(this.observationsKey, JSON.stringify(this.observations));
-            }
-        } catch (error) {
-            console.error('❌ Erro ao salvar observações:', error);
-        }
-    }
-
-    async saveSchedules() {
-        try {
-            if (Object.keys(this.schedules).length > 0) {
-                localStorage.setItem(this.schedulesKey, JSON.stringify(this.schedules));
-            }
-        } catch (error) {
-            console.error('❌ Erro ao salvar agendamentos:', error);
-        }
-    }
-
-    clearOldCache() {
-        const keys = Object.keys(localStorage);
-        keys.forEach(key => {
-            if (key.includes('pmg_') && key !== this.cacheKey && key !== this.observationsKey && key !== this.schedulesKey) {
-                localStorage.removeItem(key);
-                console.log('🧹 Cache antigo removido:', key);
-            }
-        });
-    }
-
-    // MODAL COMPLETO COM TODAS AS FUNCIONALIDADES
-    showClientModal(cliente) {
-        this.currentItem = cliente;
-        const modal = document.getElementById('modal');
-        const modalTitle = document.getElementById('modalTitle');
-        const modalBody = document.getElementById('modalBody');
-        
-        if (!modal || !modalTitle || !modalBody) {
-            console.error('❌ Elementos do modal não encontrados');
-            return;
-        }
-        
-        const clientId = this.getClientId(cliente);
-        const nome = cliente['Nome Fantasia'] || cliente['Cliente'] || 'Cliente';
-        const contato = cliente['Contato'] || 'N/A';
-        const telefone = cliente['Celular'] || 'N/A';
-        const endereco = cliente['Endereço'] || 'N/A';
-        const status = cliente['Status'] || 'N/A';
-        const segmento = cliente['Segmento'] || 'N/A';
-        const cnpj = cliente['CNPJ / CPF'] || 'N/A';
-        
-        // Informações de geocodificação
-        const geocodingInfo = cliente.geocoding?.success ? 
-            `<div class="geocoding-info">
-                <p><strong>📍 Localização:</strong> ${cliente.geocoding.method} (${Math.round((cliente.geocoding.confidence || 0) * 100)}% confiança)</p>
-                ${cliente.geocoding.coordinates ? 
-                    `<p><strong>Coordenadas:</strong> ${cliente.geocoding.coordinates.lat.toFixed(6)}, ${cliente.geocoding.coordinates.lon.toFixed(6)}</p>` 
-                    : ''}
-            </div>` : '';
-        
-        // Observações existentes
-        const currentObservation = this.observations[clientId] || '';
-        
-        // Agendamento existente
-        const currentSchedule = this.schedules[clientId];
-        const scheduleInfo = currentSchedule ? 
-            `<div class="current-schedule">
-                <strong>📅 Agendamento atual:</strong> ${new Date(currentSchedule.date).toLocaleDateString('pt-BR')} às ${currentSchedule.time}
-                <button onclick="window.clientManager.removeSchedule('${clientId}')" class="btn-small btn-danger" style="margin-left: 10px;">Remover</button>
-            </div>` : '';
-        
-        modalTitle.innerHTML = `
-            <span>${nome}</span>
-            <div class="modal-status">
-                <span class="status-badge status-${status.toLowerCase().includes('ativo') ? 'active' : status.toLowerCase().includes('novo') ? 'new' : 'inactive'}">${status}</span>
-            </div>
-        `;
-        
-        modalBody.innerHTML = `
-            <div class="client-details-advanced">
-                <!-- Informações Básicas -->
-                <div class="detail-section">
-                    <h4>📋 Informações Básicas</h4>
-                    <div class="detail-grid">
-                        <div class="detail-item">
-                            <label>Nome/Razão Social:</label>
-                            <div class="detail-value">${nome}</div>
-                        </div>
-                        <div class="detail-item">
-                            <label>Status:</label>
-                            <div class="detail-value">${status}</div>
-                        </div>
-                        <div class="detail-item">
-                            <label>Segmento:</label>
-                            <div class="detail-value">${segmento}</div>
-                        </div>
-                        <div class="detail-item">
-                            <label>CNPJ/CPF:</label>
-                            <div class="detail-value">${cnpj}</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Contato -->
-                <div class="detail-section">
-                    <h4>📞 Contato</h4>
-                    <div class="detail-grid">
-                        <div class="detail-item">
-                            <label>Pessoa de Contato:</label>
-                            <div class="detail-value">${contato}</div>
-                        </div>
-                        <div class="detail-item">
-                            <label>Telefone:</label>
-                            <div class="detail-value">
-                                ${telefone}
-                                ${this.createWhatsAppButton(telefone, nome)}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Endereço -->
-                <div class="detail-section">
-                    <h4>📍 Endereço e Localização</h4>
-                    <div class="detail-item full-width">
-                        <label>Endereço Completo:</label>
-                        <div class="detail-value">${this.formatAddress(endereco)}</div>
-                        ${this.createRouteButton(cliente)}
-                    </div>
-                    ${geocodingInfo}
-                </div>
-
-                <!-- Agendamento -->
-                <div class="detail-section">
-                    <h4>📅 Agendamento</h4>
-                    ${scheduleInfo}
-                    <div class="schedule-form">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="schedule-date">Data:</label>
-                                <input type="date" id="schedule-date" class="form-control" 
-                                       value="${currentSchedule ? currentSchedule.date : ''}" 
-                                       min="${new Date().toISOString().split('T')[0]}">
-                            </div>
-                            <div class="form-group">
-                                <label for="schedule-time">Hora:</label>
-                                <input type="time" id="schedule-time" class="form-control" 
-                                       value="${currentSchedule ? currentSchedule.time : '09:00'}">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="schedule-notes">Observações do Agendamento:</label>
-                            <textarea id="schedule-notes" class="form-control" rows="2" 
-                                      placeholder="Adicione observações sobre o agendamento...">${currentSchedule ? currentSchedule.notes || '' : ''}</textarea>
-                        </div>
-                        <button onclick="window.clientManager.saveSchedule('${clientId}')" class="btn btn-primary">
-                            📅 ${currentSchedule ? 'Atualizar' : 'Agendar'} Visita
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Observações -->
-                <div class="detail-section">
-                    <h4>📝 Observações</h4>
-                    <div class="form-group">
-                        <textarea id="client-observations" class="form-control" rows="4" 
-                                  placeholder="Adicione suas observações sobre este cliente...">${currentObservation}</textarea>
-                    </div>
-                    <button onclick="window.clientManager.saveObservation('${clientId}')" class="btn btn-secondary">
-                        💾 Salvar Observações
-                    </button>
-                </div>
-
-                <!-- Ações -->
-                <div class="detail-section">
-                    <h4>⚡ Ações Rápidas</h4>
-                    <div class="action-buttons">
-                        ${this.createWhatsAppButton(telefone, nome, true)}
-                        ${this.createRouteButton(cliente, true)}
-                        <button onclick="window.clientManager.editClient('${clientId}')" class="btn btn-warning">
-                            ✏️ Editar Dados
-                        </button>
-                        <button onclick="window.clientManager.duplicateClient('${clientId}')" class="btn btn-info">
-                            📋 Duplicar Cliente
-                        </button>
-                        ${this.createStatusButtons(clientId, status)}
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        modal.style.display = 'block';
-        
-        // Focar no primeiro input se existir
-        setTimeout(() => {
-            const firstInput = modal.querySelector('input, textarea');
-            if (firstInput) firstInput.focus();
-        }, 100);
-    }
-
-    createWhatsAppButton(telefone, nome, isActionButton = false) {
-        if (!telefone || telefone === 'N/A') {
-            return isActionButton ? '<button class="btn btn-disabled" disabled>📱 WhatsApp Indisponível</button>' : '';
-        }
-        
-        const cleanPhone = telefone.replace(/\D/g, '');
-        if (cleanPhone.length < 10) {
-            return isActionButton ? '<button class="btn btn-disabled" disabled>📱 Número Inválido</button>' : '';
-        }
-        
-        const whatsappNumber = cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone;
-        const message = encodeURIComponent(`Olá ${nome}, tudo bem? Sou da PMG e gostaria de conversar sobre nossos serviços.`);
-        const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${message}`;
-        
-        if (isActionButton) {
-            return `<a href="${whatsappUrl}" target="_blank" class="btn btn-success">📱 Abrir WhatsApp</a>`;
-        } else {
-            return `<br><a href="${whatsappUrl}" target="_blank" class="whatsapp-link">📱 WhatsApp</a>`;
-        }
-    }
-
-    createRouteButton(cliente, isActionButton = false) {
-        const endereco = cliente['Endereço'] || '';
-        const nome = cliente['Nome Fantasia'] || 'Cliente';
-        
-        if (!endereco || endereco === 'N/A') {
-            return isActionButton ? '<button class="btn btn-disabled" disabled>🗺️ Endereço Indisponível</button>' : '';
-        }
-        
-        let routeUrl = '';
-        
-        // Se tem coordenadas, usar elas
-        if (cliente.geocoding?.success && cliente.geocoding.coordinates) {
-            const lat = cliente.geocoding.coordinates.lat;
-            const lon = cliente.geocoding.coordinates.lon;
-            routeUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}&travelmode=driving`;
-        } else {
-            // Usar endereço textual
-            const addressForUrl = encodeURIComponent(endereco + ', São José dos Campos, SP');
-            routeUrl = `https://www.google.com/maps/dir/?api=1&destination=${addressForUrl}&travelmode=driving`;
-        }
-        
-        if (isActionButton) {
-            return `<a href="${routeUrl}" target="_blank" class="btn btn-primary">🗺️ Traçar Rota</a>`;
-        } else {
-            return `<br><a href="${routeUrl}" target="_blank" class="route-link">🗺️ Como chegar</a>`;
-        }
-    }
-
-    createStatusButtons(clientId, currentStatus) {
-        const statuses = [
-            { key: 'ativo', label: 'Ativo', color: 'success' },
-            { key: 'inativo', label: 'Inativo', color: 'danger' },
-            { key: 'novo', label: 'Novo', color: 'warning' }
-        ];
-        
-        return statuses
-            .filter(s => !currentStatus.toLowerCase().includes(s.key))
-            .map(s => `<button onclick="window.clientManager.changeStatus('${clientId}', '${s.key}')" class="btn btn-${s.color}">
-                         ${s.key === 'ativo' ? '🟢' : s.key === 'novo' ? '🆕' : '🔴'} Marcar como ${s.label}
-                       </button>`)
-            .join('');
-    }
-
-    formatAddress(endereco) {
-        if (!endereco || endereco === 'N/A') return 'Endereço não disponível';
-        
-        return endereco.split('\n')
-            .map(linha => linha.trim())
-            .filter(linha => linha)
-            .join('<br>');
-    }
-
-    getClientId(cliente) {
-        return cliente.id || cliente['ID Cliente'] || 
-               cliente['Nome Fantasia']?.replace(/\s+/g, '_').toLowerCase() || 
-               'client_' + Date.now();
-    }
-
-    // FUNCIONALIDADES DO MODAL
-
-    async saveObservation(clientId) {
-        try {
-            const textarea = document.getElementById('client-observations');
-            if (!textarea) return;
-            
-            const observation = textarea.value.trim();
-            
-            if (observation) {
-                this.observations[clientId] = observation;
-                await this.saveObservations();
+            // Encontrar e remover o cliente
+            const index = this.ativos.findIndex(c => c.id === cliente.id);
+            if (index !== -1) {
+                // Remover do array
+                this.ativos.splice(index, 1);
+                console.log(`✅ Cliente removido do array (posição ${index})`);
                 
-                this.showToast('Observação salva com sucesso!', 'success');
-                console.log(`📝 Observação salva para cliente ${clientId}`);
+                // Salvar usando método robusto que limpa e reinsere todos os dados
+                await window.dbManager.saveArrayData('ativos', this.ativos);
+                
+                // Atualizar variável global
+                window.ativos = this.ativos;
+                
+                console.log('✅ Dados salvos no IndexedDB');
+                console.log('📊 Estado após exclusão:', {
+                    totalAtivos: this.ativos.length,
+                    idsRestantes: this.ativos.map(c => c.id).slice(0, 3)
+                });
+                
+                // Verificar se a exclusão foi salva corretamente
+                const verificacao = await window.dbManager.verifyDataIntegrity('ativos');
+                console.log('🔍 Verificação de integridade:', {
+                    totalCarregado: verificacao.length,
+                    clienteAindaExiste: verificacao.some(c => c.id === cliente.id)
+                });
+                
+                return true;
             } else {
-                delete this.observations[clientId];
-                await this.saveObservations();
-                this.showToast('Observação removida', 'info');
+                console.warn('⚠️ Cliente não encontrado na lista de ativos');
+                return false;
             }
-            
         } catch (error) {
-            console.error('❌ Erro ao salvar observação:', error);
-            this.showToast('Erro ao salvar observação', 'error');
+            console.error('❌ Erro ao excluir cliente ativo:', error);
+            throw error;
         }
     }
 
-    async saveSchedule(clientId) {
+    // Excluir cliente ativo por ID - NOVA FUNÇÃO ESPECÍFICA
+    async excluirAtivoPorId(clienteId) {
         try {
-            const dateInput = document.getElementById('schedule-date');
-            const timeInput = document.getElementById('schedule-time');
-            const notesInput = document.getElementById('schedule-notes');
-            
-            if (!dateInput || !timeInput) return;
-            
-            const date = dateInput.value;
-            const time = timeInput.value;
-            const notes = notesInput ? notesInput.value.trim() : '';
-            
-            if (!date || !time) {
-                this.showToast('Data e hora são obrigatórios', 'error');
-                return;
+            console.log('🗑️ Excluindo cliente ativo por ID:', clienteId);
+
+            // Encontrar o cliente
+            const cliente = this.ativos.find(c => c.id === clienteId);
+            if (!cliente) {
+                console.warn('⚠️ Cliente não encontrado:', clienteId);
+                return false;
             }
-            
-            const scheduleDate = new Date(date + 'T' + time);
-            const now = new Date();
-            
-            if (scheduleDate <= now) {
-                this.showToast('Agendamento deve ser para o futuro', 'error');
-                return;
-            }
-            
-            this.schedules[clientId] = {
-                date: date,
-                time: time,
-                notes: notes,
-                createdAt: new Date().toISOString(),
-                clientName: this.currentItem['Nome Fantasia'] || 'Cliente'
-            };
-            
-            await this.saveSchedules();
-            await this.saveAllData(); // Salvar também no cache principal
-            
-            this.showToast('Agendamento salvo com sucesso!', 'success');
-            
-            // Atualizar modal
-            setTimeout(() => {
-                if (this.currentItem) {
-                    this.showClientModal(this.currentItem);
-                }
-            }, 1000);
-            
+
+            // Usar a função robusta de exclusão
+            return await this.excluirAtivo(cliente);
+
         } catch (error) {
-            console.error('❌ Erro ao salvar agendamento:', error);
-            this.showToast('Erro ao salvar agendamento', 'error');
+            console.error('❌ Erro ao excluir cliente por ID:', error);
+            throw error;
         }
     }
 
-    removeSchedule(clientId) {
-        if (confirm('Tem certeza que deseja remover este agendamento?')) {
-            delete this.schedules[clientId];
-            this.saveSchedules();
-            this.saveAllData();
-            
-            this.showToast('Agendamento removido', 'info');
-            
-            // Atualizar modal
-            setTimeout(() => {
-                if (this.currentItem) {
-                    this.showClientModal(this.currentItem);
-                }
-            }, 500);
-        }
-    }
-
-    changeStatus(clientId, newStatus) {
+    // Recarregar dados dos ativos - NOVA FUNÇÃO
+    async recarregarAtivos() {
         try {
-            const client = this.findClientById(clientId);
-            if (!client) {
-                this.showToast('Cliente não encontrado', 'error');
-                return;
-            }
+            console.log('🔄 Recarregando dados dos ativos...');
             
-            const oldStatus = client['Status'] || 'Inativo';
-            client['Status'] = newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
+            this.ativos = await window.dbManager.loadData('ativos') || [];
+            window.ativos = this.ativos;
             
-            // Mover cliente entre arrays se necessário
-            this.moveClientBetweenArrays(client, oldStatus, newStatus);
-            
-            this.saveAllData();
-            this.updateGlobals();
-            
-            // Atualizar contadores e listas
-            if (typeof window.updateTabCounts === 'function') {
-                window.updateTabCounts();
-            }
-            if (typeof window.renderAllTabs === 'function') {
-                window.renderAllTabs();
-            }
-            
-            this.showToast(`Status alterado para ${newStatus}`, 'success');
-            
-            // Fechar modal e atualizar interface
-            document.getElementById('modal').style.display = 'none';
-            
+            console.log(`✅ Ativos recarregados: ${this.ativos.length} clientes`);
+            return this.ativos;
         } catch (error) {
-            console.error('❌ Erro ao alterar status:', error);
-            this.showToast('Erro ao alterar status', 'error');
+            console.error('❌ Erro ao recarregar ativos:', error);
+            return [];
         }
     }
 
-    moveClientBetweenArrays(client, oldStatus, newStatus) {
-        // Remover de array atual
-        this.removeClientFromArray(client, oldStatus);
-        
-        // Adicionar ao novo array
-        if (newStatus.toLowerCase().includes('ativo')) {
-            this.ativos.push(client);
-        } else if (newStatus.toLowerCase().includes('novo')) {
-            this.novos.push(client);
-        } else {
-            this.data.push(client);
-        }
-    }
-
-    removeClientFromArray(client, status) {
-        const clientId = this.getClientId(client);
-        
-        this.data = this.data.filter(c => this.getClientId(c) !== clientId);
-        this.ativos = this.ativos.filter(c => this.getClientId(c) !== clientId);
-        this.novos = this.novos.filter(c => this.getClientId(c) !== clientId);
-    }
-
-    findClientById(clientId) {
-        const allClients = [...this.data, ...this.ativos, ...this.novos];
-        return allClients.find(client => this.getClientId(client) === clientId);
-    }
-
-    editClient(clientId) {
-        this.showToast('Funcionalidade de edição em desenvolvimento', 'info');
-        // TODO: Implementar edição de dados do cliente
-    }
-
-    duplicateClient(clientId) {
-        try {
-            const client = this.findClientById(clientId);
-            if (!client) return;
-            
-            const duplicated = { 
-                ...client,
-                'Nome Fantasia': (client['Nome Fantasia'] || 'Cliente') + ' (Cópia)',
-                id: 'client_copy_' + Date.now()
-            };
-            
-            // Adicionar à lista de inativos por padrão
-            duplicated['Status'] = 'Inativo';
-            this.data.push(duplicated);
-            
-            this.saveAllData();
-            this.updateGlobals();
-            
-            if (typeof window.updateTabCounts === 'function') {
-                window.updateTabCounts();
-            }
-            if (typeof window.renderAllTabs === 'function') {
-                window.renderAllTabs();
-            }
-            
-            this.showToast('Cliente duplicado com sucesso!', 'success');
-            
-        } catch (error) {
-            console.error('❌ Erro ao duplicar cliente:', error);
-            this.showToast('Erro ao duplicar cliente', 'error');
-        }
-    }
-
-    showToast(message, type = 'info') {
-        // Usar função global se disponível
-        if (typeof window.showNotification === 'function') {
-            window.showNotification(message, type);
-        } else {
-            alert(message);
-        }
-    }
-
-    // APLICAR FILTROS E ORDENAÇÃO
+    // Aplicar filtros e ordenação
     applyFiltersAndSort() {
         try {
-            if (!Array.isArray(this.data)) {
-                this.data = [];
+            const saldoMin = parseFloat(document.getElementById('saldoFilter')?.value) || this.savedFilters.saldoMin || 0;
+            const cidadesSelecionadas = Array.from(document.querySelectorAll('#cidadeList input:checked')).map(input => input.value) || this.savedFilters.cidadesSelecionadas;
+            const sort = document.getElementById('sortOption')?.value || this.savedFilters.sort || 'nome-az';
+
+            if (this.currentTab === 'inativos') {
+                this.filteredData = this.data.filter(item => {
+                    const saldo = parseFloat(item['Saldo de Credito']) || 0;
+                    const itemCidade = item['Cidade'] || '';
+                    return saldo >= saldoMin && (cidadesSelecionadas.length === 0 || cidadesSelecionadas.includes(itemCidade));
+                });
+
+                // Aplicar ordenação
+                this.applySorting(sort);
+                window.filteredData = this.filteredData;
+                this.renderList();
+            } else if (this.currentTab === 'ativos') {
+                this.filteredData = this.ativos.slice();
+                this.renderList();
             }
-            
-            const sortOption = document.getElementById('sortOption')?.value || 'nome-az';
-            
-            let filtered = [...this.data];
-            
-            // Ordenação
-            filtered.sort((a, b) => {
-                const nameA = a['Nome Fantasia'] || '';
-                const nameB = b['Nome Fantasia'] || '';
-                
-                switch(sortOption) {
-                    case 'nome-za':
-                        return nameB.localeCompare(nameA, 'pt-BR');
-                    case 'cidade-az':
-                        return this.extrairCidade(a).localeCompare(this.extrairCidade(b), 'pt-BR');
-                    case 'cidade-za':
-                        return this.extrairCidade(b).localeCompare(this.extrairCidade(a), 'pt-BR');
-                    default: // nome-az
-                        return nameA.localeCompare(nameB, 'pt-BR');
-                }
-            });
-            
-            this.renderList(filtered);
-            
+
+            console.log(`🔍 Filtros aplicados: ${this.filteredData.length}/${this.data.length} clientes exibidos`);
         } catch (error) {
             console.error('❌ Erro ao aplicar filtros:', error);
-            this.renderList(this.data);
         }
     }
 
-    renderList(data) {
-        const list = document.getElementById('client-list');
-        if (!list) return;
+    // Aplicar ordenação
+    applySorting(sort) {
+        switch (sort) {
+            case 'nome-az':
+                this.filteredData.sort((a, b) => (a['Nome Fantasia'] || '').localeCompare(b['Nome Fantasia'] || ''));
+                break;
+            case 'nome-za':
+                this.filteredData.sort((a, b) => (b['Nome Fantasia'] || '').localeCompare(a['Nome Fantasia'] || ''));
+                break;
+            case 'saldo-desc':
+                this.filteredData.sort((a, b) => parseFloat(b['Saldo de Credito']) - parseFloat(a['Saldo de Credito']));
+                break;
+            case 'saldo-asc':
+                this.filteredData.sort((a, b) => parseFloat(a['Saldo de Credito']) - parseFloat(b['Saldo de Credito']));
+                break;
+            case 'data-asc':
+                this.filteredData.sort((a, b) => this.parseDate(this.formatDateUS2BR(a['Data Ultimo Pedido'])) - this.parseDate(this.formatDateUS2BR(b['Data Ultimo Pedido'])));
+                break;
+            case 'data-desc':
+                this.filteredData.sort((a, b) => this.parseDate(this.formatDateUS2BR(b['Data Ultimo Pedido'])) - this.parseDate(this.formatDateUS2BR(a['Data Ultimo Pedido'])));
+                break;
+        }
+    }
+
+    // Utilitários de data
+    parseDate(dateStr) {
+        if (!dateStr) return 0;
+        const regex = /^\d{2}\/\d{2}\/\d{4}$/;
+        if (!regex.test(dateStr)) return 0;
         
-        if (!data || data.length === 0) {
-            list.innerHTML = '<div class="empty-state">Nenhum cliente encontrado</div>';
+        const [dayStr, monthStr, yearStr] = dateStr.split('/');
+        const day = parseInt(dayStr, 10);
+        const month = parseInt(monthStr, 10);
+        const year = parseInt(yearStr, 10);
+        
+        if (month < 1 || month > 12 || day < 1 || day > 31) return 0;
+        
+        const date = new Date(year, month - 1, day);
+        if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return 0;
+        
+        return date.getTime();
+    }
+
+    formatDate(date) {
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+    }
+
+    formatDateUS2BR(dateStr) {
+        if (!dateStr) return '';
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) return dateStr;
+        
+        const parts = dateStr.split('/');
+        if (parts.length !== 3) return dateStr;
+        
+        let [month, day, year] = parts;
+        if (year.length === 2) year = '20' + year;
+        
+        return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+    }
+
+    daysSince(dateStr) {
+        const lastDate = new Date(this.parseDate(this.formatDateUS2BR(dateStr)));
+        const diff = Math.floor((this.today - lastDate) / (1000 * 60 * 60 * 24));
+        return isNaN(diff) ? 'N/A' : diff;
+    }
+
+    // Renderizar lista
+    renderList() {
+        const listElement = document.getElementById(this.currentTab === 'inativos' ? 'list' : 'ativos-list');
+        if (!listElement) return;
+
+        listElement.innerHTML = '';
+
+        if (this.filteredData.length === 0) {
+            listElement.innerHTML = '<li style="text-align: center; color: #666;">Nenhum cliente encontrado</li>';
             return;
         }
-        
-        list.innerHTML = '';
-        
-        data.forEach(item => {
-            const div = document.createElement('div');
-            div.className = 'client-item';
+
+        this.filteredData.forEach(item => {
+            const li = document.createElement('li');
+            const daysSince = this.daysSince(item['Data Ultimo Pedido']);
             
-            const geocodingInfo = item.geocoding?.success ? 
-                `<div class="geocoding-status">📍 Localizado (${Math.round((item.geocoding.confidence || 0) * 100)}%)</div>` : 
-                '<div class="geocoding-status pending">📍 Aguardando localização</div>';
-            
-            const scheduleInfo = this.schedules[this.getClientId(item)] ? 
-                `<div class="schedule-status">📅 Agendado: ${new Date(this.schedules[this.getClientId(item)].date).toLocaleDateString('pt-BR')}</div>` : '';
-            
-            const observationInfo = this.observations[this.getClientId(item)] ? 
-                '<div class="observation-status">📝 Com observações</div>' : '';
-            
-            div.innerHTML = `
-                <div class="client-header">
-                    <h4>${item['Nome Fantasia'] || 'Cliente'}</h4>
-                    <span class="status-badge status-${item['Status']?.toLowerCase().includes('ativo') ? 'active' : item['Status']?.toLowerCase().includes('novo') ? 'new' : 'inactive'}">
-                        ${item['Status'] || 'Inativo'}
-                    </span>
+            li.innerHTML = `
+                <div>
+                    <strong>${item['Nome Fantasia'] || 'Sem Nome'}</strong>
+                    <span class="days-since">${daysSince} dias sem pedido</span>
                 </div>
-                <div class="client-info">
-                    <p><strong>Contato:</strong> ${item['Contato'] || 'N/A'}</p>
-                    <p><strong>Telefone:</strong> ${item['Celular'] || 'N/A'}</p>
-                    <p><strong>Segmento:</strong> ${item['Segmento'] || 'N/A'}</p>
-                    <p><strong>Cidade:</strong> ${this.extrairCidade(item)}</p>
-                </div>
-                <div class="client-status">
-                    ${geocodingInfo}
-                    ${scheduleInfo}
-                    ${observationInfo}
+                <div style="font-size: 0.9em; color: #666;">
+                    ${item['Cidade'] || ''} - Saldo: R$ ${item['Saldo de Credito'] || '0'}
                 </div>
             `;
-            
-            div.onclick = () => this.showClientModal(item);
-            list.appendChild(div);
+            li.onclick = () => this.openModal(item, this.currentTab);
+            listElement.appendChild(li);
         });
     }
 
-    extrairCidade(item) {
-        if (item['Cidade']) return item['Cidade'];
-        return 'São José dos Campos';
+    // Abrir modal de detalhes - ATUALIZADO COM FUNÇÃO DE EXCLUSÃO ROBUSTA
+    openModal(item, tab) {
+        this.currentItem = item;
+        
+        const modalBody = document.getElementById('modal-body');
+        modalBody.innerHTML = `
+            <h2 id="modal-title">${item['Nome Fantasia'] || 'Sem Nome'}</h2>
+            
+            <!-- Campos de exibição -->
+            <div class="display-field" id="display-info">
+                <p><strong>Cliente:</strong> <span id="display-cliente">${item.Cliente || ''}</span></p>
+                <p><strong>CNPJ/CPF:</strong> <span id="display-cnpj">${item['CNPJ / CPF'] || ''}</span></p>
+                <p><strong>Contato:</strong> <span id="display-contato">${item.Contato || ''}</span></p>
+                <p><strong>Telefone Comercial:</strong> <span id="display-telefone">${item['Telefone Comercial'] || ''}</span></p>
+                <p><strong>Celular:</strong> <span id="display-celular">${item.Celular || ''}</span></p>
+                <p><strong>Email:</strong> <span id="display-email">${item.Email || ''}</span></p>
+                <p><strong>Endereço:</strong> <span id="display-endereco-completo">${item.Endereco || ''}</span></p>
+                <p><strong>Número:</strong> <span id="display-numero">${item.Numero || ''}</span></p>
+                <p><strong>Bairro:</strong> <span id="display-bairro">${item.Bairro || ''}</span></p>
+                <p><strong>Cidade:</strong> <span id="display-cidade">${item.Cidade || ''}</span></p>
+                <p><strong>UF:</strong> <span id="display-uf">${item.UF || ''}</span></p>
+                <p><strong>CEP:</strong> <span id="display-cep">${item.CEP || ''}</span></p>
+                <p><strong>Saldo de Crédito:</strong> <span id="display-saldo">R$ ${item['Saldo de Credito'] || '0'}</span></p>
+                <p><strong>Data Último Pedido:</strong> <span id="display-data">${this.formatDateUS2BR(item['Data Ultimo Pedido']) || ''}</span></p>
+            </div>
+            
+            <!-- Campos de edição (inicialmente ocultos) -->
+            <div class="edit-field" id="edit-form" style="display: none;">
+                <div class="edit-row">
+                    <label><strong>Nome Fantasia:</strong></label>
+                    <input type="text" id="edit-nome-fantasia" class="edit-input" value="${item['Nome Fantasia'] || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>Cliente:</strong></label>
+                    <input type="text" id="edit-cliente" class="edit-input" value="${item.Cliente || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>CNPJ/CPF:</strong></label>
+                    <input type="text" id="edit-cnpj-cpf" class="edit-input" value="${item['CNPJ / CPF'] || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>Contato:</strong></label>
+                    <input type="text" id="edit-contato" class="edit-input" value="${item.Contato || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>Telefone Comercial:</strong></label>
+                    <input type="tel" id="edit-telefone-comercial" class="edit-input" value="${item['Telefone Comercial'] || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>Celular:</strong></label>
+                    <input type="tel" id="edit-celular" class="edit-input" value="${item.Celular || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>Email:</strong></label>
+                    <input type="email" id="edit-email" class="edit-input" value="${item.Email || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>Endereço:</strong></label>
+                    <input type="text" id="edit-endereco" class="edit-input" value="${item.Endereco || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>Número:</strong></label>
+                    <input type="text" id="edit-numero" class="edit-input" value="${item.Numero || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>Bairro:</strong></label>
+                    <input type="text" id="edit-bairro" class="edit-input" value="${item.Bairro || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>Cidade:</strong></label>
+                    <input type="text" id="edit-cidade" class="edit-input" value="${item.Cidade || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>UF:</strong></label>
+                    <input type="text" id="edit-uf" class="edit-input" maxlength="2" value="${item.UF || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>CEP:</strong></label>
+                    <input type="text" id="edit-cep" class="edit-input" maxlength="9" value="${item.CEP || ''}">
+                </div>
+                
+                <div class="edit-row">
+                    <label><strong>Saldo de Crédito:</strong></label>
+                    <input type="number" id="edit-saldo-credito" class="edit-input" min="0" step="0.01" value="${item['Saldo de Credito'] || ''}">
+                </div>
+            </div>
+            
+            <!-- Botões de ação -->
+            <div class="action-buttons" style="margin-top: 20px;">
+                <button id="editarCliente" class="action-btn edit-btn">✏️ Editar Cliente</button>
+                <button id="salvarEdicao" class="action-btn save-btn" style="display: none;">💾 Salvar</button>
+                <button id="cancelarEdicao" class="action-btn cancel-btn" style="display: none;">❌ Cancelar</button>
+            </div>
+        `;
+
+        // Configurar event listeners para os botões de edição
+        setTimeout(() => {
+            const editBtn = document.getElementById('editarCliente');
+            const saveBtn = document.getElementById('salvarEdicao');
+            const cancelBtn = document.getElementById('cancelarEdicao');
+            
+            if (editBtn) {
+                editBtn.addEventListener('click', () => this.toggleEditMode());
+            }
+            
+            if (saveBtn) {
+                saveBtn.addEventListener('click', () => this.salvarEdicaoCliente());
+            }
+            
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', () => this.cancelarEdicaoCliente());
+            }
+        }, 100);
+
+        // Configurar botões WhatsApp e Maps
+        const whatsappBtn = document.getElementById('whatsapp-btn');
+        const mapsBtn = document.getElementById('maps-btn');
+
+        if (whatsappBtn) {
+            const phone = item['Telefone Comercial'] || item.Celular || '';
+            const message = `Olá ${item['Nome Fantasia'] || 'cliente'}! Estou entrando em contato para verificar se podemos retomar nosso relacionamento comercial.`;
+            whatsappBtn.href = this.generateWhatsAppLink(phone, message);
+            whatsappBtn.style.display = phone ? 'inline-block' : 'none';
+        }
+
+        if (mapsBtn) {
+            const address = this.getFullAddress(item);
+            mapsBtn.href = this.generateMapsLink(address);
+            mapsBtn.style.display = address ? 'inline-block' : 'none';
+        }
+
+        // Configurar botões de status
+        document.getElementById('tornarAtivo').style.display = (tab === 'inativos') ? 'inline-block' : 'none';
+        document.getElementById('excluirAtivo').style.display = (tab === 'ativos') ? 'inline-block' : 'none';
+        document.getElementById('editDataPedido').style.display = 'none';
+        document.getElementById('labelEditDataPedido').style.display = 'none';
+        document.getElementById('confirmarAtivo').style.display = 'none';
+
+        // Carregar observações
+        const obsTextarea = document.getElementById('observacoes');
+        if (obsTextarea) {
+            obsTextarea.value = window.dbManager.loadObservation(item.id);
+            document.getElementById('observacoes-contador').textContent = obsTextarea.value.length + '/2000';
+        }
+
+        document.getElementById('modal').style.display = 'flex';
     }
 
-    // Método para uso externo
-    extrairCidadeDoItem(item) {
-        return this.extrairCidade(item);
+    // Alternar modo de edição
+    toggleEditMode() {
+        const displayField = document.getElementById('display-info');
+        const editField = document.getElementById('edit-form');
+        const editBtn = document.getElementById('editarCliente');
+        const saveBtn = document.getElementById('salvarEdicao');
+        const cancelBtn = document.getElementById('cancelarEdicao');
+        
+        if (displayField && editField && editBtn && saveBtn && cancelBtn) {
+            displayField.style.display = 'none';
+            editField.style.display = 'block';
+            editBtn.style.display = 'none';
+            saveBtn.style.display = 'inline-block';
+            cancelBtn.style.display = 'inline-block';
+        }
+    }
+
+    // Cancelar edição
+    cancelarEdicaoCliente() {
+        const displayField = document.getElementById('display-info');
+        const editField = document.getElementById('edit-form');
+        const editBtn = document.getElementById('editarCliente');
+        const saveBtn = document.getElementById('salvarEdicao');
+        const cancelBtn = document.getElementById('cancelarEdicao');
+        
+        if (displayField && editField && editBtn && saveBtn && cancelBtn) {
+            displayField.style.display = 'block';
+            editField.style.display = 'none';
+            editBtn.style.display = 'inline-block';
+            saveBtn.style.display = 'none';
+            cancelBtn.style.display = 'none';
+        }
+    }
+
+    // Salvar edição do cliente
+    async salvarEdicaoCliente() {
+        const cliente = this.currentItem;
+        if (!cliente) return;
+        
+        try {
+            // Coletar dados editados
+            const dadosEditados = {
+                'Nome Fantasia': document.getElementById('edit-nome-fantasia')?.value?.trim() || '',
+                'Cliente': document.getElementById('edit-cliente')?.value?.trim() || '',
+                'CNPJ / CPF': document.getElementById('edit-cnpj-cpf')?.value?.trim() || '',
+                'Contato': document.getElementById('edit-contato')?.value?.trim() || '',
+                'Telefone Comercial': document.getElementById('edit-telefone-comercial')?.value?.trim() || '',
+                'Celular': document.getElementById('edit-celular')?.value?.trim() || '',
+                'Email': document.getElementById('edit-email')?.value?.trim() || '',
+                'Endereco': document.getElementById('edit-endereco')?.value?.trim() || '',
+                'Numero': document.getElementById('edit-numero')?.value?.trim() || '',
+                'Bairro': document.getElementById('edit-bairro')?.value?.trim() || '',
+                'Cidade': document.getElementById('edit-cidade')?.value?.trim() || '',
+                'UF': document.getElementById('edit-uf')?.value?.trim()?.toUpperCase() || '',
+                'CEP': document.getElementById('edit-cep')?.value?.trim() || '',
+                'Saldo de Credito': document.getElementById('edit-saldo-credito')?.value || '0'
+            };
+            
+            // Validação básica
+            if (!dadosEditados['Nome Fantasia']) {
+                alert('❌ Nome Fantasia é obrigatório!');
+                return;
+            }
+            
+            // Salvar alterações
+            await this.editarCliente(cliente.id, dadosEditados);
+            
+            // Fechar modal
+            document.getElementById('modal').style.display = 'none';
+            
+            // Atualizar interface
+            this.applyFiltersAndSort();
+            
+            alert('✅ Cliente editado com sucesso!');
+            
+        } catch (error) {
+            console.error('❌ Erro ao editar cliente:', error);
+            alert('❌ Erro ao editar cliente: ' + error.message);
+        }
+    }
+
+    // Utilitários
+    getFullAddress(item) {
+        const parts = [
+            item.Endereco || '',
+            item.Numero || '',
+            item.Bairro || '',
+            item.Cidade || '',
+            item.UF || '',
+            item.CEP || ''
+        ].filter(part => part.trim());
+        
+        return parts.join(', ');
+    }
+
+    generateWhatsAppLink(phone, message) {
+        if (!phone) return '#';
+        const cleanPhone = phone.replace(/\D/g, '');
+        const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone;
+        const encodedMessage = encodeURIComponent(message);
+        return `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
+    }
+
+    generateMapsLink(address) {
+        if (!address) return '#';
+        const encodedAddress = encodeURIComponent(address);
+        return `https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`;
     }
 }
 
+// Função global para exclusão robusta de ativos - NOVA
+window.excluirAtivoRobusto = async function(clienteId) {
+    try {
+        console.log('🗑️ Iniciando exclusão robusta do cliente:', clienteId);
+        
+        if (!window.clientManager) {
+            console.error('❌ ClientManager não encontrado');
+            return false;
+        }
+        
+        // Confirmar exclusão
+        const cliente = window.clientManager.ativos.find(c => c.id === clienteId);
+        if (!cliente) {
+            console.error('❌ Cliente não encontrado nos ativos');
+            return false;
+        }
+        
+        const nomeCliente = cliente['Nome Fantasia'] || 'Cliente sem nome';
+        if (!confirm(`Tem certeza que deseja excluir "${nomeCliente}" dos clientes ativos?`)) {
+            return false;
+        }
+        
+        // Executar exclusão
+        const sucesso = await window.clientManager.excluirAtivo(cliente);
+        
+        if (sucesso) {
+            console.log('✅ Exclusão robusta concluída com sucesso');
+            
+            // Atualizar interface imediatamente
+            if (typeof renderAtivos === 'function') {
+                renderAtivos();
+            }
+            
+            // Fechar modal se estiver aberto
+            const modal = document.getElementById('modal');
+            if (modal && modal.style.display === 'flex') {
+                modal.style.display = 'none';
+            }
+            
+            alert(`✅ Cliente "${nomeCliente}" excluído com sucesso!`);
+            return true;
+        } else {
+            alert('❌ Erro ao excluir cliente');
+            return false;
+        }
+        
+    } catch (error) {
+        console.error('❌ Erro na exclusão robusta:', error);
+        alert('❌ Erro ao excluir cliente: ' + error.message);
+        return false;
+    }
+};
+
+// Instância global do gerenciador de clientes
 window.clientManager = new ClientManager();
-console.log('✅ client-manager.js COMPLETO carregado com todas as funcionalidades');
+
+console.log('✅ client-manager.js carregado - versão com exclusão robusta corrigida');
