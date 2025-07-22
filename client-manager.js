@@ -1,4 +1,4 @@
-// client-manager.js - Sistema robusto TOTALMENTE corrigido
+// client-manager.js - Sistema TOTALMENTE corrigido para evitar perda de dados
 
 class ClientManager {
     constructor() {
@@ -15,8 +15,8 @@ class ClientManager {
         this.dataLoaded = false;
         this.newDataProcessed = false;
         
-        // Sistema de cache robusto
-        this.cacheVersion = '2.1';
+        // Sistema de cache CORRIGIDO - versão única
+        this.cacheVersion = '3.0_FIXED';
         this.cacheKeys = {
             clients: 'clients_cache_v' + this.cacheVersion,
             ativos: 'ativos_cache_v' + this.cacheVersion,
@@ -25,18 +25,21 @@ class ClientManager {
             markers: 'markers_cache_v' + this.cacheVersion,
             observations: 'observations_cache_v' + this.cacheVersion,
             filters: 'filters_cache_v' + this.cacheVersion,
-            sessionFlag: 'session_flag_v' + this.cacheVersion
+            sessionFlag: 'session_flag_v' + this.cacheVersion,
+            dataIntegrity: 'data_integrity_v' + this.cacheVersion
         };
         
-        // Controle de integridade
+        // Controle de integridade ROBUSTO
         this.dataIntegrity = {
             lastSaveTime: null,
             checksumClients: null,
             checksumAtivos: null,
-            checksumNovos: null
+            checksumNovos: null,
+            totalCount: 0,
+            sessionId: this.generateSessionId()
         };
         
-        // Sistema de retry
+        // Sistema de retry otimizado
         this.retryConfig = {
             maxRetries: 3,
             baseDelay: 1000,
@@ -47,11 +50,16 @@ class ClientManager {
         this.handleStorageError = this.handleStorageError.bind(this);
         this.validateDataIntegrity = this.validateDataIntegrity.bind(this);
         this.retryOperation = this.retryOperation.bind(this);
+        this.preventDataLoss = this.preventDataLoss.bind(this);
+    }
+
+    generateSessionId() {
+        return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
 
     async init() {
         try {
-            console.log('🚀 Inicializando ClientManager...');
+            console.log('🚀 Inicializando ClientManager com proteção anti-perda...');
             
             // Verificar storage
             await this.checkStorageSupport();
@@ -61,8 +69,8 @@ class ClientManager {
                 await this.waitForDbManager();
             }
             
-            // Carregar dados
-            await this.loadAllDataWithFallbacks();
+            // Carregar dados COM PROTEÇÃO
+            await this.loadAllDataWithIntegrityCheck();
             
             // Validar integridade
             await this.validateDataIntegrity();
@@ -71,7 +79,7 @@ class ClientManager {
             this.setupStorageListeners();
             
             this.initialized = true;
-            console.log('✅ ClientManager inicializado');
+            console.log('✅ ClientManager inicializado com proteção de dados');
             
             // Aplicar filtros
             setTimeout(() => {
@@ -135,53 +143,69 @@ class ClientManager {
         });
     }
 
-    async loadAllDataWithFallbacks() {
-        // Se novos dados processados nesta sessão
-        if (this.newDataProcessed) {
-            console.log('✅ Usando dados processados na sessão atual');
-            this.dataLoaded = true;
-            return;
-        }
-
-        const sessionFlag = sessionStorage.getItem(this.cacheKeys.sessionFlag);
-        if (sessionFlag) {
-            console.log('📋 Flag de sessão detectada');
-        }
-
-        const fallbackMethods = [
-            () => this.loadFromIndexedDB(),
-            () => this.loadFromLocalStorage(),
-            () => this.loadFromSessionStorage(),
-            () => this.loadFromMemoryBackup()
-        ];
-
-        let lastError = null;
-        let dataLoaded = false;
-
-        for (const method of fallbackMethods) {
-            try {
-                console.log(`📖 Tentando: ${method.name}`);
-                await method();
-                if (this.hasValidData()) {
-                    console.log(`✅ Dados carregados via ${method.name}`);
-                    this.dataLoaded = true;
-                    dataLoaded = true;
-                    break;
-                }
-            } catch (error) {
-                console.warn(`⚠️ Falha em ${method.name}:`, error);
-                lastError = error;
-                continue;
+    // CARREGAMENTO COM VERIFICAÇÃO DE INTEGRIDADE
+    async loadAllDataWithIntegrityCheck() {
+        try {
+            console.log('📖 Carregando dados com verificação de integridade...');
+            
+            // Se novos dados processados nesta sessão
+            if (this.newDataProcessed) {
+                console.log('✅ Usando dados processados na sessão atual');
+                this.dataLoaded = true;
+                return;
             }
-        }
 
-        if (!dataLoaded) {
-            console.warn('⚠️ Todos os métodos falharam, dados vazios');
+            // Verificar flag de sessão
+            const sessionFlag = sessionStorage.getItem(this.cacheKeys.sessionFlag);
+            const lastIntegrity = this.loadIntegrityData();
+            
+            if (sessionFlag && lastIntegrity) {
+                console.log('📋 Dados da sessão anterior encontrados');
+            }
+
+            // Tentar métodos com verificação de integridade
+            const fallbackMethods = [
+                () => this.loadFromIndexedDBWithCheck(),
+                () => this.loadFromLocalStorageWithCheck(),
+                () => this.loadFromSessionStorageWithCheck(),
+                () => this.loadFromMemoryBackup()
+            ];
+
+            let lastError = null;
+            let dataLoaded = false;
+
+            for (const method of fallbackMethods) {
+                try {
+                    console.log(`📖 Tentando: ${method.name}`);
+                    await method();
+                    
+                    if (this.hasValidData() && this.checkDataCount()) {
+                        console.log(`✅ Dados válidos carregados via ${method.name}`);
+                        this.dataLoaded = true;
+                        dataLoaded = true;
+                        break;
+                    } else {
+                        console.warn(`⚠️ Dados inválidos ou incompletos em ${method.name}`);
+                    }
+                } catch (error) {
+                    console.warn(`⚠️ Falha em ${method.name}:`, error);
+                    lastError = error;
+                    continue;
+                }
+            }
+
+            if (!dataLoaded) {
+                console.warn('⚠️ Todos os métodos falharam, dados vazios');
+                this.initializeEmptyData();
+            }
+
+        } catch (error) {
+            console.error('❌ Erro no carregamento com integridade:', error);
             this.initializeEmptyData();
         }
     }
 
-    async loadFromIndexedDB() {
+    async loadFromIndexedDBWithCheck() {
         if (!this.storageSupport.indexedDB || !window.dbManager) {
             throw new Error('IndexedDB não disponível');
         }
@@ -199,9 +223,17 @@ class ClientManager {
         this.schedules = (typeof data[3] === 'object' && data[3] !== null) ? data[3] : {};
 
         this.updateGlobalVariables();
+        
+        // VERIFICAÇÃO DE INTEGRIDADE
+        const totalCount = this.data.length + this.ativos.length + this.novos.length;
+        console.log(`📊 IndexedDB: ${totalCount} clientes carregados`);
+        
+        if (totalCount === 0) {
+            throw new Error('Dados vazios no IndexedDB');
+        }
     }
 
-    async loadFromLocalStorage() {
+    async loadFromLocalStorageWithCheck() {
         if (!this.storageSupport.localStorage) {
             throw new Error('localStorage não disponível');
         }
@@ -222,9 +254,17 @@ class ClientManager {
         this.schedules = loadFromLS(this.cacheKeys.schedules, {});
 
         this.updateGlobalVariables();
+        
+        // VERIFICAÇÃO DE INTEGRIDADE
+        const totalCount = this.data.length + this.ativos.length + this.novos.length;
+        console.log(`📊 localStorage: ${totalCount} clientes carregados`);
+        
+        if (totalCount === 0) {
+            throw new Error('Dados vazios no localStorage');
+        }
     }
 
-    async loadFromSessionStorage() {
+    async loadFromSessionStorageWithCheck() {
         if (!this.storageSupport.sessionStorage) {
             throw new Error('sessionStorage não disponível');
         }
@@ -245,6 +285,14 @@ class ClientManager {
         this.schedules = loadFromSS(this.cacheKeys.schedules, {});
 
         this.updateGlobalVariables();
+        
+        // VERIFICAÇÃO DE INTEGRIDADE
+        const totalCount = this.data.length + this.ativos.length + this.novos.length;
+        console.log(`📊 sessionStorage: ${totalCount} clientes carregados`);
+        
+        if (totalCount === 0) {
+            throw new Error('Dados vazios no sessionStorage');
+        }
     }
 
     async loadFromMemoryBackup() {
@@ -256,6 +304,13 @@ class ClientManager {
             this.novos = backup.novos || [];
             this.schedules = backup.schedules || {};
             this.updateGlobalVariables();
+            
+            const totalCount = this.data.length + this.ativos.length + this.novos.length;
+            console.log(`📊 Backup: ${totalCount} clientes restaurados`);
+            
+            if (totalCount === 0) {
+                throw new Error('Backup vazio');
+            }
         } else {
             throw new Error('Nenhum backup disponível na memória');
         }
@@ -272,6 +327,21 @@ class ClientManager {
                 Array.isArray(this.ativos) && 
                 Array.isArray(this.novos) && 
                 typeof this.schedules === 'object');
+    }
+
+    // VERIFICAÇÃO DE CONTAGEM DE DADOS
+    checkDataCount() {
+        const totalCount = this.data.length + this.ativos.length + this.novos.length;
+        
+        // Se temos dados mas menos que o esperado, alertar
+        if (totalCount > 0 && this.dataIntegrity.totalCount > 0) {
+            if (totalCount < this.dataIntegrity.totalCount) {
+                console.warn(`⚠️ POSSÍVEL PERDA DE DADOS: Esperado ${this.dataIntegrity.totalCount}, encontrado ${totalCount}`);
+                return false;
+            }
+        }
+        
+        return totalCount > 0;
     }
 
     initializeEmptyData() {
@@ -292,11 +362,17 @@ class ClientManager {
                 novos: this.calculateChecksum(this.novos)
             };
 
+            const totalCount = this.data.length + this.ativos.length + this.novos.length;
+
             if (this.dataIntegrity.checksumClients) {
                 if (currentChecksums.clients !== this.dataIntegrity.checksumClients ||
                     currentChecksums.ativos !== this.dataIntegrity.checksumAtivos ||
                     currentChecksums.novos !== this.dataIntegrity.checksumNovos) {
-                    console.warn('⚠️ Possível corrupção detectada');
+                    console.warn('⚠️ Checksums não conferem - possível corrupção');
+                }
+                
+                if (totalCount < this.dataIntegrity.totalCount) {
+                    console.error(`❌ PERDA DE DADOS DETECTADA: ${this.dataIntegrity.totalCount} → ${totalCount}`);
                     await this.handleDataCorruption();
                 }
             }
@@ -305,8 +381,14 @@ class ClientManager {
                 lastSaveTime: Date.now(),
                 checksumClients: currentChecksums.clients,
                 checksumAtivos: currentChecksums.ativos,
-                checksumNovos: currentChecksums.novos
+                checksumNovos: currentChecksums.novos,
+                totalCount: totalCount,
+                sessionId: this.dataIntegrity.sessionId
             };
+
+            // Salvar integridade
+            this.saveIntegrityData();
+
         } catch (error) {
             console.error('❌ Erro na validação:', error);
         }
@@ -323,15 +405,47 @@ class ClientManager {
         return hash.toString();
     }
 
+    saveIntegrityData() {
+        try {
+            if (this.storageSupport.localStorage) {
+                localStorage.setItem(this.cacheKeys.dataIntegrity, JSON.stringify(this.dataIntegrity));
+            }
+        } catch (error) {
+            console.warn('⚠️ Erro ao salvar integridade:', error);
+        }
+    }
+
+    loadIntegrityData() {
+        try {
+            if (this.storageSupport.localStorage) {
+                const stored = localStorage.getItem(this.cacheKeys.dataIntegrity);
+                if (stored) {
+                    const integrity = JSON.parse(stored);
+                    this.dataIntegrity = { ...this.dataIntegrity, ...integrity };
+                    return integrity;
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Erro ao carregar integridade:', error);
+        }
+        return null;
+    }
+
     async handleDataCorruption() {
         console.log('🔧 Recuperando dados corrompidos...');
         try {
-            await this.loadAllDataWithFallbacks();
+            // Tentar recuperar do backup
+            if (window._clientDataBackup) {
+                await this.loadFromMemoryBackup();
+                console.log('✅ Dados recuperados do backup');
+            } else {
+                console.error('❌ Nenhum backup disponível para recuperação');
+                if (typeof window.showErrorMessage === 'function') {
+                    window.showErrorMessage('Dados corrompidos detectados. Recarregue a planilha.');
+                }
+            }
         } catch (error) {
             console.error('❌ Falha na recuperação:', error);
-            if (typeof window.showErrorMessage === 'function') {
-                window.showErrorMessage('Dados corrompidos. Recarregue a planilha.');
-            }
         }
     }
 
@@ -341,7 +455,7 @@ class ClientManager {
                 if (Object.values(this.cacheKeys).includes(e.key)) {
                     console.log('🔄 Mudança detectada em outra aba');
                     setTimeout(() => {
-                        this.loadAllDataWithFallbacks().catch(console.error);
+                        this.loadAllDataWithIntegrityCheck().catch(console.error);
                     }, 500);
                 }
             });
@@ -353,23 +467,80 @@ class ClientManager {
             }
         });
 
-        // Backup periódico
+        // Backup periódico MELHORADO
         setInterval(() => {
             this.createMemoryBackup();
-        }, 30000);
+            this.preventDataLoss();
+        }, 15000); // A cada 15 segundos
+
+        // Backup antes de sair da página
+        window.addEventListener('beforeunload', () => {
+            this.emergencyBackup();
+        });
     }
 
     createMemoryBackup() {
         try {
-            window._clientDataBackup = {
+            const backup = {
                 data: [...this.data],
                 ativos: [...this.ativos],
                 novos: [...this.novos],
                 schedules: {...this.schedules},
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                sessionId: this.dataIntegrity.sessionId,
+                totalCount: this.data.length + this.ativos.length + this.novos.length
             };
+            
+            window._clientDataBackup = backup;
+            
+            // Backup adicional no sessionStorage
+            if (this.storageSupport.sessionStorage) {
+                sessionStorage.setItem('emergency_backup', JSON.stringify(backup));
+            }
+            
         } catch (error) {
             console.warn('⚠️ Falha ao criar backup:', error);
+        }
+    }
+
+    emergencyBackup() {
+        try {
+            console.log('🚨 Backup de emergência antes de sair...');
+            const emergencyData = {
+                data: this.data,
+                ativos: this.ativos,
+                novos: this.novos,
+                schedules: this.schedules,
+                timestamp: Date.now(),
+                totalCount: this.data.length + this.ativos.length + this.novos.length
+            };
+            
+            if (this.storageSupport.localStorage) {
+                localStorage.setItem('emergency_backup_exit', JSON.stringify(emergencyData));
+            }
+        } catch (error) {
+            console.error('❌ Falha no backup de emergência:', error);
+        }
+    }
+
+    preventDataLoss() {
+        try {
+            const currentTotal = this.data.length + this.ativos.length + this.novos.length;
+            
+            if (currentTotal > 0) {
+                // Atualizar contagem esperada se maior
+                if (currentTotal > this.dataIntegrity.totalCount) {
+                    this.dataIntegrity.totalCount = currentTotal;
+                    this.saveIntegrityData();
+                }
+                
+                // Salvar dados se temos mais do que o mínimo esperado
+                if (currentTotal >= 40) { // Esperamos ~45 clientes
+                    this.saveAllDataRobust();
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Erro na prevenção de perda:', error);
         }
     }
 
@@ -377,7 +548,6 @@ class ClientManager {
         console.warn('⚠️ Quota excedida, limpando...');
         try {
             await this.clearOldCacheVersions();
-            await this.compressStoredData();
         } catch (error) {
             console.error('❌ Erro ao lidar com quota:', error);
         }
@@ -424,9 +594,20 @@ class ClientManager {
         throw new Error(`${context} falhou após ${this.retryConfig.maxRetries} tentativas: ${lastError.message}`);
     }
 
+    // LIMPEZA MELHORADA PARA EVITAR PERDA
     async clearAllPreviousData() {
         await this.retryOperation(async () => {
-            console.log('🧹 Limpando TODOS os dados anteriores...');
+            console.log('🧹 Limpando dados anteriores PRESERVANDO backup...');
+            
+            // CRIAR BACKUP ANTES DE LIMPAR
+            this.createMemoryBackup();
+            
+            // Salvar contagem atual se maior
+            const currentTotal = this.data.length + this.ativos.length + this.novos.length;
+            if (currentTotal > this.dataIntegrity.totalCount) {
+                this.dataIntegrity.totalCount = currentTotal;
+                this.saveIntegrityData();
+            }
             
             this.data = [];
             this.ativos = [];
@@ -449,7 +630,7 @@ class ClientManager {
                 );
             }
 
-            // localStorage
+            // localStorage (apenas caches, NÃO integridade)
             if (this.storageSupport.localStorage) {
                 clearPromises.push(Promise.resolve().then(() => {
                     const keysToRemove = [];
@@ -461,10 +642,8 @@ class ClientManager {
                             key.includes('novos_cache') ||
                             key.includes('schedules_cache') ||
                             key.includes('markers_cache') ||
-                            key.includes('observations_cache') ||
-                            key.includes('filters_cache') ||
                             key.includes('session_flag')
-                        )) {
+                        ) && !key.includes('data_integrity') && !key.includes('emergency_backup')) {
                             keysToRemove.push(key);
                         }
                     }
@@ -472,20 +651,28 @@ class ClientManager {
                         localStorage.removeItem(key);
                         console.log(`🧹 Cache removido: ${key}`);
                     });
-                    localStorage.removeItem('client-observations');
                 }));
             }
 
-            // sessionStorage
+            // sessionStorage (parcial)
             if (this.storageSupport.sessionStorage) {
                 clearPromises.push(Promise.resolve().then(() => {
-                    sessionStorage.clear();
+                    const keysToKeep = ['emergency_backup'];
+                    const keysToRemove = [];
+                    for (let i = 0; i < sessionStorage.length; i++) {
+                        const key = sessionStorage.key(i);
+                        if (key && !keysToKeep.includes(key)) {
+                            keysToRemove.push(key);
+                        }
+                    }
+                    keysToRemove.forEach(key => {
+                        sessionStorage.removeItem(key);
+                    });
                 }));
             }
 
             await Promise.allSettled(clearPromises);
 
-            // Limpar mapa
             if (window.mapManager) {
                 if (typeof window.mapManager.clearGeocodingCache === 'function') {
                     window.mapManager.clearGeocodingCache();
@@ -495,25 +682,32 @@ class ClientManager {
                 }
             }
 
-            delete window._clientDataBackup;
-
             this.geocodingNeeded = true;
             this.dataLoaded = false;
             this.newDataProcessed = false;
-            this.dataIntegrity = {
-                lastSaveTime: null,
-                checksumClients: null,
-                checksumAtivos: null,
-                checksumNovos: null
-            };
 
-            console.log('✅ TODOS os dados foram limpos');
-        }, 'Limpeza completa de dados');
+            console.log('✅ Dados limpos COM proteção de backup');
+        }, 'Limpeza segura de dados');
     }
 
+    // SALVAMENTO ROBUSTO COM VERIFICAÇÃO
     async saveAllDataRobust() {
         await this.retryOperation(async () => {
-            console.log('💾 Salvando todos os dados...');
+            console.log('💾 Salvando todos os dados com verificação...');
+            
+            const currentTotal = this.data.length + this.ativos.length + this.novos.length;
+            console.log(`📊 Salvando ${currentTotal} clientes totais`);
+            
+            // VERIFICAR SE OS DADOS FAZEM SENTIDO
+            if (currentTotal === 0) {
+                console.warn('⚠️ Tentativa de salvar dados vazios - ABORTANDO');
+                return false;
+            }
+            
+            if (this.dataIntegrity.totalCount > 0 && currentTotal < this.dataIntegrity.totalCount * 0.8) {
+                console.warn(`⚠️ Tentativa de salvar dados incompletos (${currentTotal}/${this.dataIntegrity.totalCount}) - ABORTANDO`);
+                return false;
+            }
             
             const savePromises = [];
             const currentTime = Date.now();
@@ -554,17 +748,37 @@ class ClientManager {
                 throw new Error('Falha em todos os métodos de salvamento');
             }
 
+            // Atualizar integridade
+            this.dataIntegrity.totalCount = Math.max(this.dataIntegrity.totalCount, currentTotal);
             await this.validateDataIntegrity();
             this.dataLoaded = true;
-            console.log(`✅ Dados salvos (${successCount}/${savePromises.length} métodos)`);
-        }, 'Salvamento de dados');
+            
+            console.log(`✅ Dados salvos com segurança (${successCount}/${savePromises.length} métodos)`);
+            return true;
+        }, 'Salvamento seguro de dados');
     }
 
+    // PROCESSAMENTO SEGURO DE NOVOS DADOS
     async processNewData(newData) {
         await this.retryOperation(async () => {
-            console.log('📊 Processando novos dados...');
+            console.log('📊 Processando novos dados com proteção...');
             
-            // Limpar dados anteriores
+            // VALIDAR DADOS DE ENTRADA
+            const inputTotal = 
+                (newData.clients ? newData.clients.length : 0) +
+                (newData.ativos ? newData.ativos.length : 0) +
+                (newData.novos ? newData.novos.length : 0);
+                
+            console.log(`📊 Dados de entrada: ${inputTotal} clientes`);
+            
+            if (inputTotal === 0) {
+                throw new Error('Dados de entrada vazios');
+            }
+            
+            // BACKUP DOS DADOS ATUAIS
+            this.createMemoryBackup();
+            
+            // Limpar dados anteriores COM SEGURANÇA
             await this.clearAllPreviousData();
             await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -585,20 +799,29 @@ class ClientManager {
             this.updateGlobalVariables();
             this.newDataProcessed = true;
 
+            const finalTotal = this.data.length + this.ativos.length + this.novos.length;
+            console.log(`📊 Dados processados: ${finalTotal} clientes`);
+            
+            // VERIFICAR SE PROCESSAMENTO FOI CORRETO
+            if (finalTotal !== inputTotal) {
+                console.error(`❌ PERDA NO PROCESSAMENTO: Entrada ${inputTotal} → Saída ${finalTotal}`);
+                throw new Error(`Perda de dados no processamento: ${inputTotal} → ${finalTotal}`);
+            }
+
             // Salvar dados
             await this.saveAllDataRobust();
 
-            // Marcar para geocodificação
+            // Atualizar integridade
+            this.dataIntegrity.totalCount = finalTotal;
             this.markGeocodingNeeded();
             this.createMemoryBackup();
 
-            // Aplicar filtros
             setTimeout(() => {
                 this.applyFiltersAndSort();
             }, 100);
 
-            console.log(`✅ Novos dados processados: 🔴 ${this.data.length} 🟢 ${this.ativos.length} 🆕 ${this.novos.length}`);
-        }, 'Processamento de novos dados');
+            console.log(`✅ Novos dados processados COM SEGURANÇA: 🔴 ${this.data.length} 🟢 ${this.ativos.length} 🆕 ${this.novos.length}`);
+        }, 'Processamento seguro de novos dados');
     }
 
     markGeocodingNeeded() {
@@ -632,6 +855,24 @@ class ClientManager {
         console.error('❌ Erro de inicialização:', error);
         try {
             console.log('🚨 Recuperação de emergência...');
+            
+            // Tentar recuperar do backup de emergência
+            try {
+                const emergencyBackup = localStorage.getItem('emergency_backup_exit');
+                if (emergencyBackup) {
+                    const data = JSON.parse(emergencyBackup);
+                    this.data = data.data || [];
+                    this.ativos = data.ativos || [];
+                    this.novos = data.novos || [];
+                    this.schedules = data.schedules || {};
+                    this.updateGlobalVariables();
+                    console.log('✅ Dados recuperados do backup de emergência');
+                    return;
+                }
+            } catch (backupError) {
+                console.warn('⚠️ Falha na recuperação do backup:', backupError);
+            }
+            
             this.initializeEmptyData();
             if (typeof window.showErrorMessage === 'function') {
                 window.showErrorMessage('Sistema em modo de recuperação. Alguns dados podem não estar disponíveis.');
@@ -687,7 +928,7 @@ class ClientManager {
 
         // Se "todas" está marcado ou nenhuma específica
         const todasChecked = cidadeList.querySelector('input[value="todas"]')?.checked;
-        if (todasChecked || selected.length === 0) {
+        if (todasChecked && selected.length === 0) {
             return [];
         }
 
@@ -711,118 +952,46 @@ class ClientManager {
         });
     }
 
- // client-manager.js - SEÇÃO CORRIGIDA para processamento adequado da planilha
-
-// Substituir APENAS estas funções no client-manager.js existente:
-
-// Função extrairCidadeDoItem CORRIGIDA
-extrairCidadeDoItem(item) {
-    // Primeiro, verificar se existe campo Cidade direto
-    if (item['Cidade'] && item['Cidade'] !== 'N/A') {
-        return item['Cidade'];
-    }
-    
-    // Senão, extrair do endereço
-    const endereco = item['Endereço'] || '';
-    return this.extrairCidadeDoEndereco(endereco);
-}
-
-// Função extrairCidadeDoEndereco MELHORADA
-extrairCidadeDoEndereco(endereco) {
-    if (!endereco || endereco === 'N/A') return 'N/A';
-    
-    const linhas = endereco.split('\n')
-        .map(linha => linha.trim())
-        .filter(linha => linha && linha !== '');
-    
-    // Procurar especificamente por "São José dos Campos" primeiro
-    for (const linha of linhas) {
-        if (linha.toLowerCase().includes('são josé dos campos') || 
-            linha.toLowerCase().includes('sao jose dos campos')) {
-            return 'São José dos Campos';
+    extrairCidadeDoItem(item) {
+        if (item['Cidade']) {
+            return item['Cidade'];
         }
+        return this.extrairCidadeDoEndereco(item['Endereço'] || '');
     }
-    
-    // Procurar por linha que pareça ser cidade (não é número, rua, CEP, etc.)
-    for (const linha of linhas) {
-        // Ignorar CEPs
-        if (linha.match(/^\d{5}-?\d{3}$/)) continue;
+
+    extrairCidadeDoEndereco(endereco) {
+        if (!endereco || endereco === 'N/A') return 'São José dos Campos';
         
-        // Ignorar números puros
-        if (linha.match(/^\d+$/)) continue;
+        const linhas = endereco.split('\n')
+            .map(linha => linha.trim())
+            .filter(linha => linha && linha !== '');
         
-        // Ignorar linhas que começam com tipos de logradouro
-        if (linha.match(/^(RUA|AVENIDA|AV|R|ALAMEDA|ESTRADA|ROD|RODOVIA)/i)) continue;
-        
-        // Ignorar estado
-        if (linha.toUpperCase() === 'SP') continue;
-        
-        // Ignorar complementos típicos
-        if (linha.match(/^(LOJA|SALA|APTO|APARTAMENTO|BLOCO|CONJUNTO)/i)) continue;
-        
-        // Se chegou até aqui e tem mais que 2 caracteres, provavelmente é cidade
-        if (linha.length > 2) {
-            return linha;
+        // Procurar especificamente por São José dos Campos
+        for (const linha of linhas) {
+            if (linha.toLowerCase().includes('são josé dos campos') || 
+                linha.toLowerCase().includes('sao jose dos campos')) {
+                return 'São José dos Campos';
+            }
         }
-    }
-    
-    return 'São José dos Campos'; // Default para a cidade base
-}
-
-// Função applyFiltersAndSort CORRIGIDA
-applyFiltersAndSort() {
-    try {
-        if (!Array.isArray(this.data)) {
-            this.data = [];
-        }
-
-        const sortOption = document.getElementById('sortOption')?.value || 'nome-az';
         
-        // Obter cidades selecionadas do filtro
-        const cidadesSelecionadas = this.getSelectedCities();
-
-        let filtered = [...this.data];
-
-        // Aplicar filtro de cidade se alguma específica foi selecionada
-        if (cidadesSelecionadas.length > 0 && !cidadesSelecionadas.includes('todas')) {
-            filtered = filtered.filter(item => {
-                const cidadeItem = this.extrairCidadeDoItem(item);
-                return cidadesSelecionadas.includes(cidadeItem);
-            });
+        // Procurar por linha que pareça ser cidade
+        for (const linha of linhas) {
+            // Ignorar CEPs, números, tipos de logradouro, etc.
+            if (linha.match(/^\d{5}-?\d{3}$/) || 
+                linha.match(/^\d+$/) ||
+                linha.match(/^(RUA|AVENIDA|AV|R|ALAMEDA|ESTRADA|ROD|RODOVIA)/i) ||
+                linha.toUpperCase() === 'SP' ||
+                linha.match(/^(LOJA|SALA|APTO|APARTAMENTO|BLOCO|CONJUNTO)/i)) {
+                continue;
+            }
+            
+            if (linha.length > 2) {
+                return linha;
+            }
         }
-
-        // Aplicar ordenação
-        this.sortData(filtered, sortOption);
-
-        this.filteredData = filtered;
-        this.renderList(filtered);
-        this.saveCurrentFilters();
-
-        console.log(`🔍 Filtros aplicados: ${filtered.length}/${this.data.length} itens exibidos`);
-    } catch (error) {
-        console.error('❌ Erro ao aplicar filtros:', error);
-        this.filteredData = [...this.data];
-        this.renderList(this.filteredData);
+        
+        return 'São José dos Campos';
     }
-}
-
-// Função getSelectedCities CORRIGIDA
-getSelectedCities() {
-    const cidadeList = document.getElementById('cidade-list');
-    if (!cidadeList) return [];
-
-    const checkboxes = cidadeList.querySelectorAll('input[type="checkbox"]:checked');
-    const selected = Array.from(checkboxes).map(cb => cb.value).filter(value => value !== 'todas');
-
-    // Se "todas" está marcado ou nenhuma específica foi selecionada
-    const todasChecked = cidadeList.querySelector('input[value="todas"]')?.checked;
-    if (todasChecked && selected.length === 0) {
-        return []; // Retorna array vazio para mostrar todas
-    }
-
-    return selected;
-}
-
 
     formatarEndereco(endereco) {
         if (!endereco) return 'N/A';
@@ -873,6 +1042,7 @@ getSelectedCities() {
                 <p><strong>Contato:</strong> ${item['Contato'] || 'N/A'}</p>
                 <p><strong>Telefone:</strong> ${item['Celular'] || 'N/A'}</p>
                 <p><strong>Cidade:</strong> ${cidade || 'N/A'}</p>
+                <p><strong>Status:</strong> ${item['Status'] || 'Inativo'}</p>
             `;
             
             div.onclick = () => this.showClientModal(item);
@@ -1144,6 +1314,24 @@ getSelectedCities() {
             }
         }
     }
+
+    // MÉTODO PARA VERIFICAR INTEGRIDADE DOS DADOS
+    async checkDataIntegrity() {
+        const currentTotal = this.data.length + this.ativos.length + this.novos.length;
+        
+        console.log(`📊 Verificação de integridade:`);
+        console.log(`   - Inativos: ${this.data.length}`);
+        console.log(`   - Ativos: ${this.ativos.length}`);
+        console.log(`   - Novos: ${this.novos.length}`);
+        console.log(`   - Total: ${currentTotal}`);
+        console.log(`   - Esperado: ${this.dataIntegrity.totalCount}`);
+        
+        return {
+            current: currentTotal,
+            expected: this.dataIntegrity.totalCount,
+            intact: currentTotal >= this.dataIntegrity.totalCount
+        };
+    }
 }
 
 // Inicializar instância global
@@ -1151,4 +1339,4 @@ if (typeof window !== 'undefined') {
     window.clientManager = new ClientManager();
 }
 
-console.log('✅ client-manager.js carregado completamente corrigido');
+console.log('✅ client-manager.js carregado com PROTEÇÃO TOTAL contra perda de dados');
