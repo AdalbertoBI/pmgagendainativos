@@ -1,4 +1,4 @@
-// script.js - Arquivo principal CORRIGIDO com mapa inicializando automaticamente
+// script.js - Sistema PMG Agenda COMPLETO E FUNCIONAL
 let currentTab = 'inativos';
 let isSystemReady = false;
 let isProcessingGeocode = false;
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-async function initializeSystem(){
+async function initializeSystem() {
     try {
         console.log('🔧 Inicializando sistema (preservando dados existentes)...');
         
@@ -85,179 +85,6 @@ async function initializeSystem(){
     } catch (error) {
         console.error('❌ Falha na inicialização:', error);
         throw error;
-    }
-}
-
-
-
-
-async function initializeMapAutomatically() {
-    try {
-        if (mapInitialized) return;
-        
-        console.log('🗺️ Inicializando mapa automaticamente...');
-        
-        // Verificar se Leaflet está disponível
-        if (typeof L === 'undefined') {
-            console.warn('⚠️ Leaflet não disponível, aguardando...');
-            await waitForLibrary('L', 10000);
-        }
-        
-        // Criar o mapa imediatamente
-        await createMapInstance();
-        
-        // Marcar como inicializado
-        mapInitialized = true;
-        updateMapStatus('Mapa carregado');
-        
-        console.log('✅ Mapa inicializado automaticamente');
-        
-    } catch (error) {
-        console.error('❌ Erro ao inicializar mapa:', error);
-        updateMapStatus('Erro no mapa');
-        showMapFallback();
-    }
-}
-
-async function createMapInstance() {
-    try {
-        const mapContainer = document.getElementById('map');
-        if (!mapContainer) {
-            throw new Error('Container do mapa não encontrado');
-        }
-        
-        // Limpar container
-        mapContainer.innerHTML = '';
-        
-        // Configurar dimensões
-        mapContainer.style.height = '500px';
-        mapContainer.style.width = '100%';
-        
-        console.log('🗺️ Criando instância do mapa...');
-        
-        // Obter localização do usuário
-        const userLocation = await getUserLocationSafely();
-        
-        // Definir centro e zoom
-        let center = [-23.2237, -45.9009]; // São José dos Campos
-        let zoom = 12;
-        
-        if (userLocation) {
-            center = [userLocation.lat, userLocation.lon];
-            zoom = userLocation.accuracy < 1000 ? 14 : 12;
-            console.log('📍 Usando localização do usuário:', center);
-        }
-        
-        // Criar mapa
-        const map = L.map('map', {
-            center: center,
-            zoom: zoom,
-            zoomControl: true,
-            attributionControl: true,
-            maxZoom: 18,
-            minZoom: 8
-        });
-        
-        // Adicionar tiles
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 18,
-            attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
-        
-        // Adicionar marcador do usuário
-        if (userLocation) {
-            const userIcon = L.divIcon({
-                className: 'user-location-marker',
-                html: '📍',
-                iconSize: [30, 30],
-                iconAnchor: [15, 30]
-            });
-            
-            L.marker([userLocation.lat, userLocation.lon], {
-                icon: userIcon,
-                zIndexOffset: 1000
-            }).addTo(map).bindPopup(`
-                <div>
-                    <h4>📍 Sua Localização</h4>
-                    <p><strong>Precisão:</strong> ±${Math.round(userLocation.accuracy)}m</p>
-                    <p><strong>Hora:</strong> ${new Date().toLocaleTimeString()}</p>
-                </div>
-            `);
-        }
-        
-        // Armazenar referência global
-        window.mapInstance = map;
-        
-        // Forçar resize do mapa
-        setTimeout(() => {
-            map.invalidateSize();
-            console.log('🔄 Mapa redimensionado');
-        }, 300);
-        
-        console.log('✅ Mapa criado com sucesso');
-        
-    } catch (error) {
-        console.error('❌ Erro ao criar mapa:', error);
-        throw error;
-    }
-}
-
-async function getUserLocationSafely() {
-    return new Promise((resolve) => {
-        if (!('geolocation' in navigator)) {
-            console.warn('⚠️ Geolocalização não suportada');
-            resolve(null);
-            return;
-        }
-        
-        console.log('📍 Obtendo localização do usuário...');
-        
-        const timeoutId = setTimeout(() => {
-            console.warn('⚠️ Timeout na geolocalização');
-            resolve(null);
-        }, 8000);
-        
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                clearTimeout(timeoutId);
-                const location = {
-                    lat: position.coords.latitude,
-                    lon: position.coords.longitude,
-                    accuracy: position.coords.accuracy,
-                    timestamp: position.timestamp
-                };
-                console.log('✅ Localização obtida:', location);
-                resolve(location);
-            },
-            (error) => {
-                clearTimeout(timeoutId);
-                console.warn('⚠️ Erro de geolocalização:', error.message);
-                resolve(null);
-            },
-            {
-                enableHighAccuracy: false, // Mudado para false para ser mais rápido
-                timeout: 7000,
-                maximumAge: 300000 // 5 minutos
-            }
-        );
-    });
-}
-
-function showMapFallback() {
-    const mapContainer = document.getElementById('map');
-    if (mapContainer) {
-        mapContainer.innerHTML = `
-            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 500px; background: #f8f9fa; border-radius: 8px; border: 2px dashed #dee2e6;">
-                <div style="font-size: 3rem; margin-bottom: 1rem; color: #6c757d;">🗺️</div>
-                <h3 style="color: #6c757d; margin-bottom: 1rem; text-align: center;">Mapa Temporariamente Indisponível</h3>
-                <p style="color: #6c757d; text-align: center; max-width: 400px; margin-bottom: 1rem;">
-                    O mapa será carregado assim que os clientes forem geocodificados.
-                </p>
-                <button onclick="initializeMapAutomatically()" class="btn btn-primary">
-                    🔄 Tentar Novamente
-                </button>
-            </div>
-        `;
     }
 }
 
@@ -480,6 +307,176 @@ async function handleMapTabActivation() {
     }
 }
 
+async function initializeMapAutomatically() {
+    try {
+        if (mapInitialized) return;
+        
+        console.log('🗺️ Inicializando mapa automaticamente...');
+        
+        // Verificar se Leaflet está disponível
+        if (typeof L === 'undefined') {
+            console.warn('⚠️ Leaflet não disponível, aguardando...');
+            await waitForLibrary('L', 10000);
+        }
+        
+        // Criar o mapa imediatamente
+        await createMapInstance();
+        
+        // Marcar como inicializado
+        mapInitialized = true;
+        updateMapStatus('Mapa carregado');
+        
+        console.log('✅ Mapa inicializado automaticamente');
+        
+    } catch (error) {
+        console.error('❌ Erro ao inicializar mapa:', error);
+        updateMapStatus('Erro no mapa');
+        showMapFallback();
+    }
+}
+
+async function createMapInstance() {
+    try {
+        const mapContainer = document.getElementById('map');
+        if (!mapContainer) {
+            throw new Error('Container do mapa não encontrado');
+        }
+        
+        // Limpar container
+        mapContainer.innerHTML = '';
+        
+        // Configurar dimensões
+        mapContainer.style.height = '500px';
+        mapContainer.style.width = '100%';
+        
+        console.log('🗺️ Criando instância do mapa...');
+        
+        // Obter localização do usuário
+        const userLocation = await getUserLocationSafely();
+        
+        // Definir centro e zoom
+        let center = [-23.2237, -45.9009]; // São José dos Campos
+        let zoom = 12;
+        
+        if (userLocation) {
+            center = [userLocation.lat, userLocation.lon];
+            zoom = userLocation.accuracy < 1000 ? 14 : 12;
+            console.log('📍 Usando localização do usuário:', center);
+        }
+        
+        // Criar mapa
+        const map = L.map('map', {
+            center: center,
+            zoom: zoom,
+            zoomControl: true,
+            attributionControl: true,
+            maxZoom: 18,
+            minZoom: 8
+        });
+        
+        // Adicionar tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        
+        // Adicionar marcador do usuário
+        if (userLocation) {
+            const userIcon = L.divIcon({
+                className: 'user-location-marker',
+                html: '📍',
+                iconSize: [30, 30],
+                iconAnchor: [15, 30]
+            });
+            
+            L.marker([userLocation.lat, userLocation.lon], {
+                icon: userIcon,
+                zIndexOffset: 1000
+            }).addTo(map).bindPopup(`
+                <div>
+                    <h4>📍 Sua Localização</h4>
+                    <p><strong>Precisão:</strong> ±${Math.round(userLocation.accuracy)}m</p>
+                    <p><strong>Hora:</strong> ${new Date().toLocaleTimeString()}</p>
+                </div>
+            `);
+        }
+        
+        // Armazenar referência global
+        window.mapInstance = map;
+        
+        // Forçar resize do mapa
+        setTimeout(() => {
+            map.invalidateSize();
+            console.log('🔄 Mapa redimensionado');
+        }, 300);
+        
+        console.log('✅ Mapa criado com sucesso');
+        
+    } catch (error) {
+        console.error('❌ Erro ao criar mapa:', error);
+        throw error;
+    }
+}
+
+async function getUserLocationSafely() {
+    return new Promise((resolve) => {
+        if (!('geolocation' in navigator)) {
+            console.warn('⚠️ Geolocalização não suportada');
+            resolve(null);
+            return;
+        }
+        
+        console.log('📍 Obtendo localização do usuário...');
+        
+        const timeoutId = setTimeout(() => {
+            console.warn('⚠️ Timeout na geolocalização');
+            resolve(null);
+        }, 8000);
+        
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                clearTimeout(timeoutId);
+                const location = {
+                    lat: position.coords.latitude,
+                    lon: position.coords.longitude,
+                    accuracy: position.coords.accuracy,
+                    timestamp: position.timestamp
+                };
+                console.log('✅ Localização obtida:', location);
+                resolve(location);
+            },
+            (error) => {
+                clearTimeout(timeoutId);
+                console.warn('⚠️ Erro de geolocalização:', error.message);
+                resolve(null);
+            },
+            {
+                enableHighAccuracy: false,
+                timeout: 7000,
+                maximumAge: 300000
+            }
+        );
+    });
+}
+
+function showMapFallback() {
+    const mapContainer = document.getElementById('map');
+    if (mapContainer) {
+        mapContainer.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 500px; background: #f8f9fa; border-radius: 8px; border: 2px dashed #dee2e6;">
+                <div style="font-size: 3rem; margin-bottom: 1rem; color: #6c757d;">🗺️</div>
+                <h3 style="color: #6c757d; margin-bottom: 1rem; text-align: center;">Mapa Temporariamente Indisponível</h3>
+                <p style="color: #6c757d; text-align: center; max-width: 400px; margin-bottom: 1rem;">
+                    O mapa será carregado assim que os clientes forem geocodificados.
+                </p>
+                <button onclick="initializeMapAutomatically()" class="btn btn-primary">
+                    🔄 Tentar Novamente
+                </button>
+            </div>
+        `;
+    }
+}
+
 async function handleFileSelect(event) {
     const file = event.target.files[0];
     if (file) {
@@ -582,10 +579,6 @@ function categorizeData(rawData) {
     };
 }
 
-// script.js - Seção de geocodificação CORRIGIDA (manter resto do arquivo igual)
-
-// ... (manter todo código anterior até startGeocodingProcess)
-
 async function startGeocodingProcess() {
     if (isProcessingGeocode) {
         console.warn('⚠️ Geocodificação já em andamento');
@@ -618,11 +611,11 @@ async function startGeocodingProcess() {
         showProgressSection();
         updateMapStatus('Geocodificando com segurança...');
         
-        // Mostrar aviso sobre o processo lento
+        // Mostrar aviso sobre o processo
         showNotification(
             `Iniciando localização de ${allClients.length} clientes.\n\n` +
             `⚠️ Processo otimizado para evitar timeouts:\n` +
-            `• Rate limiting rigoroso (4s entre requests)\n` +
+            `• Rate limiting rigoroso\n` +
             `• Múltiplas estratégias de fallback\n` +
             `• Circuit breakers para proteção\n\n` +
             `Tempo estimado: ${Math.ceil(allClients.length * 6 / 60)} minutos`,
@@ -651,18 +644,15 @@ async function startGeocodingProcess() {
         // Mostrar estatísticas detalhadas
         const stats = window.geocodingService.getStats();
         const successCount = results.filter(r => r.geocoding?.success).length;
-        const timeoutCount = stats.timeouts || 0;
-        const fallbackCount = stats.fallbacks || 0;
         
         updateMapStatus(`${successCount} localizações encontradas`);
         
         showSuccessMessage(
             `🎉 Geocodificação concluída!\n\n` +
             `✅ Sucessos: ${successCount}/${allClients.length}\n` +
-            `📦 Cache hits: ${stats.cacheHits}\n` +
-            `🌐 Requests realizados: ${stats.requests}\n` +
-            `⏰ Timeouts evitados: ${timeoutCount}\n` +
-            `🛡️ Fallbacks seguros: ${fallbackCount}\n\n` +
+            `📦 Cache hits: ${stats.cacheHits || 0}\n` +
+            `🌐 Requests realizados: ${stats.requests || 0}\n` +
+            `🛡️ Fallbacks seguros: ${stats.fallbacks || 0}\n\n` +
             `Taxa de sucesso: ${Math.round((successCount / allClients.length) * 100)}%`
         );
         
@@ -684,19 +674,204 @@ async function startGeocodingProcess() {
     }
 }
 
+async function updateMapWithResults(results) {
+    try {
+        console.log('🗺️ Atualizando mapa com resultados da geocodificação...');
+        
+        if (!mapInitialized || !window.mapInstance) {
+            console.log('🗺️ Inicializando mapa para exibir resultados...');
+            await initializeMapAutomatically();
+        }
+        
+        if (!window.mapInstance) {
+            console.warn('⚠️ Mapa não disponível, pulando atualização');
+            return;
+        }
+        
+        // Limpar marcadores existentes (exceto usuário)
+        window.mapInstance.eachLayer((layer) => {
+            if (layer instanceof L.Marker && 
+                !layer.options.className?.includes('user-location') &&
+                layer.options.zIndexOffset !== 1000) {
+                window.mapInstance.removeLayer(layer);
+            }
+        });
+        
+        // Adicionar novos marcadores
+        const markersAdded = [];
+        let successCount = 0;
+        
+        results.forEach((client, index) => {
+            if (client.geocoding?.success && client.geocoding.coordinates) {
+                try {
+                    const marker = createClientMarker(client);
+                    if (marker) {
+                        marker.addTo(window.mapInstance);
+                        markersAdded.push(marker);
+                        successCount++;
+                    }
+                } catch (markerError) {
+                    console.warn(`⚠️ Erro ao criar marcador para ${client['Nome Fantasia']}: ${markerError.message}`);
+                }
+            }
+        });
+        
+        console.log(`✅ ${successCount} marcadores adicionados ao mapa`);
+        
+        // Ajustar zoom se há marcadores
+        if (markersAdded.length > 0) {
+            try {
+                const group = new L.featureGroup(markersAdded);
+                window.mapInstance.fitBounds(group.getBounds(), {
+                    padding: [20, 20],
+                    maxZoom: 15
+                });
+                console.log('🔍 Zoom ajustado para mostrar todos os marcadores');
+            } catch (boundsError) {
+                console.warn('⚠️ Erro ao ajustar bounds:', boundsError.message);
+            }
+        }
+        
+        // Atualizar status do mapa
+        updateMapStatus(`${successCount} localizações no mapa`);
+        
+    } catch (error) {
+        console.error('❌ Erro ao atualizar mapa com resultados:', error);
+        updateMapStatus('Erro ao atualizar mapa');
+    }
+}
+
+function createClientMarker(client) {
+    try {
+        const coords = client.geocoding.coordinates;
+        const status = client['Status'] || 'Inativo';
+        const isApproximate = client.geocoding.isApproximate;
+        const confidence = client.geocoding.confidence || 0;
+        
+        // Definir ícone baseado no status
+        let iconSymbol = '📍';
+        let iconClass = 'client-marker';
+        
+        if (status.toLowerCase().includes('ativo')) {
+            iconSymbol = '🟢';
+            iconClass += ' client-active';
+        } else if (status.toLowerCase().includes('novo')) {
+            iconSymbol = '🆕';
+            iconClass += ' client-new';
+        } else {
+            iconSymbol = '🔴';
+            iconClass += ' client-inactive';
+        }
+        
+        // Marcar se é aproximado ou tem baixa confiança
+        if (isApproximate || confidence < 0.5) {
+            iconSymbol = '❓';
+            iconClass += ' client-approximate';
+        } else if (client.geocoding.method?.includes('viacep')) {
+            iconSymbol = '✅';
+            iconClass += ' client-verified';
+        }
+        
+        const icon = L.divIcon({
+            className: iconClass,
+            html: iconSymbol,
+            iconSize: [24, 24],
+            iconAnchor: [12, 24]
+        });
+        
+        const marker = L.marker([coords.lat, coords.lon], { icon });
+        
+        // Criar popup informativo
+        const popupContent = createClientPopupContent(client);
+        marker.bindPopup(popupContent);
+        
+        return marker;
+        
+    } catch (error) {
+        console.error('❌ Erro ao criar marcador para cliente:', error);
+        return null;
+    }
+}
+
+function createClientPopupContent(client) {
+    const nome = client['Nome Fantasia'] || client['Cliente'] || 'Cliente';
+    const contato = client['Contato'] || 'N/A';
+    const telefone = client['Celular'] || 'N/A';
+    const endereco = client['Endereço'] || 'N/A';
+    const status = client['Status'] || 'N/A';
+    
+    const geocoding = client.geocoding || {};
+    const method = geocoding.method || 'desconhecido';
+    const confidence = Math.round((geocoding.confidence || 0) * 100);
+    
+    // Informações sobre a geocodificação
+    let methodInfo = '';
+    if (method.includes('viacep')) {
+        methodInfo = '✅ Verificado com ViaCEP + Nominatim';
+    } else if (method.includes('nominatim')) {
+        methodInfo = '🌐 Localizado via Nominatim';
+    } else if (method.includes('local')) {
+        methodInfo = '🏠 Base de coordenadas local';
+    } else if (method.includes('fallback')) {
+        methodInfo = '📍 Localização aproximada';
+    }
+    
+    // Link do WhatsApp se telefone disponível
+    let whatsappLink = '';
+    const cleanPhone = telefone.replace(/\D/g, '');
+    if (cleanPhone.length >= 10) {
+        const whatsappNumber = cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone;
+        const message = encodeURIComponent(`Olá ${nome}, tudo bem? Sou da PMG.`);
+        whatsappLink = `<br><a href="https://wa.me/${whatsappNumber}?text=${message}" target="_blank" style="color: #25d366; text-decoration: none;">📱 WhatsApp</a>`;
+    }
+    
+    // Link para rota
+    let routeLink = '';
+    if (geocoding.coordinates) {
+        const lat = geocoding.coordinates.lat;
+        const lon = geocoding.coordinates.lon;
+        routeLink = `<br><a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}&travelmode=driving" target="_blank" style="color: #007bff; text-decoration: none;">🗺️ Como chegar</a>`;
+    }
+    
+    return `
+        <div class="client-popup" style="max-width: 300px; font-family: Arial, sans-serif;">
+            <h4 style="margin-bottom: 0.5rem; color: #007bff; font-size: 1.1rem;">${nome}</h4>
+            <p style="margin: 0.25rem 0; font-size: 0.9rem;"><strong>Status:</strong> ${status}</p>
+            <p style="margin: 0.25rem 0; font-size: 0.9rem;"><strong>Contato:</strong> ${contato}</p>
+            <p style="margin: 0.25rem 0; font-size: 0.9rem;"><strong>Telefone:</strong> ${telefone}${whatsappLink}</p>
+            <hr style="margin: 0.5rem 0; border: none; border-top: 1px solid #eee;">
+            <p style="margin: 0.25rem 0; font-size: 0.85rem; color: #666;"><strong>Endereço:</strong><br>${endereco}${routeLink}</p>
+            <hr style="margin: 0.5rem 0; border: none; border-top: 1px solid #eee;">
+            <p style="margin: 0.25rem 0; font-size: 0.8rem; color: #888;">
+                <strong>Precisão:</strong> ${methodInfo} (${confidence}%)
+                ${geocoding.isApproximate ? '<br><em>Localização aproximada</em>' : ''}
+            </p>
+        </div>
+    `;
+}
+
 async function saveGeocodingResults(results) {
     try {
         console.log('💾 Salvando resultados da geocodificação...');
         
-        if (!window.clientManager) return;
+        if (!window.clientManager) {
+            console.warn('⚠️ ClientManager não disponível');
+            return;
+        }
         
-        // Atualizar clientes com resultados de geocodificação
-        const updateClient = (clientArray, results) => {
+        // Função auxiliar para atualizar cliente com geocodificação
+        const updateClientWithGeocoding = (clientArray, results) => {
             return clientArray.map(client => {
-                const clientId = window.clientManager.getClientId(client);
-                const result = results.find(r => 
-                    window.clientManager.getClientId(r) === clientId
-                );
+                const clientId = window.clientManager.getClientId ? 
+                    window.clientManager.getClientId(client) : 
+                    client.id || client['ID Cliente'] || client['Nome Fantasia'];
+                
+                const result = results.find(r => {
+                    const resultId = window.clientManager.getClientId ? 
+                        window.clientManager.getClientId(r) : 
+                        r.id || r['ID Cliente'] || r['Nome Fantasia'];
+                    return resultId === clientId;
+                });
                 
                 if (result && result.geocoding) {
                     return { ...client, geocoding: result.geocoding };
@@ -705,18 +880,74 @@ async function saveGeocodingResults(results) {
             });
         };
         
-        // Atualizar arrays
-        window.clientManager.data = updateClient(window.clientManager.data, results);
-        window.clientManager.ativos = updateClient(window.clientManager.ativos, results);
-        window.clientManager.novos = updateClient(window.clientManager.novos, results);
+        // Atualizar todos os arrays de clientes
+        if (window.clientManager.data) {
+            window.clientManager.data = updateClientWithGeocoding(window.clientManager.data, results);
+        }
+        if (window.clientManager.ativos) {
+            window.clientManager.ativos = updateClientWithGeocoding(window.clientManager.ativos, results);
+        }
+        if (window.clientManager.novos) {
+            window.clientManager.novos = updateClientWithGeocoding(window.clientManager.novos, results);
+        }
         
         // Salvar no storage
-        await window.clientManager.saveAllData();
+        if (typeof window.clientManager.saveAllData === 'function') {
+            await window.clientManager.saveAllData();
+        }
         
-        console.log('✅ Resultados da geocodificação salvos');
+        // Atualizar variáveis globais
+        if (typeof window.clientManager.updateGlobals === 'function') {
+            window.clientManager.updateGlobals();
+        }
+        
+        console.log('✅ Resultados da geocodificação salvos com sucesso');
         
     } catch (error) {
-        console.error('❌ Erro ao salvar resultados:', error);
+        console.error('❌ Erro ao salvar resultados da geocodificação:', error);
+    }
+}
+
+async function refreshMapWithClients() {
+    try {
+        if (!mapInitialized) {
+            await initializeMapAutomatically();
+        }
+        
+        if (window.clientManager) {
+            const allClients = [
+                ...(window.clientManager.data || []),
+                ...(window.clientManager.ativos || []),
+                ...(window.clientManager.novos || [])
+            ];
+            
+            const geocodedClients = allClients.filter(c => c.geocoding?.success);
+            
+            if (geocodedClients.length > 0) {
+                await updateMapWithResults(geocodedClients);
+            } else {
+                console.log('ℹ️ Nenhum cliente geocodificado para mostrar no mapa');
+            }
+        }
+        
+    } catch (error) {
+        console.error('❌ Erro ao refresh do mapa:', error);
+        throw error;
+    }
+}
+
+function showProgressSection() {
+    const section = document.getElementById('progress-section');
+    if (section) {
+        section.style.display = 'block';
+        window.geocodingStartTime = Date.now();
+    }
+}
+
+function hideProgressSection() {
+    const section = document.getElementById('progress-section');
+    if (section) {
+        section.style.display = 'none';
     }
 }
 
@@ -746,71 +977,6 @@ function updateProgress(progress) {
             ${status}: <strong>${progress.client['Nome Fantasia']}</strong>
             <br><small>Cliente ${progress.current} de ${progress.total}</small>
         `;
-    }
-}
-
-function showProgressSection() {
-    const section = document.getElementById('progress-section');
-    if (section) {
-        section.style.display = 'block';
-        window.geocodingStartTime = Date.now();
-        
-        // Adicionar informações sobre o processo seguro
-        const progressContainer = section.querySelector('.progress-container');
-        if (progressContainer) {
-            const existingInfo = progressContainer.querySelector('.safety-info');
-            if (!existingInfo) {
-                const safetyInfo = document.createElement('div');
-                safetyInfo.className = 'safety-info';
-                safetyInfo.style.cssText = `
-                    background: #e8f5e8;
-                    border: 1px solid #c3e6c3;
-                    border-radius: 6px;
-                    padding: 1rem;
-                    margin-top: 1rem;
-                    font-size: 0.9rem;
-                `;
-                safetyInfo.innerHTML = `
-                    <h4 style="color: #155724; margin-bottom: 0.5rem;">🛡️ Processo de Geocodificação Seguro</h4>
-                    <ul style="margin: 0; padding-left: 1.5rem; color: #155724;">
-                        <li>Rate limiting de 4 segundos entre requests</li>
-                        <li>Circuit breakers para evitar sobrecarga</li>
-                        <li>Múltiplos serviços de fallback</li>
-                        <li>Timeouts generosos (25s por request)</li>
-                        <li>Cache inteligente para evitar re-requests</li>
-                    </ul>
-                `;
-                progressContainer.appendChild(safetyInfo);
-            }
-        }
-    }
-}
-
-// ... (manter resto do código igual)
-
-
-function hideProgressSection() {
-    const section = document.getElementById('progress-section');
-    if (section) {
-        section.style.display = 'none';
-    }
-}
-
-function updateProgress(progress) {
-    const progressBar = document.getElementById('progress-bar');
-    const progressText = document.getElementById('progress-text');
-    const currentClient = document.getElementById('current-client');
-    
-    if (progressBar) {
-        progressBar.style.width = `${progress.percentage}%`;
-    }
-    
-    if (progressText) {
-        progressText.textContent = `${progress.current} de ${progress.total} (${progress.percentage}%)`;
-    }
-    
-    if (currentClient && progress.client) {
-        currentClient.textContent = `Processando: ${progress.client['Nome Fantasia']}`;
     }
 }
 
@@ -858,16 +1024,24 @@ function renderClientList(containerId, clients) {
         div.className = 'client-item';
         
         const geocodingInfo = client.geocoding?.success ? 
-            `<p style="color: #28a745; font-size: 0.8rem;">📍 Localizado (${Math.round((client.geocoding.confidence || 0) * 100)}%)</p>` :
-            '';
+            `<div class="geocoding-status">📍 Localizado (${Math.round((client.geocoding.confidence || 0) * 100)}%)</div>` : 
+            '<div class="geocoding-status pending">📍 Aguardando localização</div>';
         
         div.innerHTML = `
-            <h4>${client['Nome Fantasia'] || 'Cliente'}</h4>
-            <p><strong>Status:</strong> ${client['Status'] || 'N/A'}</p>
-            <p><strong>Contato:</strong> ${client['Contato'] || 'N/A'}</p>
-            <p><strong>Telefone:</strong> ${client['Celular'] || 'N/A'}</p>
-            <p><strong>Segmento:</strong> ${client['Segmento'] || 'N/A'}</p>
-            ${geocodingInfo}
+            <div class="client-header">
+                <h4>${client['Nome Fantasia'] || 'Cliente'}</h4>
+                <span class="status-badge status-${client['Status']?.toLowerCase().includes('ativo') ? 'active' : client['Status']?.toLowerCase().includes('novo') ? 'new' : 'inactive'}">
+                    ${client['Status'] || 'Inativo'}
+                </span>
+            </div>
+            <div class="client-info">
+                <p><strong>Contato:</strong> ${client['Contato'] || 'N/A'}</p>
+                <p><strong>Telefone:</strong> ${client['Celular'] || 'N/A'}</p>
+                <p><strong>Segmento:</strong> ${client['Segmento'] || 'N/A'}</p>
+            </div>
+            <div class="client-status">
+                ${geocodingInfo}
+            </div>
         `;
         
         div.onclick = () => window.clientManager?.showClientModal(client);
@@ -1035,11 +1209,68 @@ style.textContent = `
         border-color: #ffc107;
     }
     
+    .client-verified {
+        border-color: #17a2b8;
+        background: linear-gradient(45deg, #fff, #e7f3ff);
+    }
+    
     .client-approximate {
         border-style: dashed;
         opacity: 0.8;
     }
+    
+    .drag-over {
+        border-color: #007bff !important;
+        background: rgba(0, 123, 255, 0.1) !important;
+    }
+    
+    .geocoding-status {
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        background: #d4edda;
+        color: #155724;
+        margin-top: 0.5rem;
+    }
+    
+    .geocoding-status.pending {
+        background: #fff3cd;
+        color: #856404;
+    }
+    
+    .client-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+        gap: 1rem;
+    }
+    
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .status-active {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .status-inactive {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .status-new {
+        background: #fff3cd;
+        color: #856404;
+    }
 `;
 document.head.appendChild(style);
 
-console.log('✅ script.js OTIMIZADO carregado com mapa automático');
+console.log('✅ script.js COMPLETO E FUNCIONAL carregado');
