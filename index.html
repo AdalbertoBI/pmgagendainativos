@@ -2,54 +2,49 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PMG - Agenda Clientes</title>
-    <link rel="stylesheet" href="styles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>PMG Agenda Clientes - Sistema Completo</title>
+    <meta name="description" content="Sistema completo para gerenciamento de clientes inativos, ativos e novos com funcionalidades de mapa, agendamento e relatórios">
+    
+    <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
+    
+    <!-- Preconnect para otimização MELHORADA -->
+    <link rel="preconnect" href="https://unpkg.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin>
+    <link rel="preconnect" href="https://viacep.com.br" crossorigin>
+    <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin>
+    
+    <!-- Meta tags PWA -->
     <meta name="theme-color" content="#007bff">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="PMG Agenda">
     
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" 
-          integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A==" 
-          crossorigin=""/>
-    
-    <!-- PWA Icons -->
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="48x48" href="icon-48.png">
     <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="icon-192.png">
     
-    <style>
-        /* Loading Screen */
-        #loading-indicator {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(255,255,255,0.95);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 99999;
-        }
-        
-        .loading-spinner {
-            width: 40px; height: 40px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #007bff;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
+    <!-- Leaflet CSS com integrity -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+          integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+          crossorigin="">
+    
+    <!-- CSS Principal -->
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <!-- Loading Screen -->
-    <div id="loading-indicator" style="display: none;">
-        <div class="loading-spinner"></div>
-        <p>Carregando sistema...</p>
+    <!-- Loading inicial MELHORADO -->
+    <div id="loading-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; color: white;">
+        <div class="loading-spinner" style="width: 60px; height: 60px; border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid #ffffff; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 1.5rem;"></div>
+        <h2 style="margin: 0 0 1rem 0; font-size: 1.5rem; font-weight: 600;">🏢 PMG Agenda</h2>
+        <p style="margin: 0; color: rgba(255,255,255,0.9); font-weight: 500; text-align: center;">Carregando sistema completo...</p>
+        <div style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.8;">
+            <div>🗺️ Inicializando mapa...</div>
+            <div>📊 Carregando componentes...</div>
+        </div>
     </div>
 
     <div class="app-container">
@@ -57,11 +52,11 @@
         <header class="header">
             <div class="header-content">
                 <div class="header-title">
-                    <span class="header-icon">📋</span>
-                    <h1>PMG - Agenda Clientes</h1>
+                    <div class="header-icon">🏢</div>
+                    <h1>PMG Agenda Clientes</h1>
                 </div>
-                <div class="header-info">
-                    <span id="data-info"></span>
+                <div class="header-info" id="data-info">
+                    Sistema de Gestão Completo
                 </div>
             </div>
         </header>
@@ -71,26 +66,27 @@
             <button class="tab-button active" data-tab="inativos">
                 <span class="tab-icon">🔴</span>
                 <span class="tab-text">Inativos</span>
-                <span id="inativos-count" class="tab-count">0</span>
+                <span class="tab-count" id="inativos-count">0</span>
             </button>
             <button class="tab-button" data-tab="ativos">
                 <span class="tab-icon">🟢</span>
                 <span class="tab-text">Ativos</span>
-                <span id="ativos-count" class="tab-count">0</span>
+                <span class="tab-count" id="ativos-count">0</span>
             </button>
             <button class="tab-button" data-tab="novos">
                 <span class="tab-icon">🆕</span>
                 <span class="tab-text">Novos</span>
-                <span id="novos-count" class="tab-count">0</span>
+                <span class="tab-count" id="novos-count">0</span>
             </button>
             <button class="tab-button" data-tab="agenda">
                 <span class="tab-icon">📅</span>
                 <span class="tab-text">Agenda</span>
-                <span id="agenda-count" class="tab-count">0</span>
+                <span class="tab-count" id="agenda-count">0</span>
             </button>
             <button class="tab-button" data-tab="mapa">
                 <span class="tab-icon">🗺️</span>
                 <span class="tab-text">Mapa</span>
+                <span id="map-status" style="font-size: 0.7rem; opacity: 0.8;">Carregando...</span>
             </button>
         </nav>
 
@@ -100,24 +96,46 @@
             <section class="upload-section">
                 <div class="upload-container">
                     <div class="upload-area" id="upload-area">
-                        <div class="upload-icon">📁</div>
+                        <div class="upload-icon">📊</div>
                         <label for="file-input" class="upload-label">
-                            Selecionar Planilha Excel
+                            Carregar Planilha de Clientes
                         </label>
                         <p class="upload-description">
-                            Arraste e solte o arquivo aqui ou clique para selecionar
+                            Arraste e solte o arquivo Excel (.xlsx) aqui ou clique para selecionar
                         </p>
                         <input type="file" id="file-input" class="file-input" accept=".xlsx,.xls">
                     </div>
                 </div>
             </section>
 
-            <!-- Tab Content: Inativos -->
+            <!-- Progress Section MELHORADA -->
+            <section id="progress-section" class="progress-section" style="display: none;">
+                <div class="progress-container">
+                    <div class="progress-header">
+                        <h3>🗺️ Processando Localização dos Clientes</h3>
+                        <div class="progress-stats">
+                            <span id="progress-text">Preparando...</span>
+                        </div>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" id="progress-bar" style="width: 0%"></div>
+                    </div>
+                    <div class="progress-details">
+                        <div id="current-client" style="font-weight: 500; color: #495057; margin: 1rem 0;">Aguardando...</div>
+                        <div class="progress-info" style="font-size: 0.9rem; color: #6c757d;">
+                            <div>✅ ViaCEP: Consulta de CEPs</div>
+                            <div>🌐 Nominatim: Geocodificação precisa</div>
+                            <div>📍 Fallback: Localização aproximada</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab Contents -->
             <div id="inativos-tab" class="tab-content active">
                 <div class="content-header">
                     <h2 class="section-title">
-                        <span>🔴</span>
-                        Clientes Inativos
+                        🔴 Clientes Inativos
                     </h2>
                     
                     <!-- Filters -->
@@ -131,104 +149,84 @@
                                 <option value="cidade-za">Cidade Z-A</option>
                             </select>
                         </div>
-                        
-                        <div class="filter-group cidade-filter">
-                            <label class="filter-label">Filtrar por cidade:</label>
-                            <div class="cidade-selector" id="cidade-selector">
-                                <span id="cidade-selected">Todas as cidades</span>
-                                <span class="selector-arrow">▼</span>
-                            </div>
-                            <div class="cidade-list escondido" id="cidade-list">
-                                <!-- Cidades serão preenchidas dinamicamente -->
-                            </div>
-                        </div>
-                        
-                        <div class="action-buttons">
-                            <button class="btn btn-primary" id="atualizar-mapa">
-                                <span>🗺️</span> Atualizar Mapa
-                            </button>
-                        </div>
                     </div>
                 </div>
                 
                 <div class="client-list-container">
                     <div id="client-list" class="client-list">
                         <div class="empty-state">
-                            Nenhum cliente inativo encontrado. Faça o upload de uma planilha.
+                            Carregue uma planilha para visualizar os clientes inativos
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Tab Content: Ativos -->
             <div id="ativos-tab" class="tab-content">
                 <div class="content-header">
                     <h2 class="section-title">
-                        <span>🟢</span>
-                        Clientes Ativos
+                        🟢 Clientes Ativos
                     </h2>
                 </div>
                 
                 <div class="client-list-container">
                     <div id="ativos-list" class="client-list">
                         <div class="empty-state">
-                            Nenhum cliente ativo encontrado.
+                            Carregue uma planilha para visualizar os clientes ativos
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Tab Content: Novos -->
             <div id="novos-tab" class="tab-content">
                 <div class="content-header">
                     <h2 class="section-title">
-                        <span>🆕</span>
-                        Clientes Novos
+                        🆕 Clientes Novos
                     </h2>
                 </div>
                 
                 <div class="client-list-container">
                     <div id="novos-list" class="client-list">
                         <div class="empty-state">
-                            Nenhum cliente novo encontrado.
+                            Carregue uma planilha para visualizar os clientes novos
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Tab Content: Agenda -->
             <div id="agenda-tab" class="tab-content">
                 <div class="content-header">
                     <h2 class="section-title">
-                        <span>📅</span>
-                        Agenda de Visitas
+                        📅 Agenda de Compromissos
                     </h2>
                 </div>
                 
                 <div class="agenda-container">
                     <div id="agenda-list" class="agenda-list">
                         <div class="empty-state">
-                            Nenhum agendamento encontrado.
+                            Nenhum agendamento encontrado
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Tab Content: Mapa -->
             <div id="mapa-tab" class="tab-content">
                 <div class="content-header">
                     <h2 class="section-title">
-                        <span>🗺️</span>
-                        Mapa de Clientes
+                        🗺️ Mapa dos Clientes
                     </h2>
+                    <div id="map-controls" class="action-buttons">
+                        <button id="refresh-map" class="btn btn-primary">
+                            <span>🔄</span> Atualizar Mapa
+                        </button>
+                        <button id="clear-cache" class="btn btn-secondary">
+                            <span>🧹</span> Limpar Cache
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="map-container">
-                    <div id="map" class="map-area">
-                        <div class="loading">
-                            <div class="loading-spinner"></div>
-                            <p>Carregando mapa...</p>
-                        </div>
+                    <div id="map" class="map-area" style="height: 500px; width: 100%;">
+                        <!-- Mapa será inicializado automaticamente aqui -->
                     </div>
                 </div>
             </div>
@@ -239,53 +237,47 @@
     <div id="modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="modalTitle">Detalhes do Cliente</h2>
-                <span class="close" onclick="closeModal()">&times;</span>
+                <h2 id="modalTitle">Cliente</h2>
+                <span class="close">&times;</span>
             </div>
             <div class="modal-body" id="modalBody">
-                <!-- Conteúdo será preenchido dinamicamente -->
+                <!-- Conteúdo preenchido dinamicamente -->
             </div>
         </div>
     </div>
 
-    <!-- Error Messages Container -->
-    <div id="error-container" style="position: fixed; top: 80px; right: 20px; z-index: 10001;"></div>
+    <!-- Error Container -->
+    <div id="error-container"></div>
 
-    <!-- Scripts -->
-    <!-- XLSX Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" 
-            integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" 
-            crossorigin="anonymous"></script>
+    <!-- Scripts Core -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+            integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA=="
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js" 
-            integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA==" 
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+            integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
             crossorigin=""></script>
 
-    <!-- App Scripts -->
+    <!-- Scripts Próprios OTIMIZADOS -->
+    <script src="cep-processor.js"></script>
+    <script src="geocoding-service.js"></script>
     <script src="dbManager.js"></script>
     <script src="client-manager.js"></script>
-    <script src="map.js"></script>
     <script src="script.js"></script>
 
+    <!-- Service Worker Registration -->
     <script>
-        // Service Worker Registration
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./service-worker.js')
-                .then(registration => console.log('SW registered:', registration))
-                .catch(error => console.log('SW registration failed:', error));
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then((registration) => {
+                        console.log('✅ SW registrado:', registration.scope);
+                    })
+                    .catch((registrationError) => {
+                        console.log('❌ Falha SW:', registrationError);
+                    });
+            });
         }
-        
-        // Global error handling
-        window.addEventListener('error', (e) => {
-            console.error('Global error:', e.error);
-            showErrorMessage('Erro no sistema: ' + e.message);
-        });
-        
-        window.addEventListener('unhandledrejection', (e) => {
-            console.error('Unhandled promise rejection:', e.reason);
-            showErrorMessage('Erro de sistema não tratado');
-        });
     </script>
 </body>
 </html>

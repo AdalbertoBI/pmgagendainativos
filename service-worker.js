@@ -1,6 +1,6 @@
 // service-worker.js - Service Worker otimizado para funcionamento offline COMPLETO
 
-const CACHE_NAME = 'pmg-agenda-v3.4';
+const CACHE_NAME = 'pmg-agenda-v3.2';
 const CACHE_VERSION = '3.2';
 
 // Arquivos para cache - TODOS os recursos necessários
