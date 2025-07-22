@@ -237,31 +237,33 @@ async function handleMapTabActivation() {
             }
         }
 
-        // Usar o método específico para ativação da aba (se disponível)
+        // Usar o método específico para ativação da aba
         if (typeof window.mapManager.onMapTabActivated === 'function') {
             console.log('🔄 Notificando mapManager sobre ativação da aba');
             window.mapManager.onMapTabActivated();
         } else {
-            // Fallback - invalidar tamanho e atualizar marcadores
+            // Fallback - invalidar tamanho e processar marcadores
             console.log('🔄 Usando método fallback para ativar mapa');
             
             setTimeout(() => {
                 try {
-                    // Verificar se o mapa interno existe antes de usar
+                    // Invalidar tamanho do mapa
                     if (window.mapManager.map && typeof window.mapManager.map.invalidateSize === 'function') {
                         window.mapManager.map.invalidateSize(true);
                         console.log('✅ Tamanho do mapa invalidado');
                     }
                     
-                    // Atualizar marcadores se disponível
-                    if (typeof window.mapManager.updateAllMarkers === 'function') {
-                        window.mapManager.updateAllMarkers();
-                        console.log('✅ Marcadores do mapa atualizados');
+                    // Processar TODOS os marcadores se não há nenhum
+                    if (window.mapManager.currentMarkers && window.mapManager.currentMarkers.length === 0) {
+                        if (typeof window.mapManager.processAllMarkersComplete === 'function') {
+                            window.mapManager.processAllMarkersComplete();
+                            console.log('✅ Processamento de todos os marcadores iniciado');
+                        }
                     }
                 } catch (updateError) {
                     console.error('❌ Erro ao atualizar mapa:', updateError);
                 }
-            }, 200);
+            }, 300);
         }
 
     } catch (error) {
@@ -271,6 +273,45 @@ async function handleMapTabActivation() {
         showMapError('Erro ao carregar mapa. Verifique sua conexão e tente novamente.');
     }
 }
+
+// Adicione também esta função melhorada para mostrar erro no mapa:
+function showMapError(message) {
+    const mapContainer = document.getElementById('map');
+    if (!mapContainer) {
+        console.warn('⚠️ Container do mapa não encontrado para mostrar erro');
+        return;
+    }
+
+    mapContainer.style.height = '500px';
+    mapContainer.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #6c757d; text-align: center; padding: 2rem; background: #f8f9fa;">
+            <div style="font-size: 4rem; margin-bottom: 1.5rem;">🗺️</div>
+            <h3 style="margin: 0 0 1rem 0; color: #dc3545;">Problema no Mapa</h3>
+            <p style="margin: 0 0 1.5rem 0; font-size: 1rem; max-width: 400px; line-height: 1.5;">${message}</p>
+            <button onclick="retryMapInitialization()" style="padding: 0.75rem 1.5rem; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: all 0.3s ease;">
+                🔄 Tentar Novamente
+            </button>
+        </div>
+    `;
+}
+
+// Função para retry do mapa
+function retryMapInitialization() {
+    console.log('🔄 Tentando reinicializar mapa pelo usuário...');
+    
+    // Resetar estado se mapManager existir
+    if (window.mapManager && typeof window.mapManager.forceRetry === 'function') {
+        window.mapManager.forceRetry();
+    } else {
+        // Tentar recarregar a aba do mapa
+        handleMapTabActivation().catch(error => {
+            console.error('❌ Retry falhou:', error);
+            showMapError('Falha persistente. Recarregue a página completamente.');
+        });
+    }
+}
+
+console.log('✅ script.js - seção do mapa corrigida para carregar TODOS os clientes');
 
 // Função para aguardar mapManager - NOVA
 function waitForMapManager(timeout = 10000) {
