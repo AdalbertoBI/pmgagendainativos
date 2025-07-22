@@ -1,4 +1,4 @@
-// client-manager.js - Gerenciamento de clientes com exclusão robusta
+// client-manager.js - Gerenciamento de clientes com importação robusta e compatibilidade com planilhas
 
 class ClientManager {
     constructor() {
@@ -14,73 +14,46 @@ class ClientManager {
         this.MAX_RECORDS = 10000;
     }
 
-    // Inicializar gerenciador
+    // Inicializar e importar dados
     async init() {
         try {
             this.data = await window.dbManager.loadData('clients') || [];
             this.ativos = await window.dbManager.loadData('ativos') || [];
             this.schedules = await window.dbManager.loadData('schedules') || {};
             this.savedFilters = window.dbManager.loadFilters();
-
-            // Disponibilizar globalmente
             window.data = this.data;
             window.ativos = this.ativos;
             window.filteredData = this.filteredData;
-
-            console.log('✅ ClientManager inicializado');
-            console.log(`📊 Dados carregados: ${this.data.length} inativos, ${this.ativos.length} ativos`);
         } catch (error) {
             console.error('❌ Erro ao inicializar ClientManager:', error);
         }
     }
 
-    // Gerar ID único para cliente
-    generateClientId() {
-        return `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    }
+    // Gera ID único
+    generateClientId() { return `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`; }
 
-    // Validar dados do cliente
+    // Validação de dados (CNPJ/CPF, email, CEP)
     validateClientData(clientData) {
         const errors = [];
-
-        if (!clientData['Nome Fantasia'] || clientData['Nome Fantasia'].trim() === '') {
-            errors.push('Nome Fantasia é obrigatório');
-        }
-
-        if (clientData['CNPJ / CPF'] && !this.validateCNPJCPF(clientData['CNPJ / CPF'])) {
-            errors.push('CNPJ/CPF inválido');
-        }
-
-        if (clientData.Email && !this.validateEmail(clientData.Email)) {
-            errors.push('Email inválido');
-        }
-
-        if (clientData.CEP && !this.validateCEP(clientData.CEP)) {
-            errors.push('CEP inválido');
-        }
-
+        if (!clientData['Nome Fantasia'] || clientData['Nome Fantasia'].trim() === '') errors.push('Nome Fantasia é obrigatório');
+        if (clientData['CNPJ / CPF'] && !this.validateCNPJCPF(clientData['CNPJ / CPF'])) errors.push('CNPJ/CPF inválido');
+        if (clientData.Email && !this.validateEmail(clientData.Email)) errors.push('Email inválido');
+        if (clientData.CEP && !this.validateCEP(clientData.CEP)) errors.push('CEP inválido');
         return errors;
     }
-
-    // Validar email
     validateEmail(email) {
         const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return regex.test(email);
     }
-
-    // Validar CEP
     validateCEP(cep) {
-        const cleanCep = cep.replace(/\D/g, '');
+        const cleanCep = (cep || '').replace(/\D/g, '');
         return cleanCep.length === 8;
     }
-
-    // Validar CNPJ/CPF (básico)
     validateCNPJCPF(doc) {
-        const cleanDoc = doc.replace(/\D/g, '');
+        const cleanDoc = (doc || '').replace(/\D/g, '');
         return cleanDoc.length === 11 || cleanDoc.length === 14;
     }
 
-    // Cadastrar novo cliente
     async cadastrarCliente(formData) {
         try {
             const clientData = {
@@ -102,121 +75,63 @@ class ClientManager {
                 'Data Ultimo Pedido': formData.dataUltimoPedido || this.formatDate(new Date()),
                 'Data Cadastro': this.formatDate(new Date())
             };
-
-            // Validar dados
             const errors = this.validateClientData(clientData);
-            if (errors.length > 0) {
-                throw new Error(errors.join('\n'));
-            }
-
-            // Adicionar à lista de inativos
+            if (errors.length > 0) throw new Error(errors.join('\n'));
             this.data.push(clientData);
             window.data = this.data;
-
-            // Salvar no banco usando método robusto
             await window.dbManager.saveArrayData('clients', this.data);
-
-            console.log('✅ Cliente cadastrado:', clientData['Nome Fantasia']);
             return clientData;
-
         } catch (error) {
             console.error('❌ Erro ao cadastrar cliente:', error);
             throw error;
         }
     }
 
-    // Editar cliente - FUNÇÃO CORRIGIDA
     async editarCliente(clienteId, dadosEditados) {
         try {
-            // Validar dados
             const errors = this.validateClientData(dadosEditados);
-            if (errors.length > 0) {
-                throw new Error(errors.join('\n'));
-            }
-
+            if (errors.length > 0) throw new Error(errors.join('\n'));
             let clienteEditado = false;
-
-            // Encontrar cliente na lista de inativos
             const indexInativo = this.data.findIndex(c => c.id === clienteId);
             if (indexInativo !== -1) {
-                // Atualizar dados mantendo ID e data de cadastro
-                this.data[indexInativo] = {
-                    ...this.data[indexInativo],
-                    ...dadosEditados
-                };
+                this.data[indexInativo] = { ...this.data[indexInativo], ...dadosEditados };
                 await window.dbManager.saveArrayData('clients', this.data);
                 window.data = this.data;
                 clienteEditado = true;
-                console.log('✅ Cliente inativo editado:', dadosEditados['Nome Fantasia']);
             }
-
-            // Encontrar cliente na lista de ativos
             const indexAtivo = this.ativos.findIndex(c => c.id === clienteId);
             if (indexAtivo !== -1) {
-                // Atualizar dados mantendo ID e data de cadastro
-                this.ativos[indexAtivo] = {
-                    ...this.ativos[indexAtivo],
-                    ...dadosEditados
-                };
+                this.ativos[indexAtivo] = { ...this.ativos[indexAtivo], ...dadosEditados };
                 await window.dbManager.saveArrayData('ativos', this.ativos);
                 window.ativos = this.ativos;
                 clienteEditado = true;
-                console.log('✅ Cliente ativo editado:', dadosEditados['Nome Fantasia']);
             }
-
-            if (!clienteEditado) {
-                throw new Error('Cliente não encontrado');
-            }
-
+            if (!clienteEditado) throw new Error('Cliente não encontrado');
         } catch (error) {
             console.error('❌ Erro ao editar cliente:', error);
             throw error;
         }
     }
 
-    // Tornar cliente ativo - CORRIGIDA
     async tornarAtivo(cliente, novaData = null) {
         try {
-            console.log('🔄 Tornando cliente ativo:', cliente['Nome Fantasia']);
-
-            // Remover da lista de inativos
             const index = this.data.findIndex(c => c.id === cliente.id);
-            if (index !== -1) {
-                this.data.splice(index, 1);
-                console.log('✅ Cliente removido dos inativos');
-            }
-
-            // Adicionar à lista de ativos
-            if (novaData) {
-                cliente['Data Ultimo Pedido'] = novaData;
-            }
+            if (index !== -1) this.data.splice(index, 1);
+            if (novaData) cliente['Data Ultimo Pedido'] = novaData;
             cliente.isAtivo = true;
-            
-            // Verificar se já existe nos ativos para evitar duplicatas
             const existeAtivo = this.ativos.findIndex(c => c.id === cliente.id);
-            if (existeAtivo === -1) {
-                this.ativos.push(cliente);
-                console.log('✅ Cliente adicionado aos ativos');
-            }
-
-            // Salvar ambas as listas usando método robusto
+            if (existeAtivo === -1) this.ativos.push(cliente);
             await window.dbManager.saveArrayData('clients', this.data);
             await window.dbManager.saveArrayData('ativos', this.ativos);
-
-            // Atualizar variáveis globais
             window.data = this.data;
             window.ativos = this.ativos;
-
-            console.log(`✅ Cliente "${cliente['Nome Fantasia']}" tornado ativo com sucesso`);
-            console.log(`📊 Estado atual: ${this.data.length} inativos, ${this.ativos.length} ativos`);
-            
             return cliente;
-
         } catch (error) {
             console.error('❌ Erro ao tornar cliente ativo:', error);
             throw error;
         }
     }
+
 
     // Excluir cliente dos ativos - MÉTODO ROBUSTO CORRIGIDO
     async excluirAtivo(cliente) {

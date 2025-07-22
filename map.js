@@ -397,6 +397,72 @@ async function geocodificarClienteComMaximaPrecisao(client) {
     
     console.log('❌ Geocodificação falhou para:', address);
     return null;
+}async function geocodificarClienteComMaximaPrecisao(client) {
+    const address = getFullAddress(client);
+    if (!address) return null;
+    // 1. Correção manual
+    if (manualCorrections[address]) return manualCorrections[address];
+    // 2. Cache
+    if (addressCache[address] && addressCache[address].confidence >= 0.8)
+        return addressCache[address];
+    // 3. Nominatim com mais variações
+    const variacoes = criarVariacoesEndereco(client);
+    for (const endereco of variacoes) {
+        try {
+            const coords = await geocodificarNominatimOtimizado(endereco);
+            if (coords && validarCoordenadas(coords, client)) {
+                addressCache[address] = coords; salvarCache();
+                return coords;
+            }
+        } catch (error) { }
+        await new Promise(resolve => setTimeout(resolve, 400));
+    }
+    // 4. Consulta Geonames (sem chave)
+    const geonamesCoords = await geocodificarComGeonames(address, client['Cidade'], client['UF']);
+    if (geonamesCoords && validarCoordenadas(geonamesCoords, client)) {
+        addressCache[address] = geonamesCoords; salvarCache();
+        return geonamesCoords;
+    }
+    // 5. CEP e cidade/estado fallback — como já existia
+    const coordsPorCEP = await geocodificarPorCEP(client);
+    if (coordsPorCEP && coordsPorCEP.confidence >= 0.8) {
+        addressCache[address] = coordsPorCEP; salvarCache();
+        return coordsPorCEP;
+    }
+    const coordsCidade = obterCoordenadasCidadePrecisa(client);
+    if (coordsCidade) {
+        addressCache[address] = coordsCidade; salvarCache();
+        return coordsCidade;
+    }
+    const fallback = obterFallbackOtimizado(client);
+    if (fallback) {
+        addressCache[address] = fallback; salvarCache();
+        return fallback;
+    }
+    return null;
+}
+
+// Nova função: geocodificação usando Geonames (pública, sem API key)
+async function geocodificarComGeonames(address, cidade, uf) {
+    try {
+        const cidadeLimpa = (cidade || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9 ]/g, '');
+        if (!cidadeLimpa) return null;
+        const url = `https://www.geonames.org/search.html?q=${encodeURIComponent(cidadeLimpa + ' ' + (uf || ''))}&country=BR`;
+        const res = await fetch(`https://secure.geonames.org/searchJSON?name_equals=${encodeURIComponent(cidadeLimpa)}&country=BR&maxRows=1`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.geonames && data.geonames.length > 0) {
+                return {
+                    lat: parseFloat(data.geonames[0].lat),
+                    lng: parseFloat(data.geonames[0].lng),
+                    confidence: 0.7,
+                    provider: 'Geonames',
+                    manuallyEdited: false
+                };
+            }
+        }
+    } catch (error) { }
+    return null;
 }
 
 // Geocodificar por CEP usando ViaCEP
