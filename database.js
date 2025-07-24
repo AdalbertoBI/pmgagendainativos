@@ -3,7 +3,7 @@
 class DatabaseManager {
     constructor() {
         this.dbName = 'ClientDatabase';
-        this.dbVersion = 2; // Versão corrigida para evitar conflitos
+        this.dbVersion = 3; // Incrementado para forçar upgrade
         this.db = null;
     }
 
@@ -16,11 +16,12 @@ class DatabaseManager {
                 if (!db.objectStoreNames.contains('clients')) db.createObjectStore('clients', { keyPath: 'id' });
                 if (!db.objectStoreNames.contains('ativos')) db.createObjectStore('ativos', { keyPath: 'id' });
                 if (!db.objectStoreNames.contains('schedules')) db.createObjectStore('schedules', { keyPath: 'id' });
+                if (!db.objectStoreNames.contains('backups')) db.createObjectStore('backups', { keyPath: 'id', autoIncrement: true });
             };
             request.onsuccess = (event) => {
                 this.db = event.target.result;
                 console.log('✅ IndexedDB inicializado com sucesso');
-                resolve(this.db);
+                this.ensureBackupsStore().then(() => resolve(this.db)).catch(reject);
             };
             request.onerror = (event) => {
                 console.error('❌ Erro ao abrir IndexedDB:', event.target.error);
@@ -29,29 +30,54 @@ class DatabaseManager {
         });
     }
 
+    // Garantir que o object store 'backups' exista
+    async ensureBackupsStore() {
+        return new Promise((resolve, reject) => {
+            if (!this.db.objectStoreNames.contains('backups')) {
+                const request = this.db.setVersion(this.db.version + 1); // Forçar upgrade
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains('backups')) {
+                        db.createObjectStore('backups', { keyPath: 'id', autoIncrement: true });
+                    }
+                };
+                request.onsuccess = () => resolve();
+                request.onerror = (event) => reject(event.target.error);
+            } else {
+                resolve();
+            }
+        });
+    }
+
     // Salvar dados em uma store específica
     async saveData(storeName, data) {
         if (!this.db) await this.init();
         return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction([storeName], 'readwrite');
-            const store = transaction.objectStore(storeName);
-            if (Array.isArray(data)) {
-                const clearRequest = store.clear();
-                clearRequest.onsuccess = () => {
-                    let completed = 0, total = data.length;
-                    if (total === 0) return resolve();
-                    data.forEach((item, index) => {
-                        const putRequest = store.put(item);
-                        putRequest.onsuccess = () => { if (++completed === total) resolve(); };
-                        putRequest.onerror = () => reject(new Error(`Erro ao salvar item ${index}`));
-                    });
-                };
-                clearRequest.onerror = () => reject(new Error(`Erro ao limpar ${storeName}`));
-            } else {
-                const putRequest = store.put(data);
-                putRequest.onsuccess = () => resolve();
-                putRequest.onerror = () => reject(new Error(`Erro ao salvar item em ${storeName}`));
-            }
+            const isBackup = storeName.startsWith('backup-');
+            const transactionStore = isBackup ? ['backups'] : [storeName];
+
+            const transaction = this.db.transaction(transactionStore, 'readwrite');
+            const store = transaction.objectStore(isBackup ? 'backups' : storeName);
+
+            // Para backups, usar o storeName como chave e data como valor
+            const putData = isBackup ? { id: storeName, data: data } : data;
+
+            const putRequest = store.put(putData);
+            putRequest.onsuccess = () => resolve();
+            putRequest.onerror = (event) => {
+                if (event.target.error.name === 'NotFoundError') {
+                    console.warn('⚠️ Object store não encontrado. Tentando criar...');
+                    this.ensureBackupsStore().then(() => {
+                        const newTransaction = this.db.transaction(['backups'], 'readwrite');
+                        const newStore = newTransaction.objectStore('backups');
+                        const retryRequest = newStore.put(putData);
+                        retryRequest.onsuccess = () => resolve();
+                        retryRequest.onerror = () => reject(event.target.error);
+                    }).catch(reject);
+                } else {
+                    reject(event.target.error);
+                }
+            };
             transaction.onerror = () => reject(new Error(`Erro na transação ${storeName}`));
         });
     }
@@ -117,14 +143,14 @@ class DatabaseManager {
     }
 
     // Filtros, caches e observações (localStorage)
-    saveFilters(filters)     { try { localStorage.setItem('savedFilters', JSON.stringify(filters)); } catch {} }
-    loadFilters()            { try { let saved = localStorage.getItem('savedFilters'); return saved ? JSON.parse(saved) : { saldoMin: 0, cidadesSelecionadas: [], sort: 'nome-az' }; } catch { return { saldoMin: 0, cidadesSelecionadas: [], sort: 'nome-az' }; } }
-    saveAddressCache(cache)  { try { localStorage.setItem('addressCache', JSON.stringify(cache)); } catch {} }
-    loadAddressCache()       { try { let s = localStorage.getItem('addressCache'); return s ? JSON.parse(s) : {}; } catch { return {}; } }
+    saveFilters(filters) { try { localStorage.setItem('savedFilters', JSON.stringify(filters)); } catch {} }
+    loadFilters() { try { let saved = localStorage.getItem('savedFilters'); return saved ? JSON.parse(saved) : { saldoMin: 0, cidadesSelecionadas: [], sort: 'nome-az' }; } catch { return { saldoMin: 0, cidadesSelecionadas: [], sort: 'nome-az' }; } }
+    saveAddressCache(cache) { try { localStorage.setItem('addressCache', JSON.stringify(cache)); } catch {} }
+    loadAddressCache() { try { let s = localStorage.getItem('addressCache'); return s ? JSON.parse(s) : {}; } catch { return {}; } }
     saveManualCorrections(c) { try { localStorage.setItem('manualCorrections', JSON.stringify(c)); } catch {} }
-    loadManualCorrections()  { try { let s = localStorage.getItem('manualCorrections'); return s ? JSON.parse(s) : {}; } catch { return {}; } }
+    loadManualCorrections() { try { let s = localStorage.getItem('manualCorrections'); return s ? JSON.parse(s) : {}; } catch { return {}; } }
     saveObservation(id, obs) { try { localStorage.setItem(`observacoes_${id}`, obs); } catch {} }
-    loadObservation(id)      { try { return localStorage.getItem(`observacoes_${id}`) || ''; } catch { return ''; } }
+    loadObservation(id) { try { return localStorage.getItem(`observacoes_${id}`) || ''; } catch { return ''; } }
 
     // Limpeza geral
     async clearAllData() {
@@ -151,4 +177,5 @@ class DatabaseManager {
         } catch { return null; }
     }
 }
+
 window.dbManager = new DatabaseManager();

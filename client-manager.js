@@ -32,6 +32,53 @@ class ClientManager {
     // Gera ID único
     generateClientId() { return `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`; }
 
+    // Normalizar nomes de colunas
+    normalizeColumnName(name) {
+        if (!name) return '';
+        return name
+            .trim()
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+            .replace(/\s+/g, ' ') // Normaliza espaços
+            .replace(/[^a-z0-9 ]/g, ''); // Remove caracteres especiais
+    }
+
+    // Mapear colunas da planilha para campos internos
+    mapColumnToField(column) {
+        const normalized = this.normalizeColumnName(column);
+        const columnMap = {
+            'nome fantasia': 'Nome Fantasia',
+            'fantasia': 'Nome Fantasia',
+            'razao social': 'Cliente',
+            'cliente': 'Cliente',
+            'cnpj cpf': 'CNPJ / CPF',
+            'cnpj': 'CNPJ / CPF',
+            'cpf': 'CNPJ / CPF',
+            'contato': 'Contato',
+            'telefone comercial': 'Telefone Comercial',
+            'telefone': 'Telefone Comercial',
+            'celular': 'Celular',
+            'email': 'Email',
+            'endereco': 'Endereco',
+            'endereço': 'Endereco',
+            'numero': 'Numero',
+            'número': 'Numero',
+            'bairro': 'Bairro',
+            'cidade': 'Cidade',
+            'uf': 'UF',
+            'cep': 'CEP',
+            'saldo de credito': 'Saldo de Credito',
+            'saldo credito': 'Saldo de Credito',
+            'saldo': 'Saldo de Credito',
+            'data ultimo pedido': 'Data Ultimo Pedido',
+            'ultimo pedido': 'Data Ultimo Pedido',
+            'data cadastro': 'Data Cadastro',
+            'cadastro': 'Data Cadastro'
+        };
+        return columnMap[normalized] || column;
+    }
+
     // Validação de dados (CNPJ/CPF, email, CEP)
     validateClientData(clientData) {
         const errors = [];
@@ -131,7 +178,6 @@ class ClientManager {
             throw error;
         }
     }
-
 
     // Excluir cliente dos ativos - MÉTODO ROBUSTO CORRIGIDO
     async excluirAtivo(cliente) {
@@ -248,303 +294,343 @@ class ClientManager {
 
     // Aplicar ordenação
     applySorting(sort) {
-        switch (sort) {
-            case 'nome-az':
-                this.filteredData.sort((a, b) => (a['Nome Fantasia'] || '').localeCompare(b['Nome Fantasia'] || ''));
-                break;
-            case 'nome-za':
-                this.filteredData.sort((a, b) => (b['Nome Fantasia'] || '').localeCompare(a['Nome Fantasia'] || ''));
-                break;
-            case 'saldo-desc':
-                this.filteredData.sort((a, b) => parseFloat(b['Saldo de Credito']) - parseFloat(a['Saldo de Credito']));
-                break;
-            case 'saldo-asc':
-                this.filteredData.sort((a, b) => parseFloat(a['Saldo de Credito']) - parseFloat(b['Saldo de Credito']));
-                break;
-            case 'data-asc':
-                this.filteredData.sort((a, b) => this.parseDate(this.formatDateUS2BR(a['Data Ultimo Pedido'])) - this.parseDate(this.formatDateUS2BR(b['Data Ultimo Pedido'])));
-                break;
-            case 'data-desc':
-                this.filteredData.sort((a, b) => this.parseDate(this.formatDateUS2BR(b['Data Ultimo Pedido'])) - this.parseDate(this.formatDateUS2BR(a['Data Ultimo Pedido'])));
-                break;
+        try {
+            switch (sort) {
+                case 'nome-az':
+                    this.filteredData.sort((a, b) => (a['Nome Fantasia'] || '').localeCompare(b['Nome Fantasia'] || ''));
+                    break;
+                case 'nome-za':
+                    this.filteredData.sort((a, b) => (b['Nome Fantasia'] || '').localeCompare(a['Nome Fantasia'] || ''));
+                    break;
+                case 'saldo-desc':
+                    this.filteredData.sort((a, b) => parseFloat(b['Saldo de Credito']) - parseFloat(a['Saldo de Credito']));
+                    break;
+                case 'saldo-asc':
+                    this.filteredData.sort((a, b) => parseFloat(a['Saldo de Credito']) - parseFloat(b['Saldo de Credito']));
+                    break;
+                case 'data-asc':
+                    this.filteredData.sort((a, b) => this.parseDate(this.formatDateUS2BR(a['Data Ultimo Pedido'])) - this.parseDate(this.formatDateUS2BR(b['Data Ultimo Pedido'])));
+                    break;
+                case 'data-desc':
+                    this.filteredData.sort((a, b) => this.parseDate(this.formatDateUS2BR(b['Data Ultimo Pedido'])) - this.parseDate(this.formatDateUS2BR(a['Data Ultimo Pedido'])));
+                    break;
+            }
+        } catch (error) {
+            console.error('❌ Erro ao ordenar dados:', error);
         }
     }
 
     // Utilitários de data
     parseDate(dateStr) {
-        if (!dateStr) return 0;
-        const regex = /^\d{2}\/\d{2}\/\d{4}$/;
-        if (!regex.test(dateStr)) return 0;
-        
-        const [dayStr, monthStr, yearStr] = dateStr.split('/');
-        const day = parseInt(dayStr, 10);
-        const month = parseInt(monthStr, 10);
-        const year = parseInt(yearStr, 10);
-        
-        if (month < 1 || month > 12 || day < 1 || day > 31) return 0;
-        
-        const date = new Date(year, month - 1, day);
-        if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return 0;
-        
-        return date.getTime();
+        try {
+            if (!dateStr) return 0;
+            const regex = /^\d{2}\/\d{2}\/\d{4}$/;
+            if (!regex.test(dateStr)) return 0;
+            
+            const [dayStr, monthStr, yearStr] = dateStr.split('/');
+            const day = parseInt(dayStr, 10);
+            const month = parseInt(monthStr, 10);
+            const year = parseInt(yearStr, 10);
+            
+            if (month < 1 || month > 12 || day < 1 || day > 31) return 0;
+            
+            const date = new Date(year, month - 1, day);
+            if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return 0;
+            
+            return date.getTime();
+        } catch (error) {
+            console.error('❌ Erro ao parsear data:', error);
+            return 0;
+        }
     }
 
     formatDate(date) {
-        const day = date.getDate().toString().padStart(2, '0');
-        const month = (date.getMonth() + 1).toString().padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}/${month}/${year}`;
+        try {
+            const day = date.getDate().toString().padStart(2, '0');
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
+        } catch (error) {
+            console.error('❌ Erro ao formatar data:', error);
+            return '';
+        }
     }
 
     formatDateUS2BR(dateStr) {
-        if (!dateStr) return '';
-        if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) return dateStr;
-        
-        const parts = dateStr.split('/');
-        if (parts.length !== 3) return dateStr;
-        
-        let [month, day, year] = parts;
-        if (year.length === 2) year = '20' + year;
-        
-        return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+        try {
+            if (!dateStr) return '';
+            if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) return dateStr;
+            
+            const parts = dateStr.split('/');
+            if (parts.length !== 3) return dateStr;
+            
+            let [month, day, year] = parts;
+            if (year.length === 2) year = '20' + year;
+            
+            return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+        } catch (error) {
+            console.error('❌ Erro ao converter data US para BR:', error);
+            return dateStr;
+        }
     }
 
     daysSince(dateStr) {
-        const lastDate = new Date(this.parseDate(this.formatDateUS2BR(dateStr)));
-        const diff = Math.floor((this.today - lastDate) / (1000 * 60 * 60 * 24));
-        return isNaN(diff) ? 'N/A' : diff;
+        try {
+            const lastDate = new Date(this.parseDate(this.formatDateUS2BR(dateStr)));
+            const diff = Math.floor((this.today - lastDate) / (1000 * 60 * 60 * 24));
+            return isNaN(diff) ? 'N/A' : diff;
+        } catch (error) {
+            console.error('❌ Erro ao calcular dias desde:', error);
+            return 'N/A';
+        }
     }
 
     // Renderizar lista
     renderList() {
-        const listElement = document.getElementById(this.currentTab === 'inativos' ? 'list' : 'ativos-list');
-        if (!listElement) return;
+        try {
+            const listElement = document.getElementById(this.currentTab === 'inativos' ? 'list' : 'ativos-list');
+            if (!listElement) return;
 
-        listElement.innerHTML = '';
+            listElement.innerHTML = '';
 
-        if (this.filteredData.length === 0) {
-            listElement.innerHTML = '<li style="text-align: center; color: #666;">Nenhum cliente encontrado</li>';
-            return;
+            if (this.filteredData.length === 0) {
+                listElement.innerHTML = '<li style="text-align: center; color: #666;">Nenhum cliente encontrado</li>';
+                return;
+            }
+
+            this.filteredData.forEach(item => {
+                const li = document.createElement('li');
+                const daysSince = this.daysSince(item['Data Ultimo Pedido']);
+                
+                li.innerHTML = `
+                    <div>
+                        <strong>${item['Nome Fantasia'] || 'Sem Nome'}</strong>
+                        <span class="days-since">${daysSince} dias sem pedido</span>
+                    </div>
+                    <div style="font-size: 0.9em; color: #666;">
+                        ${item['Cidade'] || ''} - Saldo: R$ ${item['Saldo de Credito'] || '0'}
+                    </div>
+                `;
+                li.onclick = () => this.openModal(item, this.currentTab);
+                listElement.appendChild(li);
+            });
+        } catch (error) {
+            console.error('❌ Erro ao renderizar lista:', error);
         }
-
-        this.filteredData.forEach(item => {
-            const li = document.createElement('li');
-            const daysSince = this.daysSince(item['Data Ultimo Pedido']);
-            
-            li.innerHTML = `
-                <div>
-                    <strong>${item['Nome Fantasia'] || 'Sem Nome'}</strong>
-                    <span class="days-since">${daysSince} dias sem pedido</span>
-                </div>
-                <div style="font-size: 0.9em; color: #666;">
-                    ${item['Cidade'] || ''} - Saldo: R$ ${item['Saldo de Credito'] || '0'}
-                </div>
-            `;
-            li.onclick = () => this.openModal(item, this.currentTab);
-            listElement.appendChild(li);
-        });
     }
 
     // Abrir modal de detalhes - ATUALIZADO COM FUNÇÃO DE EXCLUSÃO ROBUSTA
     openModal(item, tab) {
-        this.currentItem = item;
-        
-        const modalBody = document.getElementById('modal-body');
-        modalBody.innerHTML = `
-            <h2 id="modal-title">${item['Nome Fantasia'] || 'Sem Nome'}</h2>
+        try {
+            this.currentItem = item;
             
-            <!-- Campos de exibição -->
-            <div class="display-field" id="display-info">
-                <p><strong>Cliente:</strong> <span id="display-cliente">${item.Cliente || ''}</span></p>
-                <p><strong>CNPJ/CPF:</strong> <span id="display-cnpj">${item['CNPJ / CPF'] || ''}</span></p>
-                <p><strong>Contato:</strong> <span id="display-contato">${item.Contato || ''}</span></p>
-                <p><strong>Telefone Comercial:</strong> <span id="display-telefone">${item['Telefone Comercial'] || ''}</span></p>
-                <p><strong>Celular:</strong> <span id="display-celular">${item.Celular || ''}</span></p>
-                <p><strong>Email:</strong> <span id="display-email">${item.Email || ''}</span></p>
-                <p><strong>Endereço:</strong> <span id="display-endereco-completo">${item.Endereco || ''}</span></p>
-                <p><strong>Número:</strong> <span id="display-numero">${item.Numero || ''}</span></p>
-                <p><strong>Bairro:</strong> <span id="display-bairro">${item.Bairro || ''}</span></p>
-                <p><strong>Cidade:</strong> <span id="display-cidade">${item.Cidade || ''}</span></p>
-                <p><strong>UF:</strong> <span id="display-uf">${item.UF || ''}</span></p>
-                <p><strong>CEP:</strong> <span id="display-cep">${item.CEP || ''}</span></p>
-                <p><strong>Saldo de Crédito:</strong> <span id="display-saldo">R$ ${item['Saldo de Credito'] || '0'}</span></p>
-                <p><strong>Data Último Pedido:</strong> <span id="display-data">${this.formatDateUS2BR(item['Data Ultimo Pedido']) || ''}</span></p>
-            </div>
-            
-            <!-- Campos de edição (inicialmente ocultos) -->
-            <div class="edit-field" id="edit-form" style="display: none;">
-                <div class="edit-row">
-                    <label><strong>Nome Fantasia:</strong></label>
-                    <input type="text" id="edit-nome-fantasia" class="edit-input" value="${item['Nome Fantasia'] || ''}">
+            const modalBody = document.getElementById('modal-body');
+            modalBody.innerHTML = `
+                <h2 id="modal-title">${item['Nome Fantasia'] || 'Sem Nome'}</h2>
+                
+                <!-- Campos de exibição -->
+                <div class="display-field" id="display-info">
+                    <p><strong>Cliente:</strong> <span id="display-cliente">${item.Cliente || ''}</span></p>
+                    <p><strong>CNPJ/CPF:</strong> <span id="display-cnpj">${item['CNPJ / CPF'] || ''}</span></p>
+                    <p><strong>Contato:</strong> <span id="display-contato">${item.Contato || ''}</span></p>
+                    <p><strong>Telefone Comercial:</strong> <span id="display-telefone">${item['Telefone Comercial'] || ''}</span></p>
+                    <p><strong>Celular:</strong> <span id="display-celular">${item.Celular || ''}</span></p>
+                    <p><strong>Email:</strong> <span id="display-email">${item.Email || ''}</span></p>
+                    <p><strong>Endereço:</strong> <span id="display-endereco-completo">${item.Endereco || ''}</span></p>
+                    <p><strong>Número:</strong> <span id="display-numero">${item.Numero || ''}</span></p>
+                    <p><strong>Bairro:</strong> <span id="display-bairro">${item.Bairro || ''}</span></p>
+                    <p><strong>Cidade:</strong> <span id="display-cidade">${item.Cidade || ''}</span></p>
+                    <p><strong>UF:</strong> <span id="display-uf">${item.UF || ''}</span></p>
+                    <p><strong>CEP:</strong> <span id="display-cep">${item.CEP || ''}</span></p>
+                    <p><strong>Saldo de Crédito:</strong> <span id="display-saldo">R$ ${item['Saldo de Credito'] || '0'}</span></p>
+                    <p><strong>Data Último Pedido:</strong> <span id="display-data">${this.formatDateUS2BR(item['Data Ultimo Pedido']) || ''}</span></p>
                 </div>
                 
-                <div class="edit-row">
-                    <label><strong>Cliente:</strong></label>
-                    <input type="text" id="edit-cliente" class="edit-input" value="${item.Cliente || ''}">
+                <!-- Campos de edição (inicialmente ocultos) -->
+                <div class="edit-field" id="edit-form" style="display: none;">
+                    <div class="edit-row">
+                        <label><strong>Nome Fantasia:</strong></label>
+                        <input type="text" id="edit-nome-fantasia" class="edit-input" value="${item['Nome Fantasia'] || ''}">
+                    </div>
+                    
+                    <div class="edit-row">
+                        <label><strong>Cliente:</strong></label>
+                        <input type="text" id="edit-cliente" class="edit-input" value="${item.Cliente || ''}">
+                    </div>
+                    
+                    <div class="edit-row">
+                        <label><strong>CNPJ/CPF:</strong></label>
+                        <input type="text" id="edit-cnpj-cpf" class="edit-input" value="${item['CNPJ / CPF'] || ''}">
+                    </div>
+                    
+                    <div class="edit-row">
+                        <label><strong>Contato:</strong></label>
+                        <input type="text" id="edit-contato" class="edit-input" value="${item.Contato || ''}">
+                    </div>
+                    
+                    <div class="edit-row">
+                        <label><strong>Telefone Comercial:</strong></label>
+                        <input type="tel" id="edit-telefone-comercial" class="edit-input" value="${item['Telefone Comercial'] || ''}">
+                    </div>
+                    
+                    <div class="edit-row">
+                        <label><strong>Celular:</strong></label>
+                        <input type="tel" id="edit-celular" class="edit-input" value="${item.Celular || ''}">
+                    </div>
+                    
+                    <div class="edit-row">
+                        <label><strong>Email:</strong></label>
+                        <input type="email" id="edit-email" class="edit-input" value="${item.Email || ''}">
+                    </div>
+                    
+                    <div class="edit-row">
+                        <label><strong>Endereço:</strong></label>
+                        <input type="text" id="edit-endereco" class="edit-input" value="${item.Endereco || ''}">
+                    </div>
+                    
+                    <div class="edit-row">
+                        <label><strong>Número:</strong></label>
+                        <input type="text" id="edit-numero" class="edit-input" value="${item.Numero || ''}">
+                    </div>
+                    
+                    <div class="edit-row">
+                        <label><strong>Bairro:</strong></label>
+                        <input type="text" id="edit-bairro" class="edit-input" value="${item.Bairro || ''}">
+                    </div>
+                    
+                    <div class="edit-row">
+                        <label><strong>Cidade:</strong></label>
+                        <input type="text" id="edit-cidade" class="edit-input" value="${item.Cidade || ''}">
+                    </div>
+                    
+                    <div class="edit-row">
+                        <label><strong>UF:</strong></label>
+                        <input type="text" id="edit-uf" class="edit-input" maxlength="2" value="${item.UF || ''}">
+                    </div>
+                    
+                    <div class="edit-row">
+                        <label><strong>CEP:</strong></label>
+                        <input type="text" id="edit-cep" class="edit-input" maxlength="9" value="${item.CEP || ''}">
+                    </div>
+                    
+                    <div class="edit-row">
+                        <label><strong>Saldo de Crédito:</strong></label>
+                        <input type="number" id="edit-saldo-credito" class="edit-input" min="0" step="0.01" value="${item['Saldo de Credito'] || ''}">
+                    </div>
                 </div>
                 
-                <div class="edit-row">
-                    <label><strong>CNPJ/CPF:</strong></label>
-                    <input type="text" id="edit-cnpj-cpf" class="edit-input" value="${item['CNPJ / CPF'] || ''}">
+                <!-- Botões de ação -->
+                <div class="action-buttons" style="margin-top: 20px;">
+                    <button id="editarCliente" class="action-btn edit-btn">✏️ Editar Cliente</button>
+                    <button id="salvarEdicao" class="action-btn save-btn" style="display: none;">💾 Salvar</button>
+                    <button id="cancelarEdicao" class="action-btn cancel-btn" style="display: none;">❌ Cancelar</button>
                 </div>
-                
-                <div class="edit-row">
-                    <label><strong>Contato:</strong></label>
-                    <input type="text" id="edit-contato" class="edit-input" value="${item.Contato || ''}">
-                </div>
-                
-                <div class="edit-row">
-                    <label><strong>Telefone Comercial:</strong></label>
-                    <input type="tel" id="edit-telefone-comercial" class="edit-input" value="${item['Telefone Comercial'] || ''}">
-                </div>
-                
-                <div class="edit-row">
-                    <label><strong>Celular:</strong></label>
-                    <input type="tel" id="edit-celular" class="edit-input" value="${item.Celular || ''}">
-                </div>
-                
-                <div class="edit-row">
-                    <label><strong>Email:</strong></label>
-                    <input type="email" id="edit-email" class="edit-input" value="${item.Email || ''}">
-                </div>
-                
-                <div class="edit-row">
-                    <label><strong>Endereço:</strong></label>
-                    <input type="text" id="edit-endereco" class="edit-input" value="${item.Endereco || ''}">
-                </div>
-                
-                <div class="edit-row">
-                    <label><strong>Número:</strong></label>
-                    <input type="text" id="edit-numero" class="edit-input" value="${item.Numero || ''}">
-                </div>
-                
-                <div class="edit-row">
-                    <label><strong>Bairro:</strong></label>
-                    <input type="text" id="edit-bairro" class="edit-input" value="${item.Bairro || ''}">
-                </div>
-                
-                <div class="edit-row">
-                    <label><strong>Cidade:</strong></label>
-                    <input type="text" id="edit-cidade" class="edit-input" value="${item.Cidade || ''}">
-                </div>
-                
-                <div class="edit-row">
-                    <label><strong>UF:</strong></label>
-                    <input type="text" id="edit-uf" class="edit-input" maxlength="2" value="${item.UF || ''}">
-                </div>
-                
-                <div class="edit-row">
-                    <label><strong>CEP:</strong></label>
-                    <input type="text" id="edit-cep" class="edit-input" maxlength="9" value="${item.CEP || ''}">
-                </div>
-                
-                <div class="edit-row">
-                    <label><strong>Saldo de Crédito:</strong></label>
-                    <input type="number" id="edit-saldo-credito" class="edit-input" min="0" step="0.01" value="${item['Saldo de Credito'] || ''}">
-                </div>
-            </div>
-            
-            <!-- Botões de ação -->
-            <div class="action-buttons" style="margin-top: 20px;">
-                <button id="editarCliente" class="action-btn edit-btn">✏️ Editar Cliente</button>
-                <button id="salvarEdicao" class="action-btn save-btn" style="display: none;">💾 Salvar</button>
-                <button id="cancelarEdicao" class="action-btn cancel-btn" style="display: none;">❌ Cancelar</button>
-            </div>
-        `;
+            `;
 
-        // Configurar event listeners para os botões de edição
-        setTimeout(() => {
-            const editBtn = document.getElementById('editarCliente');
-            const saveBtn = document.getElementById('salvarEdicao');
-            const cancelBtn = document.getElementById('cancelarEdicao');
-            
-            if (editBtn) {
-                editBtn.addEventListener('click', () => this.toggleEditMode());
+            // Configurar event listeners para os botões de edição
+            setTimeout(() => {
+                const editBtn = document.getElementById('editarCliente');
+                const saveBtn = document.getElementById('salvarEdicao');
+                const cancelBtn = document.getElementById('cancelarEdicao');
+                
+                if (editBtn) {
+                    editBtn.addEventListener('click', () => this.toggleEditMode());
+                }
+                
+                if (saveBtn) {
+                    saveBtn.addEventListener('click', () => this.salvarEdicaoCliente());
+                }
+                
+                if (cancelBtn) {
+                    cancelBtn.addEventListener('click', () => this.cancelarEdicaoCliente());
+                }
+            }, 100);
+
+            // Configurar botões WhatsApp e Maps
+            const whatsappBtn = document.getElementById('whatsapp-btn');
+            const mapsBtn = document.getElementById('maps-btn');
+
+            if (whatsappBtn) {
+                const phone = item['Telefone Comercial'] || item.Celular || '';
+                const message = `Olá ${item['Nome Fantasia'] || 'cliente'}! Estou entrando em contato para verificar se podemos retomar nosso relacionamento comercial.`;
+                whatsappBtn.href = this.generateWhatsAppLink(phone, message);
+                whatsappBtn.style.display = phone ? 'inline-block' : 'none';
             }
-            
-            if (saveBtn) {
-                saveBtn.addEventListener('click', () => this.salvarEdicaoCliente());
+
+            if (mapsBtn) {
+                const address = this.getFullAddress(item);
+                mapsBtn.href = this.generateMapsLink(address);
+                mapsBtn.style.display = address ? 'inline-block' : 'none';
             }
-            
-            if (cancelBtn) {
-                cancelBtn.addEventListener('click', () => this.cancelarEdicaoCliente());
+
+            // Configurar botões de status
+            document.getElementById('tornarAtivo').style.display = (tab === 'inativos') ? 'inline-block' : 'none';
+            document.getElementById('excluirAtivo').style.display = (tab === 'ativos') ? 'inline-block' : 'none';
+            document.getElementById('editDataPedido').style.display = 'none';
+            document.getElementById('labelEditDataPedido').style.display = 'none';
+            document.getElementById('confirmarAtivo').style.display = 'none';
+
+            // Carregar observações
+            const obsTextarea = document.getElementById('observacoes');
+            if (obsTextarea) {
+                obsTextarea.value = window.dbManager.loadObservation(item.id);
+                document.getElementById('observacoes-contador').textContent = obsTextarea.value.length + '/2000';
             }
-        }, 100);
 
-        // Configurar botões WhatsApp e Maps
-        const whatsappBtn = document.getElementById('whatsapp-btn');
-        const mapsBtn = document.getElementById('maps-btn');
-
-        if (whatsappBtn) {
-            const phone = item['Telefone Comercial'] || item.Celular || '';
-            const message = `Olá ${item['Nome Fantasia'] || 'cliente'}! Estou entrando em contato para verificar se podemos retomar nosso relacionamento comercial.`;
-            whatsappBtn.href = this.generateWhatsAppLink(phone, message);
-            whatsappBtn.style.display = phone ? 'inline-block' : 'none';
+            document.getElementById('modal').style.display = 'flex';
+        } catch (error) {
+            console.error('❌ Erro ao abrir modal:', error);
         }
-
-        if (mapsBtn) {
-            const address = this.getFullAddress(item);
-            mapsBtn.href = this.generateMapsLink(address);
-            mapsBtn.style.display = address ? 'inline-block' : 'none';
-        }
-
-        // Configurar botões de status
-        document.getElementById('tornarAtivo').style.display = (tab === 'inativos') ? 'inline-block' : 'none';
-        document.getElementById('excluirAtivo').style.display = (tab === 'ativos') ? 'inline-block' : 'none';
-        document.getElementById('editDataPedido').style.display = 'none';
-        document.getElementById('labelEditDataPedido').style.display = 'none';
-        document.getElementById('confirmarAtivo').style.display = 'none';
-
-        // Carregar observações
-        const obsTextarea = document.getElementById('observacoes');
-        if (obsTextarea) {
-            obsTextarea.value = window.dbManager.loadObservation(item.id);
-            document.getElementById('observacoes-contador').textContent = obsTextarea.value.length + '/2000';
-        }
-
-        document.getElementById('modal').style.display = 'flex';
     }
 
     // Alternar modo de edição
     toggleEditMode() {
-        const displayField = document.getElementById('display-info');
-        const editField = document.getElementById('edit-form');
-        const editBtn = document.getElementById('editarCliente');
-        const saveBtn = document.getElementById('salvarEdicao');
-        const cancelBtn = document.getElementById('cancelarEdicao');
-        
-        if (displayField && editField && editBtn && saveBtn && cancelBtn) {
-            displayField.style.display = 'none';
-            editField.style.display = 'block';
-            editBtn.style.display = 'none';
-            saveBtn.style.display = 'inline-block';
-            cancelBtn.style.display = 'inline-block';
+        try {
+            const displayField = document.getElementById('display-info');
+            const editField = document.getElementById('edit-form');
+            const editBtn = document.getElementById('editarCliente');
+            const saveBtn = document.getElementById('salvarEdicao');
+            const cancelBtn = document.getElementById('cancelarEdicao');
+            
+            if (displayField && editField && editBtn && saveBtn && cancelBtn) {
+                displayField.style.display = 'none';
+                editField.style.display = 'block';
+                editBtn.style.display = 'none';
+                saveBtn.style.display = 'inline-block';
+                cancelBtn.style.display = 'inline-block';
+            }
+        } catch (error) {
+            console.error('❌ Erro ao alternar modo de edição:', error);
         }
     }
 
     // Cancelar edição
     cancelarEdicaoCliente() {
-        const displayField = document.getElementById('display-info');
-        const editField = document.getElementById('edit-form');
-        const editBtn = document.getElementById('editarCliente');
-        const saveBtn = document.getElementById('salvarEdicao');
-        const cancelBtn = document.getElementById('cancelarEdicao');
-        
-        if (displayField && editField && editBtn && saveBtn && cancelBtn) {
-            displayField.style.display = 'block';
-            editField.style.display = 'none';
-            editBtn.style.display = 'inline-block';
-            saveBtn.style.display = 'none';
-            cancelBtn.style.display = 'none';
+        try {
+            const displayField = document.getElementById('display-info');
+            const editField = document.getElementById('edit-form');
+            const editBtn = document.getElementById('editarCliente');
+            const saveBtn = document.getElementById('salvarEdicao');
+            const cancelBtn = document.getElementById('cancelarEdicao');
+            
+            if (displayField && editField && editBtn && saveBtn && cancelBtn) {
+                displayField.style.display = 'block';
+                editField.style.display = 'none';
+                editBtn.style.display = 'inline-block';
+                saveBtn.style.display = 'none';
+                cancelBtn.style.display = 'none';
+            }
+        } catch (error) {
+            console.error('❌ Erro ao cancelar edição:', error);
         }
     }
 
     // Salvar edição do cliente
     async salvarEdicaoCliente() {
-        const cliente = this.currentItem;
-        if (!cliente) return;
-        
         try {
+            const cliente = this.currentItem;
+            if (!cliente) return;
+            
             // Coletar dados editados
             const dadosEditados = {
                 'Nome Fantasia': document.getElementById('edit-nome-fantasia')?.value?.trim() || '',
@@ -588,31 +674,61 @@ class ClientManager {
 
     // Utilitários
     getFullAddress(item) {
-        const parts = [
-            item.Endereco || '',
-            item.Numero || '',
-            item.Bairro || '',
-            item.Cidade || '',
-            item.UF || '',
-            item.CEP || ''
-        ].filter(part => part.trim());
-        
-        return parts.join(', ');
+        try {
+            const parts = [
+                item.Endereco || '',
+                item.Numero || '',
+                item.Bairro || '',
+                item.Cidade || '',
+                item.UF || '',
+                item.CEP || ''
+            ].filter(part => part.trim());
+            
+            return parts.join(', ');
+        } catch (error) {
+            console.error('❌ Erro ao obter endereço completo:', error);
+            return '';
+        }
     }
 
     generateWhatsAppLink(phone, message) {
-        if (!phone) return '#';
-        const cleanPhone = phone.replace(/\D/g, '');
-        const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone;
-        const encodedMessage = encodeURIComponent(message);
-        return `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
+        try {
+            if (!phone) return '#';
+            const cleanPhone = phone.replace(/\D/g, '');
+            const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone;
+            const encodedMessage = encodeURIComponent(message);
+            return `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
+        } catch (error) {
+            console.error('❌ Erro ao gerar link WhatsApp:', error);
+            return '#';
+        }
     }
 
     generateMapsLink(address) {
-        if (!address) return '#';
-        const encodedAddress = encodeURIComponent(address);
-        return `https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`;
+        try {
+            if (!address) return '#';
+            const encodedAddress = encodeURIComponent(address);
+            return `https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`;
+        } catch (error) {
+            console.error('❌ Erro ao gerar link Maps:', error);
+            return '#';
+        }
     }
+
+   // Nova função: Backup automático antes de operações críticas
+// Nova função: Backup automático antes de operações críticas
+async createBackup(dataType, data) {
+    try {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const backupData = { timestamp, data: JSON.parse(JSON.stringify(data)) };
+        await window.dbManager.saveData(`backup-${dataType}-${timestamp}`, backupData);
+        console.log(`✅ Backup criado para ${dataType} em ${timestamp}`);
+    } catch (error) {
+        console.error('❌ Erro ao criar backup:', error);
+        // O object store 'backups' será criado automaticamente no init, então não precisamos de initBackupStore
+    }
+
+}
 }
 
 // Função global para exclusão robusta de ativos - NOVA
@@ -636,6 +752,9 @@ window.excluirAtivoRobusto = async function(clienteId) {
         if (!confirm(`Tem certeza que deseja excluir "${nomeCliente}" dos clientes ativos?`)) {
             return false;
         }
+        
+        // Criar backup antes da exclusão
+        await window.clientManager.createBackup('ativos', window.clientManager.ativos);
         
         // Executar exclusão
         const sucesso = await window.clientManager.excluirAtivo(cliente);
@@ -671,4 +790,4 @@ window.excluirAtivoRobusto = async function(clienteId) {
 // Instância global do gerenciador de clientes
 window.clientManager = new ClientManager();
 
-console.log('✅ client-manager.js carregado - versão com exclusão robusta corrigida');
+console.log('✅ client-manager.js carregado - versão com exclusão robusta corrigida e importação otimizada');
