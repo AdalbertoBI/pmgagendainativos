@@ -1,4 +1,4 @@
-// map.js - Versão com precisão de geocodificação restaurada e otimizada
+// map.js - Versão otimizada com consulta sequencial de APIs
 
 let map = null;
 let markers = [];
@@ -7,46 +7,7 @@ let manualCorrections = {};
 let isEditMode = false;
 let includeInativos = false;
 let precisaoStats = { total: 0, alta: 0, media: 0, baixa: 0 };
-
-// Coordenadas precisas das principais cidades brasileiras (expandidas)
-const COORDENADAS_PRECISAS = {
-    'SAO PAULO': { lat: -23.5505, lng: -46.6333, precision: 'centro' },
-    'RIO DE JANEIRO': { lat: -22.9068, lng: -43.1729, precision: 'centro' },
-    'BELO HORIZONTE': { lat: -19.9191, lng: -43.9386, precision: 'centro' },
-    'SALVADOR': { lat: -12.9714, lng: -38.5014, precision: 'centro' },
-    'BRASILIA': { lat: -15.7941, lng: -47.8825, precision: 'centro' },
-    'FORTALEZA': { lat: -3.7319, lng: -38.5267, precision: 'centro' },
-    'CURITIBA': { lat: -25.4284, lng: -49.2733, precision: 'centro' },
-    'RECIFE': { lat: -8.0476, lng: -34.8770, precision: 'centro' },
-    'PORTO ALEGRE': { lat: -30.0346, lng: -51.2177, precision: 'centro' },
-    'MANAUS': { lat: -3.1190, lng: -60.0217, precision: 'centro' },
-    'GOIANIA': { lat: -16.6864, lng: -49.2643, precision: 'centro' },
-    'CAMPINAS': { lat: -22.9099, lng: -47.0626, precision: 'centro' },
-    'SAO JOSE DOS CAMPOS': { lat: -23.2237, lng: -45.9009, precision: 'centro' },
-    'SANTOS': { lat: -23.9618, lng: -46.3322, precision: 'centro' },
-    'SOROCABA': { lat: -23.5015, lng: -47.4526, precision: 'centro' },
-    'RIBEIRAO PRETO': { lat: -21.1775, lng: -47.8142, precision: 'centro' },
-    'UBERLANDIA': { lat: -18.9113, lng: -48.2622, precision: 'centro' },
-    'CONTAGEM': { lat: -19.9317, lng: -44.0536, precision: 'centro' },
-    'NATAL': { lat: -5.7945, lng: -35.2110, precision: 'centro' },
-    'CAMPO GRANDE': { lat: -20.4697, lng: -54.6201, precision: 'centro' },
-    'TRES LAGOAS': { lat: -20.7519, lng: -51.6782, precision: 'centro' },
-    'FLORIANOPOLIS': { lat: -27.5954, lng: -48.5480, precision: 'centro' },
-    'JOINVILLE': { lat: -26.3044, lng: -48.8487, precision: 'centro' },
-    'LONDRINA': { lat: -23.3045, lng: -51.1696, precision: 'centro' },
-    'MARINGA': { lat: -23.4205, lng: -51.9331, precision: 'centro' },
-    'VITORIA': { lat: -20.2976, lng: -40.2958, precision: 'centro' },
-    'MACEIO': { lat: -9.6476, lng: -35.7175, precision: 'centro' },
-    'JOAO PESSOA': { lat: -7.1195, lng: -34.8450, precision: 'centro' },
-    'ARACAJU': { lat: -10.9472, lng: -37.0731, precision: 'centro' },
-    'TERESINA': { lat: -5.0892, lng: -42.8019, precision: 'centro' },
-    'PALMAS': { lat: -10.1689, lng: -48.3317, precision: 'centro' },
-    'CUIABA': { lat: -15.6014, lng: -56.0979, precision: 'centro' },
-    'BOA VISTA': { lat: 2.8235, lng: -60.6758, precision: 'centro' },
-    'MACAPA': { lat: 0.0389, lng: -51.0664, precision: 'centro' },
-    'RIO BRANCO': { lat: -9.9754, lng: -67.8249, precision: 'centro' },
-    'PORTO VELHO': { lat: -8.7619, lng: -63.9039, precision: 'centro' }
-};
+let lastApiCallTime = 0; // Controle de taxa global
 
 // Padrões de CEP por estado para validação
 const PADROES_CEP = {
@@ -290,41 +251,36 @@ async function loadMapData() {
     precisaoStats = { total: 0, alta: 0, media: 0, baixa: 0 };
     
     let loaded = 0;
-    let batchSize = 3; // Reduzido para melhor controle
-    
-    for (let i = 0; i < clientsToShow.length; i += batchSize) {
-        const batch = clientsToShow.slice(i, i + batchSize);
-        
-        const promises = batch.map(async client => {
-            try {
-                const coords = await geocodificarClienteComMaximaPrecisao(client);
-                if (coords) {
-                    const marker = createEditableMarker(coords, client);
-                    markers.push(marker);
-                    loaded++;
-                    
-                    // Estatísticas de precisão
-                    precisaoStats.total++;
-                    if (coords.confidence >= 0.8) precisaoStats.alta++;
-                    else if (coords.confidence >= 0.6) precisaoStats.media++;
-                    else precisaoStats.baixa++;
-                }
-            } catch (error) {
-                console.error('Erro ao processar cliente:', client['Nome Fantasia'], error);
+    for (const client of clientsToShow) {
+        try {
+            const coords = await geocodificarClienteComMaximaPrecisao(client);
+            if (coords) {
+                const marker = createEditableMarker(coords, client);
+                markers.push(marker);
+                loaded++;
+                
+                precisaoStats.total++;
+                if (coords.confidence >= 0.8) precisaoStats.alta++;
+                else if (coords.confidence >= 0.6) precisaoStats.media++;
+                else precisaoStats.baixa++;
             }
-        });
-        
-        await Promise.all(promises);
+        } catch (error) {
+            console.error('Erro ao processar cliente:', client['Nome Fantasia'], error);
+        }
         
         // Atualizar progresso
         const progress = Math.round((loaded / clientsToShow.length) * 100);
         updateMapStatus(`${statusPrefix}... ${progress}% (${loaded}/${clientsToShow.length})`);
         
-        // Pausa entre lotes para não sobrecarregar APIs
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Controle de taxa: esperar pelo menos 1 segundo desde a última chamada
+        const now = Date.now();
+        const timeSinceLastCall = now - lastApiCallTime;
+        if (timeSinceLastCall < 1000) {
+            await new Promise(resolve => setTimeout(resolve, 1000 - timeSinceLastCall));
+        }
+        lastApiCallTime = Date.now();
     }
     
-    // Estatísticas finais
     const altaPrecisao = precisaoStats.total > 0 ? Math.round((precisaoStats.alta / precisaoStats.total) * 100) : 0;
     const ativosCount = ativos.length;
     const inativosCount = includeInativos ? inativos.length : 0;
@@ -340,7 +296,7 @@ async function loadMapData() {
     });
 }
 
-// Geocodificar cliente com máxima precisão - SISTEMA OTIMIZADO
+// Geocodificar cliente com máxima precisão usando APIs sequencialmente
 async function geocodificarClienteComMaximaPrecisao(client) {
     const address = getFullAddress(client);
     if (!address) return null;
@@ -359,124 +315,46 @@ async function geocodificarClienteComMaximaPrecisao(client) {
         return addressCache[address];
     }
     
-    // 3. Geocodificação por CEP (mais precisa)
-    const coordsPorCEP = await geocodificarPorCEP(client);
-    if (coordsPorCEP && coordsPorCEP.confidence >= 0.8) {
-        console.log('🏢 Geocodificação por CEP bem-sucedida');
-        addressCache[address] = coordsPorCEP;
-        salvarCache();
-        return coordsPorCEP;
+    // 3. Geocodificação por CEP usando ViaCEP
+    const cep = (client.CEP || '').replace(/\D/g, '');
+    if (cep.length === 8) {
+        const cepData = await geocodificarPorCEP(cep);
+        if (cepData && !cepData.erro) {
+            const enderecoCompleto = `${cepData.logradouro}, ${cepData.bairro}, ${cepData.localidade}, ${cepData.uf}, Brasil`;
+            const coordsNominatim = await geocodificarNominatimOtimizado(enderecoCompleto);
+            if (coordsNominatim && validarCoordenadas(coordsNominatim, client)) {
+                console.log('🏠 Geocodificação por Nominatim a partir de ViaCEP bem-sucedida');
+                addressCache[address] = coordsNominatim;
+                salvarCache();
+                return coordsNominatim;
+            }
+        }
     }
     
-    // 4. Geocodificação por endereço completo melhorada
+    // 4. Geocodificação por endereço completo com Nominatim
     const coordsEndereco = await geocodificarEnderecoCompleto(client);
-    if (coordsEndereco && coordsEndereco.confidence >= 0.7) {
-        console.log('🏠 Geocodificação por endereço bem-sucedida');
+    if (coordsEndereco && validarCoordenadas(coordsEndereco, client)) {
+        console.log('🏠 Geocodificação por Nominatim bem-sucedida');
         addressCache[address] = coordsEndereco;
         salvarCache();
         return coordsEndereco;
     }
     
-    // 5. Geocodificação por cidade precisa
-    const coordsCidade = obterCoordenadasCidadePrecisa(client);
-    if (coordsCidade) {
-        console.log('🏙️ Usando coordenadas precisas da cidade');
-        addressCache[address] = coordsCidade;
+    // 5. Fallback com Geonames
+    const coordsGeonames = await geocodificarComGeonames(address, client.Cidade, client.UF);
+    if (coordsGeonames && validarCoordenadas(coordsGeonames, client)) {
+        console.log('🌍 Geocodificação por Geonames bem-sucedida');
+        addressCache[address] = coordsGeonames;
         salvarCache();
-        return coordsCidade;
-    }
-    
-    // 6. Fallback otimizado
-    const fallback = obterFallbackOtimizado(client);
-    if (fallback) {
-        console.log('🎯 Usando fallback otimizado');
-        addressCache[address] = fallback;
-        salvarCache();
-        return fallback;
+        return coordsGeonames;
     }
     
     console.log('❌ Geocodificação falhou para:', address);
     return null;
-}async function geocodificarClienteComMaximaPrecisao(client) {
-    const address = getFullAddress(client);
-    if (!address) return null;
-    // 1. Correção manual
-    if (manualCorrections[address]) return manualCorrections[address];
-    // 2. Cache
-    if (addressCache[address] && addressCache[address].confidence >= 0.8)
-        return addressCache[address];
-    // 3. Nominatim com mais variações
-    const variacoes = criarVariacoesEndereco(client);
-    for (const endereco of variacoes) {
-        try {
-            const coords = await geocodificarNominatimOtimizado(endereco);
-            if (coords && validarCoordenadas(coords, client)) {
-                addressCache[address] = coords; salvarCache();
-                return coords;
-            }
-        } catch (error) { }
-        await new Promise(resolve => setTimeout(resolve, 400));
-    }
-    // 4. Consulta Geonames (sem chave)
-    const geonamesCoords = await geocodificarComGeonames(address, client['Cidade'], client['UF']);
-    if (geonamesCoords && validarCoordenadas(geonamesCoords, client)) {
-        addressCache[address] = geonamesCoords; salvarCache();
-        return geonamesCoords;
-    }
-    // 5. CEP e cidade/estado fallback — como já existia
-    const coordsPorCEP = await geocodificarPorCEP(client);
-    if (coordsPorCEP && coordsPorCEP.confidence >= 0.8) {
-        addressCache[address] = coordsPorCEP; salvarCache();
-        return coordsPorCEP;
-    }
-    const coordsCidade = obterCoordenadasCidadePrecisa(client);
-    if (coordsCidade) {
-        addressCache[address] = coordsCidade; salvarCache();
-        return coordsCidade;
-    }
-    const fallback = obterFallbackOtimizado(client);
-    if (fallback) {
-        addressCache[address] = fallback; salvarCache();
-        return fallback;
-    }
-    return null;
-}
-
-// Nova função: geocodificação usando Geonames (pública, sem API key)
-async function geocodificarComGeonames(address, cidade, uf) {
-    try {
-        const cidadeLimpa = (cidade || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9 ]/g, '');
-        if (!cidadeLimpa) return null;
-        const url = `https://www.geonames.org/search.html?q=${encodeURIComponent(cidadeLimpa + ' ' + (uf || ''))}&country=BR`;
-        const res = await fetch(`https://secure.geonames.org/searchJSON?name_equals=${encodeURIComponent(cidadeLimpa)}&country=BR&maxRows=1`);
-        if (res.ok) {
-            const data = await res.json();
-            if (data.geonames && data.geonames.length > 0) {
-                return {
-                    lat: parseFloat(data.geonames[0].lat),
-                    lng: parseFloat(data.geonames[0].lng),
-                    confidence: 0.7,
-                    provider: 'Geonames',
-                    manuallyEdited: false
-                };
-            }
-        }
-    } catch (error) { }
-    return null;
 }
 
 // Geocodificar por CEP usando ViaCEP
-async function geocodificarPorCEP(client) {
-    const cep = (client.CEP || '').replace(/\D/g, '');
-    if (cep.length !== 8) return null;
-    
-    // Validar CEP por estado
-    const estado = (client.UF || '').toUpperCase();
-    if (!validarCEPPorEstado(cep, estado)) {
-        console.log('⚠️ CEP inválido para o estado:', cep, estado);
-        return null;
-    }
-    
+async function geocodificarPorCEP(cep) {
     try {
         const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, {
             timeout: 5000
@@ -485,85 +363,14 @@ async function geocodificarPorCEP(client) {
         if (!response.ok) throw new Error('CEP não encontrado');
         
         const data = await response.json();
-        if (data.erro) throw new Error('CEP inválido');
-        
-        // Usar coordenadas estimadas baseadas no CEP
-        const coordsEstimadas = await estimarCoordenadasPorCEP(data);
-        if (coordsEstimadas) {
-            return {
-                lat: coordsEstimadas.lat,
-                lng: coordsEstimadas.lng,
-                confidence: 0.85,
-                provider: 'ViaCEP',
-                manuallyEdited: false,
-                cepData: data
-            };
-        }
+        return data;
     } catch (error) {
         console.log('Erro ao geocodificar CEP:', error.message);
+        return { erro: true };
     }
-    
-    return null;
 }
 
-// Validar CEP por estado
-function validarCEPPorEstado(cep, estado) {
-    const padrao = PADROES_CEP[estado];
-    if (!padrao) return true;
-    
-    const cepNum = parseInt(cep);
-    const inicioNum = parseInt(padrao.inicio);
-    const fimNum = parseInt(padrao.fim);
-    
-    return cepNum >= inicioNum && cepNum <= fimNum;
-}
-
-// Estimar coordenadas por CEP com maior precisão
-async function estimarCoordenadasPorCEP(cepData) {
-    const cidade = cepData.localidade?.toUpperCase();
-    const bairro = cepData.bairro || '';
-    const logradouro = cepData.logradouro || '';
-    
-    // Tentar geocodificar o endereço específico primeiro
-    if (logradouro && cidade) {
-        const enderecoCompleto = `${logradouro}, ${bairro}, ${cidade}, ${cepData.uf}`;
-        const coordsEspecificas = await geocodificarNominatimOtimizado(enderecoCompleto);
-        if (coordsEspecificas && coordsEspecificas.confidence >= 0.7) {
-            return coordsEspecificas;
-        }
-    }
-    
-    // Usar coordenadas da cidade como base
-    const coordsCidade = COORDENADAS_PRECISAS[cidade];
-    if (!coordsCidade) return null;
-    
-    // Adicionar variação baseada no bairro
-    const variacao = calcularVariacaoPorBairro(bairro, logradouro);
-    
-    return {
-        lat: coordsCidade.lat + variacao.lat,
-        lng: coordsCidade.lng + variacao.lng
-    };
-}
-
-// Calcular variação por bairro com melhor distribuição
-function calcularVariacaoPorBairro(bairro, logradouro) {
-    const seed = (bairro + logradouro).toLowerCase().replace(/\s/g, '');
-    let hash = 0;
-    for (let i = 0; i < seed.length; i++) {
-        hash = ((hash << 5) - hash + seed.charCodeAt(i)) & 0xffffffff;
-    }
-    
-    // Variação mais realista (até 3km do centro)
-    const variacao = {
-        lat: ((hash % 600) - 300) * 0.0001, // ±0.03 grau ≈ 3km
-        lng: ((hash % 800) - 400) * 0.0001  // ±0.04 grau ≈ 3km
-    };
-    
-    return variacao;
-}
-
-// Geocodificar endereço completo com melhorias
+// Geocodificar por endereço completo com controle de taxa
 async function geocodificarEnderecoCompleto(client) {
     const variacoes = criarVariacoesEndereco(client);
     
@@ -574,39 +381,30 @@ async function geocodificarEnderecoCompleto(client) {
                 return coords;
             }
         } catch (error) {
-            console.log('Tentando próxima variação...');
+            console.log('Tentando próxima variação...', error);
         }
         
-        // Pausa pequena entre tentativas
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Controle de taxa: esperar 1 segundo
+        const now = Date.now();
+        const timeSinceLastCall = now - lastApiCallTime;
+        if (timeSinceLastCall < 1000) {
+            await new Promise(resolve => setTimeout(resolve, 1000 - timeSinceLastCall));
+        }
+        lastApiCallTime = now;
     }
     
     return null;
 }
 
-// Criar variações de endereço
-function criarVariacoesEndereco(client) {
-    const endereco = (client.Endereco || '').trim();
-    const numero = (client.Numero || '').trim();
-    const bairro = (client.Bairro || '').trim();
-    const cidade = (client.Cidade || '').trim();
-    const uf = (client.UF || '').trim().toUpperCase();
-    const cep = (client.CEP || '').replace(/\D/g, '');
-    
-    if (!cidade) return [];
-    
-    return [
-        `${endereco}, ${numero}, ${bairro}, ${cidade}, ${uf}, Brasil`,
-        `${endereco}, ${bairro}, ${cidade}, ${uf}, Brasil`,
-        `${endereco}, ${cidade}, ${uf}, Brasil`,
-        `${bairro}, ${cidade}, ${uf}, Brasil`,
-        `${cidade}, ${uf}, Brasil`,
-        `${cep}, Brasil`
-    ].filter(addr => addr.length > 10);
-}
-
-// Geocodificar com Nominatim otimizado
+// Geocodificar com Nominatim otimizado com controle de taxa
 async function geocodificarNominatimOtimizado(endereco) {
+    const now = Date.now();
+    const timeSinceLastCall = now - lastApiCallTime;
+    if (timeSinceLastCall < 1000) {
+        await new Promise(resolve => setTimeout(resolve, 1000 - timeSinceLastCall));
+    }
+    lastApiCallTime = now;
+
     try {
         const encodedAddress = encodeURIComponent(endereco);
         const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1&countrycodes=br&addressdetails=1`;
@@ -614,7 +412,8 @@ async function geocodificarNominatimOtimizado(endereco) {
         const response = await fetch(url, {
             headers: {
                 'User-Agent': 'ClienteManager/3.0 (contato@empresa.com)'
-            }
+            },
+            timeout: 5000
         });
         
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -641,22 +440,40 @@ async function geocodificarNominatimOtimizado(endereco) {
     return null;
 }
 
+// Nova função: geocodificação usando Geonames (pública, sem API key)
+async function geocodificarComGeonames(address, cidade, uf) {
+    try {
+        const cidadeLimpa = (cidade || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9 ]/g, '');
+        if (!cidadeLimpa) return null;
+        const res = await fetch(`https://secure.geonames.org/searchJSON?name_equals=${encodeURIComponent(cidadeLimpa)}&country=BR&maxRows=1`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.geonames && data.geonames.length > 0) {
+                return {
+                    lat: parseFloat(data.geonames[0].lat),
+                    lng: parseFloat(data.geonames[0].lng),
+                    confidence: 0.7,
+                    provider: 'Geonames',
+                    manuallyEdited: false
+                };
+            }
+        }
+    } catch (error) {}
+    return null;
+}
+
 // Calcular confiança detalhada
 function calcularConfiancaDetalhada(result, endereco) {
-    let confidence = 0.5; // Base
-    
-    // Verificar tipo de lugar
+    let confidence = 0.5;
     const placeType = result.type;
     if (placeType === 'house' || placeType === 'building') confidence += 0.4;
     else if (placeType === 'street' || placeType === 'road') confidence += 0.3;
     else if (placeType === 'neighbourhood') confidence += 0.2;
     else if (placeType === 'city' || placeType === 'town') confidence += 0.1;
     
-    // Verificar importância
     const importance = parseFloat(result.importance) || 0;
     confidence += importance * 0.3;
     
-    // Verificar detalhes do endereço
     const address = result.address || {};
     if (address.house_number) confidence += 0.15;
     if (address.road) confidence += 0.1;
@@ -668,24 +485,12 @@ function calcularConfiancaDetalhada(result, endereco) {
 
 // Validar coordenadas com verificação rigorosa
 function validarCoordenadas(coords, client) {
-    // Verificar se está no Brasil
     if (coords.lat < -35 || coords.lat > 5 || coords.lng < -75 || coords.lng > -30) {
         console.log('⚠️ Coordenadas fora do Brasil:', coords);
         return false;
     }
     
-    // Verificar se está no estado correto
     const estado = (client.UF || '').toUpperCase();
-    if (!validarCoordenadasPorEstado(coords, estado)) {
-        console.log('⚠️ Coordenadas incompatíveis com o estado:', coords, estado);
-        return false;
-    }
-    
-    return true;
-}
-
-// Validar coordenadas por estado
-function validarCoordenadasPorEstado(coords, estado) {
     const boundingBoxes = {
         'SP': { minLat: -25.3, maxLat: -19.8, minLng: -53.1, maxLng: -44.2 },
         'RJ': { minLat: -23.4, maxLat: -20.8, minLng: -45.1, maxLng: -40.9 },
@@ -699,160 +504,33 @@ function validarCoordenadasPorEstado(coords, estado) {
     };
     
     const box = boundingBoxes[estado];
-    if (!box) return true;
+    if (box && (coords.lat < box.minLat || coords.lat > box.maxLat || coords.lng < box.minLng || coords.lng > box.maxLng)) {
+        console.log('⚠️ Coordenadas incompatíveis com o estado:', coords, estado);
+        return false;
+    }
     
-    return coords.lat >= box.minLat && coords.lat <= box.maxLat &&
-           coords.lng >= box.minLng && coords.lng <= box.maxLng;
+    return true;
 }
 
-// Obter coordenadas precisas da cidade
-function obterCoordenadasCidadePrecisa(client) {
-    const cidade = (client.Cidade || '').toUpperCase().trim();
+// Criar variações de endereço
+function criarVariacoesEndereco(client) {
+    const endereco = (client.Endereco || '').trim();
+    const numero = (client.Numero || '').trim();
+    const bairro = (client.Bairro || '').trim();
+    const cidade = (client.Cidade || '').trim();
+    const uf = (client.UF || '').trim().toUpperCase();
+    const cep = (client.CEP || '').replace(/\D/g, '');
     
-    if (COORDENADAS_PRECISAS[cidade]) {
-        const coords = COORDENADAS_PRECISAS[cidade];
-        const variacao = obterVariacaoParaCliente(client);
-        
-        return {
-            lat: coords.lat + variacao.lat,
-            lng: coords.lng + variacao.lng,
-            confidence: 0.7,
-            provider: 'Cidade-Precisa',
-            manuallyEdited: false
-        };
-    }
+    if (!cidade) return [];
     
-    // Buscar por similaridade
-    for (const cidadeKey in COORDENADAS_PRECISAS) {
-        const similarity = calcularSimilaridade(cidade, cidadeKey);
-        if (similarity > 0.8) {
-            const coords = COORDENADAS_PRECISAS[cidadeKey];
-            const variacao = obterVariacaoParaCliente(client);
-            
-            return {
-                lat: coords.lat + variacao.lat,
-                lng: coords.lng + variacao.lng,
-                confidence: 0.6,
-                provider: 'Cidade-Similar',
-                manuallyEdited: false
-            };
-        }
-    }
-    
-    return null;
-}
-
-// Calcular similaridade entre strings
-function calcularSimilaridade(str1, str2) {
-    const longer = str1.length > str2.length ? str1 : str2;
-    const shorter = str1.length > str2.length ? str2 : str1;
-    
-    if (longer.length === 0) return 1.0;
-    
-    const distance = levenshteinDistance(longer, shorter);
-    return (longer.length - distance) / longer.length;
-}
-
-// Distância de Levenshtein
-function levenshteinDistance(str1, str2) {
-    const matrix = [];
-    
-    for (let i = 0; i <= str2.length; i++) {
-        matrix[i] = [i];
-    }
-    
-    for (let j = 0; j <= str1.length; j++) {
-        matrix[0][j] = j;
-    }
-    
-    for (let i = 1; i <= str2.length; i++) {
-        for (let j = 1; j <= str1.length; j++) {
-            if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
-                matrix[i][j] = matrix[i - 1][j - 1];
-            } else {
-                matrix[i][j] = Math.min(
-                    matrix[i - 1][j - 1] + 1,
-                    matrix[i][j - 1] + 1,
-                    matrix[i - 1][j] + 1
-                );
-            }
-        }
-    }
-    
-    return matrix[str2.length][str1.length];
-}
-
-// Obter variação para cliente
-function obterVariacaoParaCliente(client) {
-    const clientId = client.id || client['Nome Fantasia'] || 'default';
-    let hash = 0;
-    for (let i = 0; i < clientId.length; i++) {
-        hash = ((hash << 5) - hash + clientId.charCodeAt(i)) & 0xffffffff;
-    }
-    
-    // Variação pequena para evitar sobreposição
-    return {
-        lat: ((hash % 200) - 100) * 0.00003, // ±0.003 grau ≈ 300m
-        lng: ((hash % 300) - 150) * 0.00003  // ±0.0045 grau ≈ 300m
-    };
-}
-
-// Obter fallback otimizado
-function obterFallbackOtimizado(client) {
-    const estado = (client.UF || '').toUpperCase().trim();
-    
-    // Coordenadas centrais dos estados (precisas)
-    const coordenadasEstados = {
-        'SP': { lat: -23.5505, lng: -46.6333 },
-        'RJ': { lat: -22.9068, lng: -43.1729 },
-        'MG': { lat: -19.9191, lng: -43.9386 },
-        'BA': { lat: -12.9714, lng: -38.5014 },
-        'PR': { lat: -25.4284, lng: -49.2733 },
-        'RS': { lat: -30.0346, lng: -51.2177 },
-        'SC': { lat: -27.5954, lng: -48.5480 },
-        'GO': { lat: -16.6864, lng: -49.2643 },
-        'MT': { lat: -15.6014, lng: -56.0979 },
-        'MS': { lat: -20.4697, lng: -54.6201 },
-        'DF': { lat: -15.7941, lng: -47.8825 },
-        'PE': { lat: -8.0476, lng: -34.8770 },
-        'CE': { lat: -3.7319, lng: -38.5267 },
-        'PB': { lat: -7.1195, lng: -34.8450 },
-        'RN': { lat: -5.7945, lng: -35.2110 },
-        'AL': { lat: -9.6476, lng: -35.7175 },
-        'SE': { lat: -10.9472, lng: -37.0731 },
-        'PI': { lat: -5.0892, lng: -42.8019 },
-        'MA': { lat: -2.5307, lng: -44.3068 },
-        'PA': { lat: -1.4558, lng: -48.4902 },
-        'AM': { lat: -3.1190, lng: -60.0217 },
-        'RR': { lat: 2.8235, lng: -60.6758 },
-        'AP': { lat: 0.0389, lng: -51.0664 },
-        'TO': { lat: -10.1689, lng: -48.3317 },
-        'AC': { lat: -9.9754, lng: -67.8249 },
-        'RO': { lat: -8.7619, lng: -63.9039 },
-        'ES': { lat: -20.2976, lng: -40.2958 }
-    };
-    
-    if (coordenadasEstados[estado]) {
-        const coords = coordenadasEstados[estado];
-        const variacao = obterVariacaoParaCliente(client);
-        
-        return {
-            lat: coords.lat + variacao.lat,
-            lng: coords.lng + variacao.lng,
-            confidence: 0.4,
-            provider: 'Estado-Fallback',
-            manuallyEdited: false
-        };
-    }
-    
-    // Fallback final - São Paulo
-    return {
-        lat: -23.5505,
-        lng: -46.6333,
-        confidence: 0.3,
-        provider: 'Brasil-Fallback',
-        manuallyEdited: false
-    };
+    return [
+        `${endereco}, ${numero}, ${bairro}, ${cidade}, ${uf}, Brasil`,
+        `${endereco}, ${bairro}, ${cidade}, ${uf}, Brasil`,
+        `${endereco}, ${cidade}, ${uf}, Brasil`,
+        `${bairro}, ${cidade}, ${uf}, Brasil`,
+        `${cidade}, ${uf}, Brasil`,
+        `${cep}, Brasil`
+    ].filter(addr => addr.length > 10);
 }
 
 // Criar marcador editável
@@ -911,9 +589,7 @@ function getColorByConfidence(confidence) {
 
 // Criar ícone do marcador
 function createMarkerIcon(color, confidence, isManual, isAtivo) {
-    const symbol = isManual ? '📍' : 
-                   confidence >= 0.8 ? '✓' : 
-                   confidence >= 0.6 ? '~' : '?';
+    const symbol = isManual ? '📍' : confidence >= 0.8 ? '✓' : confidence >= 0.6 ? '~' : '?';
     
     return L.divIcon({
         className: 'custom-marker',
@@ -1044,4 +720,4 @@ window.toggleEditMode = handleEditButtonClick;
 window.setupEditButton = setupEditButton;
 window.obterLocalizacaoUsuario = obterLocalizacaoUsuario;
 
-console.log('✅ map.js carregado - Versão com precisão otimizada e restaurada');
+console.log('✅ map.js carregado - Versão com consulta sequencial de APIs');
