@@ -1,16 +1,21 @@
-// script.js - Arquivo principal corrigido
 let currentTab = 'inativos';
 let mapLoaded = false;
-let mapDataLoaded = false; // Nova variável para rastrear se os dados do mapa foram carregados
+let mapDataLoaded = false;
 
 // Inicialização da aplicação
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 Inicializando aplicação...');
     
-    // Inicializar gerenciadores
     try {
         await window.dbManager.init();
         await window.clientManager.init();
+        
+        // Carregar dados dos clientes do dbManager
+        const savedClients = await window.dbManager.getArrayData('clients');
+        if (savedClients && savedClients.length > 0) {
+            window.clientManager.data = savedClients;
+            window.data = savedClients;
+        }
         
         // Configurar eventos
         setupEventListeners();
@@ -465,7 +470,7 @@ async function handleFileUpload(event) {
     await window.dbManager.clearData('clients');
     window.clientManager.data = [];
     window.data = [];
-    mapDataLoaded = false; // Resetar mapDataLoaded para forçar recarregamento do mapa
+    mapDataLoaded = false;
     
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -749,10 +754,10 @@ function openTab(tab) {
             if (typeof window.initMap === 'function') {
                 window.initMap();
                 setTimeout(() => {
-                    // Verificar se os dados do mapa já foram carregados
-                    if (!mapDataLoaded && typeof window.loadMapData === 'function') {
+                    // Carregar dados do mapa se houver dados disponíveis
+                    if (window.clientManager.data.length > 0 && !mapDataLoaded && typeof window.loadMapData === 'function') {
                         window.loadMapData();
-                        mapDataLoaded = true; // Marca que os dados do mapa foram carregados
+                        mapDataLoaded = true;
                     }
                     if (typeof window.setupEditButton === 'function') {
                         window.setupEditButton();
@@ -761,8 +766,8 @@ function openTab(tab) {
                     const includeInativosCheckbox = document.getElementById('include-inativos-checkbox');
                     if (includeInativosCheckbox) {
                         includeInativosCheckbox.addEventListener('change', () => {
-                            mapDataLoaded = false; // Resetar para recarregar os dados do mapa
-                            if (!mapDataLoaded && typeof window.loadMapData === 'function') {
+                            mapDataLoaded = false;
+                            if (window.clientManager.data.length > 0 && !mapDataLoaded && typeof window.loadMapData === 'function') {
                                 window.loadMapData();
                                 mapDataLoaded = true;
                             }
