@@ -17,9 +17,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Carregar dados dos clientes do dbManager
         const savedClients = await window.dbManager.loadData('clients') || [];
-        if (savedClients && savedClients.length > 0) {
+        const savedAtivos = await window.dbManager.loadData('ativos') || [];
+        
+        if (savedClients.length > 0 || savedAtivos.length > 0) {
             window.clientManager.data = savedClients;
+            window.clientManager.ativos = savedAtivos;
             window.data = savedClients;
+            window.ativos = savedAtivos;
         }
         
         // Configurar eventos
@@ -44,6 +48,124 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('❌ Erro ao inicializar aplicação:', error);
     }
 });
+
+// Manipular upload de arquivo
+async function handleFileUpload(event) {
+    try {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        // Validação de formato
+        const validFormats = ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+        if (!validFormats.includes(file.type)) {
+            alert('❌ Formato de arquivo inválido! Use apenas arquivos .xls ou .xlsx.');
+            return;
+        }
+
+        if (file.size > 10 * 1024 * 1024) {
+            alert('Arquivo muito grande! O limite é 10MB.');
+            return;
+        }
+        
+        console.log('📁 Processando arquivo:', file.name);
+        
+        // Criar backup antes de limpar dados
+        await window.clientManager.createBackup('clients', window.clientManager.data);
+        await window.clientManager.createBackup('ativos', window.clientManager.ativos);
+        
+        // Limpar dados existentes
+        await window.dbManager.clearData('clients');
+        await window.dbManager.clearData('ativos');
+        
+        window.clientManager.data = [];
+        window.clientManager.ativos = [];
+        window.data = [];
+        window.ativos = [];
+        mapDataLoaded = false;
+        
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const bytes = e.target.result;
+                const workbook = XLSX.read(bytes, { type: 'binary' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
+                
+                if (rawData.length <= 1) {
+                    alert('❌ Arquivo inválido ou vazio!');
+                    return;
+                }
+                
+                // Normalizar headers
+                const headers = rawData[0].map(h => {
+                    if (!h) return '';
+                    return window.clientManager.mapColumnToField(h);
+                });
+                
+                const dataRows = rawData.slice(1);
+                const ativos = [];
+                const inativos = [];
+                
+                dataRows.forEach((row, index) => {
+                    const hasValidData = row.some(cell => cell && cell.toString().trim() !== '');
+                    if (hasValidData) {
+                        let obj = {};
+                        headers.forEach((header, j) => {
+                            obj[header] = row[j] ? row[j].toString().trim() : '';
+                        });
+                        obj.id = `client-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`;
+                        
+                        // Verificar status e separar
+                        if (obj.Status && obj.Status.toLowerCase() === 'ativo') {
+                            ativos.push(obj);
+                        } else {
+                            inativos.push(obj);
+                        }
+                    }
+                });
+                
+                if (ativos.length === 0 && inativos.length === 0) {
+                    alert('❌ Nenhum cliente válido encontrado no arquivo!');
+                    return;
+                }
+                
+                // Salvar dados
+                window.clientManager.data = inativos;
+                window.clientManager.ativos = ativos;
+                window.data = inativos;
+                window.ativos = ativos;
+                
+                await window.dbManager.saveArrayData('clients', inativos);
+                await window.dbManager.saveArrayData('ativos', ativos);
+                
+                // Atualizar interface
+                populateCidades();
+                window.clientManager.applyFiltersAndSort();
+                renderAtivos();
+                
+                alert(`✅ Arquivo carregado com sucesso!\n📊 ${ativos.length} clientes ativos e ${inativos.length} inativos encontrados`);
+                
+            } catch (error) {
+                console.error('❌ Erro ao processar arquivo durante leitura:', error);
+                alert('❌ Erro ao processar o arquivo: ' + error.message);
+            }
+        };
+        
+        reader.onerror = (error) => {
+            console.error('❌ Erro ao ler arquivo:', error);
+            alert('❌ Erro ao ler o arquivo: ' + error.message);
+        };
+        
+        reader.readAsBinaryString(file);
+    } catch (error) {
+        console.error('❌ Erro ao manipular upload de arquivo:', error);
+        alert('❌ Erro ao processar o arquivo: ' + error.message);
+    }
+
+
+
+};
 
 // Aplicar filtros salvos
 function applySavedFilters() {
