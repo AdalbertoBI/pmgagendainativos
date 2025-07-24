@@ -637,13 +637,33 @@ async function handleFileUpload(event) {
         
         // Criar backup antes de limpar dados
         await window.clientManager.createBackup('clients', window.clientManager.data);
+        await window.clientManager.createBackup('ativos', window.clientManager.ativos);
         
-        // Limpar dados de inativos
+        // Limpar dados existentes
         await window.dbManager.clearData('clients');
-        window.clientManager.data = [];
-        window.data = [];
-        mapDataLoaded = false;
+        await window.dbManager.clearData('ativos');
         
+        // Limpar variáveis globais
+        window.clientManager.data = [];
+        window.clientManager.ativos = [];
+        window.data = [];
+        window.ativos = [];
+        window.filteredData = [];
+        
+        // Limpar interfaces
+        document.getElementById('list').innerHTML = '<li style="text-align: center; color: #666;">Carregando novos dados...</li>';
+        document.getElementById('ativos-list').innerHTML = '<li style="text-align: center; color: #666;">Carregando novos dados...</li>';
+        document.getElementById('agenda-list').innerHTML = '<div style="text-align: center; color: #666;">Carregando novos dados...</div>';
+        
+        // Resetar mapa se estiver visível
+        if (currentTab === 'mapa') {
+            if (typeof window.clearMarkers === 'function') {
+                window.clearMarkers();
+            }
+            document.getElementById('map-status').textContent = 'Dados resetados - carregando novo arquivo...';
+            mapDataLoaded = false;
+        }
+
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
@@ -665,8 +685,9 @@ async function handleFileUpload(event) {
                 });
                 
                 const dataRows = rawData.slice(1);
+                const ativos = [];
+                const inativos = [];
                 
-                const processedData = [];
                 dataRows.forEach((row, index) => {
                     const hasValidData = row.some(cell => cell && cell.toString().trim() !== '');
                     if (hasValidData) {
@@ -674,34 +695,61 @@ async function handleFileUpload(event) {
                         headers.forEach((header, j) => {
                             obj[header] = row[j] ? row[j].toString().trim() : '';
                         });
-                        obj.id = `inactive-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`;
+                        obj.id = `client-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`;
                         
-                        // Validação dos dados
-                        const errors = window.clientManager.validateClientData(obj);
-                        if (errors.length === 0 || (errors.length === 1 && errors[0] === 'Nome Fantasia é obrigatório' && obj['Nome Fantasia'])) {
-                            processedData.push(obj);
+                        // Verificar status e separar
+                        if (obj.Status && obj.Status.toLowerCase() === 'ativo') {
+                            ativos.push(obj);
+                        } else {
+                            inativos.push(obj);
                         }
                     }
                 });
                 
-                if (processedData.length === 0) {
+                if (ativos.length === 0 && inativos.length === 0) {
                     alert('❌ Nenhum cliente válido encontrado no arquivo!');
                     return;
                 }
                 
                 // Salvar dados
-                window.clientManager.data = processedData;
-                window.data = processedData;
-                await window.dbManager.saveArrayData('clients', processedData);
+                window.clientManager.data = inativos;
+                window.clientManager.ativos = ativos;
+                window.data = inativos;
+                window.ativos = ativos;
                 
-                // Atualizar interface
+                await window.dbManager.saveArrayData('clients', inativos);
+                await window.dbManager.saveArrayData('ativos', ativos);
+                
+                // Atualizar interface baseada na aba atual
+                if (currentTab === 'inativos') {
+                    window.clientManager.applyFiltersAndSort();
+                } else if (currentTab === 'ativos') {
+                    renderAtivos();
+                } else if (currentTab === 'mapa' && typeof window.loadMapData === 'function') {
+                    window.loadMapData();
+                    mapDataLoaded = true;
+                } else if (currentTab === 'agenda') {
+                    renderAgenda();
+                }
+                
+                // Atualizar componentes compartilhados
                 populateCidades();
-                window.clientManager.applyFiltersAndSort();
+                updateMapStatus('Dados carregados com sucesso');
                 
-                alert(`✅ Arquivo carregado com sucesso!\n📊 ${processedData.length} clientes inativos encontrados`);
+                alert(`✅ Arquivo carregado com sucesso!\n📊 ${ativos.length} clientes ativos e ${inativos.length} inativos encontrados`);
                 
             } catch (error) {
-                console.error('❌ Erro ao processar arquivo durante leitura:', error);
+                console.error('❌ Erro ao processar arquivo:', error);
+                
+                // Restaurar mensagens de estado vazio em caso de erro
+                document.getElementById('list').innerHTML = '<li style="text-align: center; color: #666;">Erro ao carregar dados</li>';
+                document.getElementById('ativos-list').innerHTML = '<li style="text-align: center; color: #666;">Erro ao carregar dados</li>';
+                document.getElementById('agenda-list').innerHTML = '<div style="text-align: center; color: #666;">Erro ao carregar dados</div>';
+                
+                if (currentTab === 'mapa') {
+                    document.getElementById('map-status').textContent = 'Erro ao carregar dados';
+                }
+                
                 alert('❌ Erro ao processar o arquivo: ' + error.message);
             }
         };
@@ -713,8 +761,8 @@ async function handleFileUpload(event) {
         
         reader.readAsBinaryString(file);
     } catch (error) {
-        console.error('❌ Erro ao manipular upload de arquivo:', error);
-        alert('❌ Erro ao processar o arquivo: ' + error.message);
+        console.error('❌ Erro no upload:', error);
+        alert('❌ Erro no upload: ' + error.message);
     }
 }
 
