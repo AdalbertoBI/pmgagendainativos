@@ -10,25 +10,140 @@ class CatalogManager {
         this.pdfText = '';
         this.extractedProducts = [];
     }
+    // === MÉTODOS DE PERSISTÊNCIA ===
 
-    // Inicializar catálogo
-    async init() {
-        console.log('📦 Inicializando CatalogManager...');
-        try {
-            await this.loadPdfCatalog();
-            this.setupEventListeners();
-        } catch (error) {
-            console.error('❌ Erro na inicialização:', error);
-            this.updateCatalogStatus('Erro na inicialização. Carregando produtos de exemplo...');
-            this.loadMockProducts();
-            this.setupEventListeners();
-        }
+// Salvar catálogo no localStorage
+saveCatalogToCache(catalogData) {
+    try {
+        const cacheData = {
+            products: catalogData.products || this.products,
+            extractedProducts: catalogData.extractedProducts || this.extractedProducts,
+            pdfText: catalogData.pdfText || this.pdfText,
+            savedAt: new Date().toISOString(),
+            fileName: catalogData.fileName || 'Catálogo Personalizado'
+        };
+        
+        localStorage.setItem('catalogCache', JSON.stringify(cacheData));
+        console.log('✅ Catálogo salvo no cache:', cacheData.fileName);
+        
+        // Salvar flag indicando que existe catálogo personalizado
+        localStorage.setItem('hasCustomCatalog', 'true');
+        
+    } catch (error) {
+        console.error('❌ Erro ao salvar catálogo no cache:', error);
     }
+}
+
+// Carregar catálogo do localStorage
+loadCatalogFromCache() {
+    try {
+        const cacheData = localStorage.getItem('catalogCache');
+        const hasCustom = localStorage.getItem('hasCustomCatalog');
+        
+        if (!cacheData || hasCustom !== 'true') {
+            console.log('📦 Nenhum catálogo personalizado encontrado no cache');
+            return null;
+        }
+        
+        const parsedData = JSON.parse(cacheData);
+        
+        // Verificar se os dados são válidos
+        if (!parsedData.products || !Array.isArray(parsedData.products)) {
+            console.warn('⚠️ Dados do cache inválidos');
+            return null;
+        }
+        
+        console.log(`📦 Catálogo carregado do cache: ${parsedData.fileName} (${parsedData.savedAt})`);
+        console.log(`📊 ${parsedData.products.length} produtos encontrados no cache`);
+        
+        return parsedData;
+        
+    } catch (error) {
+        console.error('❌ Erro ao carregar catálogo do cache:', error);
+        return null;
+    }
+}
+
+// Limpar cache do catálogo
+clearCatalogCache() {
+    try {
+        localStorage.removeItem('catalogCache');
+        localStorage.removeItem('hasCustomCatalog');
+        console.log('🗑️ Cache do catálogo limpo');
+    } catch (error) {
+        console.error('❌ Erro ao limpar cache:', error);
+    }
+}
+
+// Verificar se existe catálogo personalizado
+hasCustomCatalogCached() {
+    return localStorage.getItem('hasCustomCatalog') === 'true';
+}
+
+
+    // Inicializar catálogo com verificação de cache
+async init() {
+    console.log('📦 Inicializando CatalogManager...');
+    try {
+        // Primeiro, tentar carregar do cache
+        const cachedCatalog = this.loadCatalogFromCache();
+        
+        if (cachedCatalog) {
+            // Usar dados do cache
+            this.products = cachedCatalog.products;
+            this.extractedProducts = cachedCatalog.extractedProducts || [];
+            this.pdfText = cachedCatalog.pdfText || '';
+            this.filteredProducts = [...this.products];
+            
+            this.updateCatalogStatus(`Catálogo carregado do cache: ${cachedCatalog.fileName} (${cachedCatalog.products.length} produtos)`);
+            this.renderProductsGrid();
+            
+            console.log(`✅ Catálogo personalizado carregado do cache: ${cachedCatalog.products.length} produtos`);
+        } else {
+            // Carregar catálogo padrão se não houver cache
+            console.log('📂 Carregando catálogo padrão...');
+            await this.loadPdfCatalog();
+        }
+        
+        this.setupEventListeners();
+        
+    } catch (error) {
+        console.error('❌ Erro na inicialização:', error);
+        this.updateCatalogStatus('Erro na inicialização. Carregando produtos de exemplo...');
+        this.loadMockProducts();
+        this.setupEventListeners();
+    }
+}
+
 
     // Configurar event listeners
     setupEventListeners() {
         console.log('🔧 Configurando event listeners...');
         
+        // Botão de carregar novo catálogo
+const loadCatalogBtn = document.getElementById('load-new-catalog');
+if (loadCatalogBtn) {
+    loadCatalogBtn.addEventListener('click', () => {
+        const fileInput = document.getElementById('catalog-file-input');
+        if (fileInput) {
+            fileInput.click();
+        }
+    });
+}
+
+// Input de arquivo para novo catálogo
+const catalogFileInput = document.getElementById('catalog-file-input');
+if (catalogFileInput) {
+    catalogFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file && file.type === 'application/pdf') {
+            this.loadNewCatalog(file);
+        } else if (file) {
+            alert('Por favor, selecione um arquivo PDF válido.');
+        }
+    });
+}
+
         // Busca de produtos
         const searchInput = document.getElementById('product-search');
         if (searchInput) {
@@ -174,6 +289,89 @@ class CatalogManager {
             });
         }
     }
+    
+    // Carregar novo catálogo (arquivo diferente do padrão) COM PERSISTÊNCIA
+async loadNewCatalog(pdfFile) {
+    if (this.isLoading) return;
+    
+    this.isLoading = true;
+    this.updateCatalogStatus('Carregando novo catálogo...');
+    
+    try {
+        let arrayBuffer;
+        let fileName = 'Catálogo Personalizado';
+        
+        // Se recebeu um arquivo File do input
+        if (pdfFile instanceof File) {
+            arrayBuffer = await pdfFile.arrayBuffer();
+            fileName = pdfFile.name;
+            this.updateCatalogStatus(`Carregando arquivo: ${fileName}...`);
+        } 
+        // Se recebeu uma URL/caminho de arquivo
+        else if (typeof pdfFile === 'string') {
+            const response = await fetch(pdfFile);
+            if (!response.ok) {
+                throw new Error(`Arquivo não encontrado: ${pdfFile}`);
+            }
+            arrayBuffer = await response.arrayBuffer();
+            fileName = pdfFile.split('/').pop() || 'Catálogo Personalizado';
+            this.updateCatalogStatus(`Carregando arquivo: ${fileName}...`);
+        }
+        else {
+            throw new Error('Formato de arquivo inválido');
+        }
+
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        
+        this.updateCatalogStatus('Extraindo texto do novo catálogo...');
+        await this.extractTextFromPDFComplete(pdf);
+        
+        this.updateCatalogStatus('Processando produtos com múltiplos métodos...');
+        await this.processProductsAdvanced();
+        
+        // ✅ SALVAR NO CACHE APÓS PROCESSAMENTO BEM-SUCEDIDO
+        this.saveCatalogToCache({
+            products: this.products,
+            extractedProducts: this.extractedProducts,
+            pdfText: this.pdfText,
+            fileName: fileName
+        });
+        
+        this.updateCatalogStatus(`Novo catálogo carregado e salvo: ${this.products.length} produtos encontrados`);
+        this.renderProductsGrid();
+        
+        // Limpar o input file após o carregamento
+        const fileInput = document.getElementById('catalog-file-input');
+        if (fileInput) {
+            fileInput.value = '';
+        }
+        
+        console.log(`✅ NOVO CATÁLOGO CARREGADO E PERSISTIDO: ${this.products.length} produtos processados`);
+        
+    } catch (error) {
+        console.error('❌ Erro ao carregar novo catálogo:', error);
+        this.updateCatalogStatus(`Erro ao carregar novo catálogo: ${error.message}`);
+        
+        // Em caso de erro, manter produtos existentes ou carregar produtos de exemplo
+        if (this.products.length === 0) {
+            // Tentar carregar do cache primeiro
+            const cachedCatalog = this.loadCatalogFromCache();
+            if (cachedCatalog) {
+                this.products = cachedCatalog.products;
+                this.filteredProducts = [...this.products];
+                this.renderProductsGrid();
+                this.updateCatalogStatus('Erro no carregamento. Mantendo catálogo anterior do cache.');
+            } else {
+                this.updateCatalogStatus('Carregando produtos de exemplo...');
+                this.loadMockProducts();
+            }
+        }
+    } finally {
+        this.isLoading = false;
+    }
+}
+
+
 
     // Carregar catálogo otimizado
     async loadPdfCatalog() {
@@ -208,6 +406,8 @@ class CatalogManager {
             this.isLoading = false;
         }
     }
+
+    
 
     // EXTRAIR TEXTO COMPLETO
     async extractTextFromPDFComplete(pdf) {
@@ -684,8 +884,8 @@ class CatalogManager {
 🏪 **Categoria:** ${product.category}
 
 📞 Entre em contato para mais informações!
-📱 Whatsapp: (12) 99999-9999
-📧 Email: vendas@empresa.com
+
+
 
 *Produto sujeito à disponibilidade de estoque.`;
 
@@ -850,7 +1050,7 @@ async generateProductImage(product) {
         ctx.font = '11px Arial';
         ctx.textAlign = 'center';
         const currentDate = new Date().toLocaleDateString('pt-BR');
-        ctx.fillText(`📞 (12) 99999-9999 | 📧 vendas@empresa.com | ${currentDate}`, canvas.width / 2, 335);
+        ctx.fillText(` |  | ${currentDate}`, canvas.width / 2, 335);
         
         // Converter canvas para blob e copiar
         canvas.toBlob(async (blob) => {
@@ -904,12 +1104,12 @@ async generateImageOffersVisual() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         // Borda
-        ctx.strokeStyle = '#007bff';
+        ctx.strokeStyle = '#099438ff';
         ctx.lineWidth = 3;
         ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
         
         // Cabeçalho
-        ctx.fillStyle = '#007bff';
+        ctx.fillStyle = '#08a32fff';
         ctx.fillRect(10, 10, canvas.width - 20, headerHeight - 10);
         
         ctx.fillStyle = '#ffffff';
@@ -1051,8 +1251,8 @@ async generateImageOffersVisual() {
         
         ctx.fillStyle = '#333333';
         ctx.font = '12px Arial';
-        ctx.fillText('📱 WhatsApp: (12) 99999-9999', canvas.width / 2, footerY + 35);
-        ctx.fillText('📧 Email: vendas@empresa.com', canvas.width / 2, footerY + 50);
+        ctx.fillText('', canvas.width / 2, footerY + 35);
+        ctx.fillText('', canvas.width / 2, footerY + 50);
         
         ctx.font = '10px Arial';
         ctx.fillStyle = '#666666';
@@ -1231,9 +1431,9 @@ async generateImageOffersVisual() {
         });
 
         offersText += `📞 **ENTRE EM CONTATO:**
-📱 WhatsApp: (12) 99999-9999
-📧 Email: vendas@empresa.com
-🌐 Site: www.empresa.com
+
+
+
 
 ⚠️ *Produtos sujeitos à disponibilidade de estoque.
 💯 *Ofertas válidas por tempo limitado.
@@ -1397,7 +1597,7 @@ async generateProductImage(product) {
         
         // Cabeçalho com nome do produto
         const headerY = 160;
-        ctx.fillStyle = '#007bff';
+        ctx.fillStyle = '#00ff62ff';
         ctx.fillRect(20, headerY, canvas.width - 40, 40);
         
         ctx.fillStyle = '#ffffff';
@@ -1435,7 +1635,7 @@ async generateProductImage(product) {
         ctx.font = '11px Arial';
         ctx.textAlign = 'center';
         const currentDate = new Date().toLocaleDateString('pt-BR');
-        ctx.fillText(`📞 (12) 99999-9999 | 📧 vendas@empresa.com | ${currentDate}`, canvas.width / 2, 335);
+        ctx.fillText(` |  | ${currentDate}`, canvas.width / 2, 335);
         
         console.log('🎨 Canvas gerado com sucesso');
         
@@ -1557,6 +1757,8 @@ async copyCanvasToClipboard(canvas, productCode) {
         }
     }
 }
+
+
 
 // === INICIALIZAÇÃO SEGURA DO CATALOG MANAGER ===
 
@@ -1749,6 +1951,8 @@ if (typeof window !== 'undefined') {
 } else {
     console.log('⚠️ Não está em contexto de navegador - inicialização pulada');
 }
+
+
 
 // Exportar para uso em módulos se necessário
 if (typeof module !== 'undefined' && module.exports) {

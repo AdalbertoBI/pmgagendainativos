@@ -77,6 +77,13 @@
             <input type="text" id="product-search" placeholder="Buscar produtos...">
             <button id="refresh-catalog" class="catalog-btn">🔄 Atualizar Catálogo</button>
             <button id="select-multiple-products" class="catalog-btn">📋 Selecionar Múltiplos</button>
+             <button class="catalog-btn" onclick="document.getElementById('catalog-file-input').click()">
+                📁 Carregar Novo Catálogo (.pdf)
+            </button>
+
+            <!-- ✅ INPUT FILE ADICIONADO -->
+            <input type="file" id="catalog-file-input" accept=".pdf" style="display: none">
+            
         </div>
         <div id="catalog-status">Carregando catálogo...</div>
         <div id="products-grid"></div>
