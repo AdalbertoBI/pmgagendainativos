@@ -3,23 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📊 Prospecção de Clientes Inativos</title>
+    <title>Prospecção de Clientes Inativos</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#007bff">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="icon" href="icon-192.png" type="image/png">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
 </head>
 <body>
-    <h1>📊 Prospecção de Clientes Inativos</h1>
+    <h1>Prospecção de Clientes Inativos</h1>
     
     <div id="upload">
-        <input type="file" id="xlsxFile" accept=".xlsx,.xls">
-        <label for="xlsxFile">📁 Carregar Planilha (.xlsx)</label>
+        <input type="file" id="xlsxFile" accept=".xlsx" />
         <button id="cadastrar-cliente-btn">➕ Cadastrar Cliente</button>
     </div>
 
     <div id="tabs">
-        <button class="active" onclick="openTab('inativos')">Inativos</button>
+        <button onclick="openTab('inativos')" class="active">Inativos</button>
         <button onclick="openTab('ativos')">Ativos</button>
         <button onclick="openTab('agenda')">Agenda</button>
         <button onclick="openTab('mapa')">Mapa</button>
@@ -28,7 +29,7 @@
 
     <div id="inativos-content" class="tab-content active">
         <div id="filters">
-            <input type="number" id="saldoFilter" placeholder="Saldo mínimo" min="0" step="0.01">
+            <input type="number" id="saldoFilter" placeholder="Saldo mínimo" min="0">
             <select id="sortOption">
                 <option value="nome-az">Nome Fantasia (A-Z)</option>
                 <option value="nome-za">Nome Fantasia (Z-A)</option>
@@ -42,14 +43,16 @@
                 <span class="seta">▼</span>
             </div>
             <div id="cidadeList" class="escondido"></div>
+            <button id="exportar-inativos" class="export-btn">📊 Exportar Inativos</button>
         </div>
         <ul id="list"></ul>
-        <button id="exportar-inativos" class="export-btn">📊 Exportar Inativos</button>
     </div>
 
     <div id="ativos-content" class="tab-content">
+        <div style="text-align: center; margin: 10px 0;">
+            <button id="exportar-ativos" class="export-btn">📊 Exportar Ativos</button>
+        </div>
         <ul id="ativos-list"></ul>
-        <button id="exportar-ativos" class="export-btn">📊 Exportar Ativos</button>
     </div>
 
     <div id="agenda-content" class="tab-content">
@@ -61,11 +64,12 @@
             <button id="edit-mode-btn" class="map-control-btn">✏️ Editar Localizações</button>
             <label class="checkbox-container">
                 <input type="checkbox" id="include-inativos-checkbox">
-                <span>Incluir inativos</span>
+                <span class="checkmark"></span>
+                Incluir inativos
             </label>
+            <span id="map-status">Carregando mapa...</span>
         </div>
-        <div id="map-status">Carregando mapa...</div>
-        <div id="map" style="height: 500px;"></div>
+        <div id="map" style="height: 400px;"></div>
     </div>
 
     <div id="catalogo-content" class="tab-content">
@@ -78,189 +82,113 @@
         <div id="products-grid"></div>
     </div>
 
-    <!-- Modal de detalhes -->
-    <div id="modal" class="modal">
-        <div id="modal-content" class="modal-content">
-            <span id="close" class="close">&times;</span>
-            <div id="item-details"></div>
-            
+    <!-- Modal de Detalhes -->
+    <div id="modal">
+        <div id="modal-content">
+            <span id="close">&times;</span>
+            <div id="modal-body">
+                <!-- Conteúdo será inserido dinamicamente -->
+            </div>
             <div id="modal-actions">
-                <button id="whatsapp-btn">📱 WhatsApp</button>
-                <button id="maps-btn">🗺️ Traçar Rota</button>
+                <a id="whatsapp-btn" href="#" target="_blank" class="whatsapp-btn">📱 WhatsApp</a>
+                <a id="maps-btn" href="#" target="_blank" class="maps-btn">🗺️ Traçar Rota</a>
             </div>
-
-            <!-- Seção de Agendamento -->
-            <div id="schedule-section" style="margin-top: 20px;">
+            <div id="agendamento-section">
                 <h3>Agendamento</h3>
-                <label>
-                    Dia da Semana:
-                    <select id="scheduleDayOfWeek">
-                        <option value="">Selecione</option>
-                        <option value="0">Domingo</option>
-                        <option value="1">Segunda</option>
-                        <option value="2">Terça</option>
-                        <option value="3">Quarta</option>
-                        <option value="4">Quinta</option>
-                        <option value="5">Sexta</option>
-                        <option value="6">Sábado</option>
-                    </select>
-                </label>
-                <label>
-                    Horário:
-                    <input type="time" id="scheduleTime">
-                </label>
-                <label>
-                    Tipo:
-                    <select id="scheduleType">
-                        <option value="">Selecione</option>
-                        <option value="visita">Visita</option>
-                        <option value="ligacao">Ligação</option>
-                        <option value="whatsapp">WhatsApp</option>
-                    </select>
-                </label>
-                <label>
-                    Repetição:
-                    <select id="scheduleRepeat">
-                        <option value="weekly">Semanal</option>
-                        <option value="biweekly">Quinzenal</option>
-                        <option value="monthly">Mensal</option>
-                    </select>
-                </label>
-                <button id="saveSchedule">Salvar agendamento</button>
+                <label>Dia da Semana:</label>
+                <select id="diaSemana">
+                    <option value="">Selecione</option>
+                    <option value="Domingo">Domingo</option>
+                    <option value="Segunda">Segunda</option>
+                    <option value="Terça">Terça</option>
+                    <option value="Quarta">Quarta</option>
+                    <option value="Quinta">Quinta</option>
+                    <option value="Sexta">Sexta</option>
+                    <option value="Sábado">Sábado</option>
+                </select>
+                <label>Horário:</label>
+                <input type="time" id="horario">
+                <label>Tipo:</label>
+                <select id="tipoAgendamento">
+                    <option value="">Selecione</option>
+                    <option value="Visita">Visita</option>
+                    <option value="Ligação">Ligação</option>
+                    <option value="WhatsApp">WhatsApp</option>
+                </select>
+                <label>Repetição:</label>
+                <select id="repeticao">
+                    <option value="Semanal">Semanal</option>
+                    <option value="Quinzenal">Quinzenal</option>
+                    <option value="Mensal">Mensal</option>
+                </select>
+                <button onclick="salvarAgendamento()">Salvar agendamento</button>
             </div>
-
-            <!-- Ações específicas para ativos/inativos -->
-            <div id="client-actions" style="margin-top: 20px;">
-                <div class="display-field">
-                    <p><strong>Status:</strong> <span id="client-status">Inativo</span></p>
-                </div>
-                
-                <div id="editDataPedidoContainer" style="display: none;">
-                    <label id="labelEditDataPedido" style="display: none;">
-                        Data Último Pedido:
-                        <input type="text" id="editDataPedido" placeholder="dd/mm/aaaa" maxlength="10" style="display: none;">
-                    </label>
-                </div>
-                
-                <div class="action-buttons">
-                    <button id="tornarAtivo" class="action-btn edit-btn">Tornar Ativo</button>
-                    <button id="confirmarAtivo" class="action-btn save-btn" style="display: none;">Confirmar Ativo</button>
-                    <button id="excluirAtivo" class="action-btn cancel-btn" style="display: none;">Excluir dos Ativos</button>
-                </div>
+            <div id="status-section">
+                <h3>Status</h3>
+                <label id="labelEditDataPedido">Data Último Pedido:</label>
+                <input type="text" id="editDataPedido" placeholder="DD/MM/AAAA" maxlength="10">
+                <button id="tornarAtivo">Tornar Ativo</button>
+                <button id="confirmarAtivo">Confirmar Ativo</button>
+                <button id="excluirAtivo">Excluir dos Ativos</button>
             </div>
-
-            <!-- Seção de Observações -->
-            <div style="margin-top: 20px;">
+            <div id="observacoes-section">
                 <h3>Observações</h3>
-                <textarea id="observacoes" placeholder="Adicione observações sobre este cliente..."></textarea>
+                <textarea id="observacoes" maxlength="2000" placeholder="Adicione observações sobre este cliente..."></textarea>
                 <div id="observacoes-contador">0/2000</div>
                 <button id="salvarObservacoes">Salvar Observações</button>
-            </div>
-
-            <!-- Seção de Edição -->
-            <div style="margin-top: 20px;">
-                <button id="editarCliente" class="action-btn edit-btn">Editar Cliente</button>
-                <button id="salvarEdicao" class="action-btn save-btn" style="display: none;">💾 Salvar</button>
-                <button id="cancelarEdicao" class="action-btn cancel-btn" style="display: none;">❌ Cancelar</button>
-            </div>
-
-            <!-- Campos de edição (ocultos inicialmente) -->
-            <div class="edit-field" style="display: none;">
-                <label>Nome Fantasia:</label>
-                <input type="text" id="edit-nome-fantasia" class="edit-input">
-                
-                <label>Cliente:</label>
-                <input type="text" id="edit-cliente" class="edit-input">
-                
-                <label>CNPJ/CPF:</label>
-                <input type="text" id="edit-cnpj-cpf" class="edit-input">
-                
-                <label>Contato:</label>
-                <input type="text" id="edit-contato" class="edit-input">
-                
-                <label>Telefone Comercial:</label>
-                <input type="text" id="edit-telefone-comercial" class="edit-input">
-                
-                <label>Celular:</label>
-                <input type="text" id="edit-celular" class="edit-input">
-                
-                <label>Email:</label>
-                <input type="email" id="edit-email" class="edit-input">
-                
-                <label>Endereço:</label>
-                <input type="text" id="edit-endereco" class="edit-input">
-                
-                <label>Número:</label>
-                <input type="text" id="edit-numero" class="edit-input">
-                
-                <label>Bairro:</label>
-                <input type="text" id="edit-bairro" class="edit-input">
-                
-                <label>Cidade:</label>
-                <input type="text" id="edit-cidade" class="edit-input">
-                
-                <label>UF:</label>
-                <input type="text" id="edit-uf" class="edit-input" maxlength="2">
-                
-                <label>CEP:</label>
-                <input type="text" id="edit-cep" class="edit-input">
-                
-                <label>Saldo de Crédito:</label>
-                <input type="number" id="edit-saldo-credito" class="edit-input" step="0.01">
             </div>
         </div>
     </div>
 
     <!-- Modal de Cadastro -->
-    <div id="modal-cadastro" class="modal">
-        <div id="modal-cadastro-content" class="modal-content">
-            <span id="close-cadastro" class="close">&times;</span>
+    <div id="modal-cadastro">
+        <div id="modal-cadastro-content">
+            <span id="close-cadastro">&times;</span>
             <h2>Cadastrar Novo Cliente</h2>
-            
             <form id="form-cadastro">
-                <label for="nome-fantasia">Nome Fantasia:</label>
+                <label>Nome Fantasia:</label>
                 <input type="text" id="nome-fantasia" required>
                 
-                <label for="cliente">Cliente:</label>
+                <label>Cliente:</label>
                 <input type="text" id="cliente">
                 
-                <label for="cnpj-cpf">CNPJ/CPF:</label>
+                <label>CNPJ/CPF:</label>
                 <input type="text" id="cnpj-cpf">
                 
-                <label for="contato">Contato:</label>
+                <label>Contato:</label>
                 <input type="text" id="contato">
                 
-                <label for="telefone-comercial">Telefone Comercial:</label>
+                <label>Telefone Comercial:</label>
                 <input type="tel" id="telefone-comercial">
                 
-                <label for="celular">Celular:</label>
+                <label>Celular:</label>
                 <input type="tel" id="celular">
                 
-                <label for="email">Email:</label>
+                <label>Email:</label>
                 <input type="email" id="email">
                 
-                <label for="endereco">Endereço:</label>
+                <label>Endereço:</label>
                 <input type="text" id="endereco">
                 
-                <label for="numero">Número:</label>
+                <label>Número:</label>
                 <input type="text" id="numero">
                 
-                <label for="bairro">Bairro:</label>
+                <label>Bairro:</label>
                 <input type="text" id="bairro">
                 
-                <label for="cidade">Cidade:</label>
+                <label>Cidade:</label>
                 <input type="text" id="cidade">
                 
-                <label for="uf">UF:</label>
+                <label>UF:</label>
                 <input type="text" id="uf" maxlength="2">
                 
-                <label for="cep">CEP:</label>
-                <input type="text" id="cep">
+                <label>CEP:</label>
+                <input type="text" id="cep" maxlength="9">
                 
-                <label for="saldo-credito">Saldo de Crédito:</label>
-                <input type="number" id="saldo-credito" step="0.01" value="0">
+                <label>Saldo de Crédito:</label>
+                <input type="number" id="saldo-credito" min="0" step="0.01">
                 
-                <label for="data-ultimo-pedido">Data Último Pedido:</label>
+                <label>Data Último Pedido:</label>
                 <input type="date" id="data-ultimo-pedido">
                 
                 <div class="form-actions">
@@ -272,14 +200,12 @@
     </div>
 
     <!-- Modal de Sucesso -->
-    <div id="modal-sucesso" class="modal">
-        <div id="modal-sucesso-content" class="modal-content">
-            <span id="close-sucesso" class="close">&times;</span>
+    <div id="modal-sucesso">
+        <div id="modal-sucesso-content">
+            <span id="close-sucesso">&times;</span>
             <div class="success-icon">✅</div>
             <h2>Cliente Cadastrado com Sucesso!</h2>
-            
             <div id="cliente-cadastrado-info"></div>
-            
             <div class="success-actions">
                 <button id="cadastrar-outro">Cadastrar Outro Cliente</button>
                 <button id="fechar-sucesso">Fechar</button>
@@ -394,5 +320,6 @@
         window.clientManager = new ClientManager();
         window.catalogManager = new CatalogManager();
     </script>
+    
 </body>
 </html>

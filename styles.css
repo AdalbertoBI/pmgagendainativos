@@ -726,7 +726,7 @@ h1 {
 
 .product-image img {
     width: 100%;
-    height: 100%;
+    height: auto;
     object-fit: cover;
     transition: opacity 0.3s ease;
 }
@@ -1233,7 +1233,7 @@ h1 {
     border-radius: 3px;
 }
 
-/* Estilo melhorado para imagens com erro */
+/* Estilo para imagens com erro */
 .product-image img[data-error-attempts] {
     border: 2px dashed #dee2e6;
 }
@@ -1276,9 +1276,9 @@ h1 {
 }
 
 .product-image img[loading="lazy"]:not([src*="data:image"]) {
-    background: linear-gradient(45deg, #f0f0f0 25%, transparent 25%), 
-                linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), 
-                linear-gradient(45deg, transparent 75%, #f0f0f0 75%), 
+    background: linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
+                linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
                 linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
     background-size: 20px 20px;
     background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
@@ -1327,7 +1327,7 @@ h1 {
 
 /* Botões desabilitados */
 button:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
 }
 
@@ -1502,7 +1502,7 @@ button:disabled:hover {
         opacity: 1; /* Sempre visível em mobile */
         background: rgba(0,0,0,0.5);
     }
-    
+
     .product-code-overlay {
         font-size: 10px;
         padding: 1px 4px;
@@ -1570,8 +1570,8 @@ button:disabled:hover {
     max-height: 90%;
     overflow-y: auto;
 }
-/* === ESTILOS PARA MODAL DE TEXTO DE OFERTAS === */
 
+/* === ESTILOS PARA MODAL DE TEXTO DE OFERTAS === */
 #modal-text-offers {
     display: none;
     position: fixed;
@@ -1657,7 +1657,6 @@ button:disabled:hover {
 }
 
 /* === ESTILOS PARA MODAL DE CLIENTES WHATSAPP === */
-
 #modal-clientes-whatsapp {
     display: none;
     position: fixed;
@@ -1729,7 +1728,6 @@ button:disabled:hover {
 }
 
 /* === RESPONSIVIDADE PARA DISPOSITIVOS MÓVEIS === */
-
 @media (max-width: 768px) {
     #modal-text-offers-content,
     #modal-clientes-whatsapp-content {
@@ -1796,6 +1794,7 @@ button:disabled:hover {
 #select-multiple-products:hover {
     background: #138496 !important;
 }
+
 /* === CORREÇÕES PARA VISIBILIDADE DOS BOTÕES === */
 
 /* Garantir que botões de ação estejam sempre visíveis */
@@ -1808,7 +1807,6 @@ button:disabled:hover {
     background: #f8f9fa !important;
     padding: 20px !important;
     border-top: 1px solid #e9ecef !important;
-    margin-top: auto !important;
 }
 
 .produto-actions h3 {
@@ -1875,7 +1873,7 @@ button:disabled:hover {
     background: rgba(255,255,255,1) !important;
 }
 
-/* Botões de seleção múltipla */
+/* Botão de seleção múltipla */
 #select-multiple-products {
     display: inline-block !important;
     visibility: visible !important;
@@ -2019,12 +2017,12 @@ button:disabled:hover {
     .produto-actions {
         padding: 15px !important;
     }
-    
+
     .action-buttons-row {
         flex-direction: column !important;
         gap: 10px !important;
     }
-    
+
     .text-btn,
     .image-btn,
     #generate-text-offers,
@@ -2034,7 +2032,7 @@ button:disabled:hover {
         min-width: auto !important;
         width: 100% !important;
     }
-    
+
     .close,
     #close-produto,
     #close-product-selection,
@@ -2094,4 +2092,79 @@ button:active {
 #catalog-controls * {
     visibility: visible !important;
     opacity: 1 !important;
+}
+
+/* === ESTILOS PARA RESPONSIVIDADE MOBILE DAS IMAGENS === */
+
+/* Estilos responsivos para imagens de produtos */
+.product-image img,
+.product-selection-image img,
+.produto-image {
+    width: 100%;
+    height: auto;
+    max-width: 100%;
+    display: block;
+}
+
+/* Media queries para mobile */
+@media (max-width: 768px) {
+    .product-image {
+        height: auto;
+        max-height: 150px;
+    }
+
+    .product-image img {
+        object-fit: contain;
+    }
+
+    .produto-image-container {
+        height: auto;
+        max-height: 200px;
+    }
+
+    .produto-image {
+        object-fit: contain;
+    }
+
+    .product-selection-image {
+        width: 100%;
+        height: auto;
+        max-height: 100px;
+    }
+
+    .product-selection-image img {
+        object-fit: contain;
+    }
+
+    /* Ajuste para grid em telas menores */
+    #products-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 10px;
+    }
+
+    .product-card {
+        font-size: 0.9em;
+    }
+
+    .product-name {
+        font-size: 14px;
+    }
+
+    .product-price {
+        font-size: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .product-image {
+        max-height: 120px;
+    }
+
+    .produto-image-container {
+        max-height: 150px;
+    }
+
+    #products-grid {
+        grid-template-columns: 1fr;
+    }
 }
