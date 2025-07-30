@@ -981,23 +981,23 @@ function openTab(tab) {
         // Remover classe active de todas as abas
         document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('#tabs button').forEach(el => el.classList.remove('active'));
-        
+
         // Ativar aba selecionada
         const tabContent = document.getElementById(tab + '-content');
         const tabButton = document.querySelector(`button[onclick="openTab('${tab}')"]`);
         
         if (tabContent) tabContent.classList.add('active');
         if (tabButton) tabButton.classList.add('active');
-        
+
         currentTab = tab;
         window.clientManager.currentTab = tab;
-        
+
         // Controlar visibilidade do upload - APENAS NA ABA INATIVOS
         const uploadDiv = document.getElementById('upload');
         if (uploadDiv) {
             uploadDiv.style.display = (tab === 'inativos') ? 'block' : 'none';
         }
-        
+
         // Ações específicas por aba
         if (tab === 'inativos') {
             window.clientManager.applyFiltersAndSort();
@@ -1010,15 +1010,18 @@ function openTab(tab) {
             setTimeout(() => {
                 if (typeof window.initMap === 'function') {
                     window.initMap();
+
                     setTimeout(() => {
                         // Carregar dados do mapa se houver dados disponíveis
                         if (window.clientManager.data.length > 0 && !mapDataLoaded && typeof window.loadMapData === 'function') {
                             window.loadMapData();
                             mapDataLoaded = true;
                         }
+
                         if (typeof window.setupEditButton === 'function') {
                             window.setupEditButton();
                         }
+
                         // Adicionar listener para o checkbox "Incluir inativos"
                         const includeInativosCheckbox = document.getElementById('include-inativos-checkbox');
                         if (includeInativosCheckbox) {
@@ -1033,11 +1036,20 @@ function openTab(tab) {
                     }, 1000);
                 }
             }, 100);
+        } else if (tab === 'catalogo') {
+            console.log('📦 Inicializando aba catálogo...');
+            setTimeout(() => {
+                if (window.catalogManager && typeof window.catalogManager.init === 'function') {
+                    window.catalogManager.init();
+                }
+            }, 100);
         }
+
     } catch (error) {
         console.error('❌ Erro ao abrir aba:', error);
     }
 }
+
 
 // Salvar filtros
 function saveFilters() {
