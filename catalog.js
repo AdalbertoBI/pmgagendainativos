@@ -10,138 +10,137 @@ class CatalogManager {
         this.pdfText = '';
         this.extractedProducts = [];
     }
-
     // === MÉTODOS DE PERSISTÊNCIA ===
 
-    // Salvar catálogo no localStorage
-    saveCatalogToCache(catalogData) {
-        try {
-            const cacheData = {
-                products: catalogData.products || this.products,
-                extractedProducts: catalogData.extractedProducts || this.extractedProducts,
-                pdfText: catalogData.pdfText || this.pdfText,
-                savedAt: new Date().toISOString(),
-                fileName: catalogData.fileName || 'Catálogo Personalizado'
-            };
-            
-            localStorage.setItem('catalogCache', JSON.stringify(cacheData));
-            console.log('✅ Catálogo salvo no cache:', cacheData.fileName);
-            
-            // Salvar flag indicando que existe catálogo personalizado
-            localStorage.setItem('hasCustomCatalog', 'true');
-            
-        } catch (error) {
-            console.error('❌ Erro ao salvar catálogo no cache:', error);
-        }
+// Salvar catálogo no localStorage
+saveCatalogToCache(catalogData) {
+    try {
+        const cacheData = {
+            products: catalogData.products || this.products,
+            extractedProducts: catalogData.extractedProducts || this.extractedProducts,
+            pdfText: catalogData.pdfText || this.pdfText,
+            savedAt: new Date().toISOString(),
+            fileName: catalogData.fileName || 'Catálogo Personalizado'
+        };
+        
+        localStorage.setItem('catalogCache', JSON.stringify(cacheData));
+        console.log('✅ Catálogo salvo no cache:', cacheData.fileName);
+        
+        // Salvar flag indicando que existe catálogo personalizado
+        localStorage.setItem('hasCustomCatalog', 'true');
+        
+    } catch (error) {
+        console.error('❌ Erro ao salvar catálogo no cache:', error);
     }
+}
 
-    // Carregar catálogo do localStorage
-    loadCatalogFromCache() {
-        try {
-            const cacheData = localStorage.getItem('catalogCache');
-            const hasCustom = localStorage.getItem('hasCustomCatalog');
-            
-            if (!cacheData || hasCustom !== 'true') {
-                console.log('📦 Nenhum catálogo personalizado encontrado no cache');
-                return null;
-            }
-            
-            const parsedData = JSON.parse(cacheData);
-            
-            // Verificar se os dados são válidos
-            if (!parsedData.products || !Array.isArray(parsedData.products)) {
-                console.warn('⚠️ Dados do cache inválidos');
-                return null;
-            }
-            
-            console.log(`📦 Catálogo carregado do cache: ${parsedData.fileName} (${parsedData.savedAt})`);
-            console.log(`📊 ${parsedData.products.length} produtos encontrados no cache`);
-            
-            return parsedData;
-            
-        } catch (error) {
-            console.error('❌ Erro ao carregar catálogo do cache:', error);
+// Carregar catálogo do localStorage
+loadCatalogFromCache() {
+    try {
+        const cacheData = localStorage.getItem('catalogCache');
+        const hasCustom = localStorage.getItem('hasCustomCatalog');
+        
+        if (!cacheData || hasCustom !== 'true') {
+            console.log('📦 Nenhum catálogo personalizado encontrado no cache');
             return null;
         }
-    }
-
-    // Limpar cache do catálogo
-    clearCatalogCache() {
-        try {
-            localStorage.removeItem('catalogCache');
-            localStorage.removeItem('hasCustomCatalog');
-            console.log('🗑️ Cache do catálogo limpo');
-        } catch (error) {
-            console.error('❌ Erro ao limpar cache:', error);
+        
+        const parsedData = JSON.parse(cacheData);
+        
+        // Verificar se os dados são válidos
+        if (!parsedData.products || !Array.isArray(parsedData.products)) {
+            console.warn('⚠️ Dados do cache inválidos');
+            return null;
         }
+        
+        console.log(`📦 Catálogo carregado do cache: ${parsedData.fileName} (${parsedData.savedAt})`);
+        console.log(`📊 ${parsedData.products.length} produtos encontrados no cache`);
+        
+        return parsedData;
+        
+    } catch (error) {
+        console.error('❌ Erro ao carregar catálogo do cache:', error);
+        return null;
     }
+}
 
-    // Verificar se existe catálogo personalizado
-    hasCustomCatalogCached() {
-        return localStorage.getItem('hasCustomCatalog') === 'true';
+// Limpar cache do catálogo
+clearCatalogCache() {
+    try {
+        localStorage.removeItem('catalogCache');
+        localStorage.removeItem('hasCustomCatalog');
+        console.log('🗑️ Cache do catálogo limpo');
+    } catch (error) {
+        console.error('❌ Erro ao limpar cache:', error);
     }
+}
+
+// Verificar se existe catálogo personalizado
+hasCustomCatalogCached() {
+    return localStorage.getItem('hasCustomCatalog') === 'true';
+}
+
 
     // Inicializar catálogo com verificação de cache
-    async init() {
-        console.log('📦 Inicializando CatalogManager...');
-        try {
-            // Primeiro, tentar carregar do cache
-            const cachedCatalog = this.loadCatalogFromCache();
+async init() {
+    console.log('📦 Inicializando CatalogManager...');
+    try {
+        // Tentar carregar do cache
+        const cachedCatalog = this.loadCatalogFromCache();
+        
+        if (cachedCatalog) {
+            this.products = cachedCatalog.products;
+            this.extractedProducts = cachedCatalog.extractedProducts || [];
+            this.pdfText = cachedCatalog.pdfText || '';
+            this.filteredProducts = [...this.products];
             
-            if (cachedCatalog) {
-                // Usar dados do cache
-                this.products = cachedCatalog.products;
-                this.extractedProducts = cachedCatalog.extractedProducts || [];
-                this.pdfText = cachedCatalog.pdfText || '';
-                this.filteredProducts = [...this.products];
-                
-                this.updateCatalogStatus(`Catálogo carregado do cache: ${cachedCatalog.fileName} (${cachedCatalog.products.length} produtos)`);
-                this.renderProductsGrid();
-                
-                console.log(`✅ Catálogo personalizado carregado do cache: ${cachedCatalog.products.length} produtos`);
-            } else {
-                // Carregar catálogo padrão se não houver cache
-                console.log('📂 Carregando catálogo padrão...');
-                await this.loadPdfCatalog();
-            }
+            this.updateCatalogStatus(`Catálogo carregado do cache: ${cachedCatalog.fileName} (${cachedCatalog.products.length} produtos)`);
+            this.renderProductsGrid();
             
-            this.setupEventListeners();
-            
-        } catch (error) {
-            console.error('❌ Erro na inicialização:', error);
-            this.updateCatalogStatus('Erro na inicialização. Carregando produtos de exemplo...');
+            console.log(`✅ Catálogo personalizado carregado do cache: ${cachedCatalog.products.length} produtos`);
+        } else {
+            this.updateCatalogStatus('Nenhum catálogo encontrado. Carregando produtos de exemplo...');
             this.loadMockProducts();
-            this.setupEventListeners();
         }
+        
+        this.setupEventListeners();
+        
+    } catch (error) {
+        console.error('❌ Erro na inicialização:', error);
+        this.updateCatalogStatus('Erro na inicialização. Carregando produtos de exemplo...');
+        this.loadMockProducts();
+        this.setupEventListeners();
     }
+}
+
 
     // Configurar event listeners
     setupEventListeners() {
         console.log('🔧 Configurando event listeners...');
         
         // Botão de carregar novo catálogo
-        const loadCatalogBtn = document.getElementById('load-new-catalog');
-        if (loadCatalogBtn) {
-            loadCatalogBtn.addEventListener('click', () => {
-                const fileInput = document.getElementById('catalog-file-input');
-                if (fileInput) {
-                    fileInput.click();
-                }
-            });
+const loadCatalogBtn = document.getElementById('load-new-catalog');
+if (loadCatalogBtn) {
+    loadCatalogBtn.addEventListener('click', () => {
+        const fileInput = document.getElementById('catalog-file-input');
+        if (fileInput) {
+            fileInput.click();
         }
+    });
+}
 
-        // Input de arquivo para novo catálogo
-        const catalogFileInput = document.getElementById('catalog-file-input');
-        if (catalogFileInput) {
-            catalogFileInput.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (file && file.type === 'application/pdf') {
-                    this.loadNewCatalog(file);
-                } else if (file) {
-                    alert('Por favor, selecione um arquivo PDF válido.');
-                }
-            });
+// Input de arquivo para novo catálogo
+const catalogFileInput = document.getElementById('catalog-file-input');
+if (catalogFileInput) {
+    catalogFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file && file.type === 'application/pdf') {
+            this.loadNewCatalog(file);
+        } else if (file) {
+            alert('Por favor, selecione um arquivo PDF válido.');
         }
+    });
+}
 
         // Busca de produtos
         const searchInput = document.getElementById('product-search');
@@ -290,85 +289,87 @@ class CatalogManager {
     }
     
     // Carregar novo catálogo (arquivo diferente do padrão) COM PERSISTÊNCIA
-    async loadNewCatalog(pdfFile) {
-        if (this.isLoading) return;
+async loadNewCatalog(pdfFile) {
+    if (this.isLoading) return;
+    
+    this.isLoading = true;
+    this.updateCatalogStatus('Carregando novo catálogo...');
+    
+    try {
+        let arrayBuffer;
+        let fileName = 'Catálogo Personalizado';
         
-        this.isLoading = true;
-        this.updateCatalogStatus('Carregando novo catálogo...');
-        
-        try {
-            let arrayBuffer;
-            let fileName = 'Catálogo Personalizado';
-            
-            // Se recebeu um arquivo File do input
-            if (pdfFile instanceof File) {
-                arrayBuffer = await pdfFile.arrayBuffer();
-                fileName = pdfFile.name;
-                this.updateCatalogStatus(`Carregando arquivo: ${fileName}...`);
-            } 
-            // Se recebeu uma URL/caminho de arquivo
-            else if (typeof pdfFile === 'string') {
-                const response = await fetch(pdfFile);
-                if (!response.ok) {
-                    throw new Error(`Arquivo não encontrado: ${pdfFile}`);
-                }
-                arrayBuffer = await response.arrayBuffer();
-                fileName = pdfFile.split('/').pop() || 'Catálogo Personalizado';
-                this.updateCatalogStatus(`Carregando arquivo: ${fileName}...`);
+        // Se recebeu um arquivo File do input
+        if (pdfFile instanceof File) {
+            arrayBuffer = await pdfFile.arrayBuffer();
+            fileName = pdfFile.name;
+            this.updateCatalogStatus(`Carregando arquivo: ${fileName}...`);
+        } 
+        // Se recebeu uma URL/caminho de arquivo
+        else if (typeof pdfFile === 'string') {
+            const response = await fetch(pdfFile);
+            if (!response.ok) {
+                throw new Error(`Arquivo não encontrado: ${pdfFile}`);
             }
-            else {
-                throw new Error('Formato de arquivo inválido');
-            }
-
-            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-            
-            this.updateCatalogStatus('Extraindo texto do novo catálogo...');
-            await this.extractTextFromPDFComplete(pdf);
-            
-            this.updateCatalogStatus('Processando produtos com múltiplos métodos...');
-            await this.processProductsAdvanced();
-            
-            // ✅ SALVAR NO CACHE APÓS PROCESSAMENTO BEM-SUCEDIDO
-            this.saveCatalogToCache({
-                products: this.products,
-                extractedProducts: this.extractedProducts,
-                pdfText: this.pdfText,
-                fileName: fileName
-            });
-            
-            this.updateCatalogStatus(`Novo catálogo carregado e salvo: ${this.products.length} produtos encontrados`);
-            this.renderProductsGrid();
-            
-            // Limpar o input file após o carregamento
-            const fileInput = document.getElementById('catalog-file-input');
-            if (fileInput) {
-                fileInput.value = '';
-            }
-            
-            console.log(`✅ NOVO CATÁLOGO CARREGADO E PERSISTIDO: ${this.products.length} produtos processados`);
-            
-        } catch (error) {
-            console.error('❌ Erro ao carregar novo catálogo:', error);
-            this.updateCatalogStatus(`Erro ao carregar novo catálogo: ${error.message}`);
-            
-            // Em caso de erro, manter produtos existentes ou carregar produtos de exemplo
-            if (this.products.length === 0) {
-                // Tentar carregar do cache primeiro
-                const cachedCatalog = this.loadCatalogFromCache();
-                if (cachedCatalog) {
-                    this.products = cachedCatalog.products;
-                    this.filteredProducts = [...this.products];
-                    this.renderProductsGrid();
-                    this.updateCatalogStatus('Erro no carregamento. Mantendo catálogo anterior do cache.');
-                } else {
-                    this.updateCatalogStatus('Carregando produtos de exemplo...');
-                    this.loadMockProducts();
-                }
-            }
-        } finally {
-            this.isLoading = false;
+            arrayBuffer = await response.arrayBuffer();
+            fileName = pdfFile.split('/').pop() || 'Catálogo Personalizado';
+            this.updateCatalogStatus(`Carregando arquivo: ${fileName}...`);
         }
+        else {
+            throw new Error('Formato de arquivo inválido');
+        }
+
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        
+        this.updateCatalogStatus('Extraindo texto do novo catálogo...');
+        await this.extractTextFromPDFComplete(pdf);
+        
+        this.updateCatalogStatus('Processando produtos com múltiplos métodos...');
+        await this.processProductsAdvanced();
+        
+        // ✅ SALVAR NO CACHE APÓS PROCESSAMENTO BEM-SUCEDIDO
+        this.saveCatalogToCache({
+            products: this.products,
+            extractedProducts: this.extractedProducts,
+            pdfText: this.pdfText,
+            fileName: fileName
+        });
+        
+        this.updateCatalogStatus(`Novo catálogo carregado e salvo: ${this.products.length} produtos encontrados`);
+        this.renderProductsGrid();
+        
+        // Limpar o input file após o carregamento
+        const fileInput = document.getElementById('catalog-file-input');
+        if (fileInput) {
+            fileInput.value = '';
+        }
+        
+        console.log(`✅ NOVO CATÁLOGO CARREGADO E PERSISTIDO: ${this.products.length} produtos processados`);
+        
+    } catch (error) {
+        console.error('❌ Erro ao carregar novo catálogo:', error);
+        this.updateCatalogStatus(`Erro ao carregar novo catálogo: ${error.message}`);
+        
+        // Em caso de erro, manter produtos existentes ou carregar produtos de exemplo
+        if (this.products.length === 0) {
+            // Tentar carregar do cache primeiro
+            const cachedCatalog = this.loadCatalogFromCache();
+            if (cachedCatalog) {
+                this.products = cachedCatalog.products;
+                this.filteredProducts = [...this.products];
+                this.renderProductsGrid();
+                this.updateCatalogStatus('Erro no carregamento. Mantendo catálogo anterior do cache.');
+            } else {
+                this.updateCatalogStatus('Carregando produtos de exemplo...');
+                this.loadMockProducts();
+            }
+        }
+    } finally {
+        this.isLoading = false;
     }
+}
+
+
 
     // Carregar catálogo otimizado
     async loadPdfCatalog() {
@@ -404,6 +405,8 @@ class CatalogManager {
         }
     }
 
+    
+
     // EXTRAIR TEXTO COMPLETO
     async extractTextFromPDFComplete(pdf) {
         try {
@@ -430,73 +433,221 @@ class CatalogManager {
         }
     }
 
-    // PROCESSAMENTO AVANÇADO - VERSÃO SEM DUPLICAÇÃO
-    async processProductsAdvanced() {
-        this.extractedProducts = [];
-        
-        if (!this.pdfText) {
-            console.log('⚠️ Nenhum texto disponível para extração');
-            return;
-        }
-
-        // ✅ USAR MAP PARA CONTROLE MAIS RIGOROSO DE DUPLICAÇÃO
-        const foundProducts = new Map(); // Chave: código, Valor: produto completo
-        
-        // MÉTODO 1: MÚLTIPLOS PADRÕES
-        await this.extractWithMultiplePatternsFixed(foundProducts);
-        
-        // MÉTODO 2: LINHA POR LINHA (apenas se não encontrou muitos produtos)
-        if (foundProducts.size < 100) {
-            await this.extractLineByLineFixed(foundProducts);
-        }
-        
-        // MÉTODO 3: BLOCOS (apenas se ainda há poucos produtos)
-        if (foundProducts.size < 200) {
-            await this.extractByBlocksFixed(foundProducts);
-        }
-        
-        // ✅ CONVERTER MAP PARA ARRAY (garante produtos únicos)
-        this.extractedProducts = Array.from(foundProducts.values());
-        
-        this.products = this.extractedProducts.map((product, index) => ({
-            id: index + 1,
-            code: product.cod,
-            name: product.produto,
-            price: this.parsePrice(product.preco),
-            formattedPrice: `R$ ${product.preco}`,
-            description: this.generateDescription(product.produto),
-            image: this.generateProductImagePath(product.cod),
-            category: this.categorizeProduct(product.produto),
-            unit: product.vendPor || 'UN'
-        }));
-
-        this.filteredProducts = [...this.products];
-        console.log(`✅ EXTRAÇÃO FINAL SEM DUPLICAÇÃO: ${this.products.length} produtos únicos`);
+   
+   // PROCESSAMENTO AVANÇADO - VERSÃO SEM DUPLICAÇÃO
+async processProductsAdvanced() {
+    this.extractedProducts = [];
+    
+    if (!this.pdfText) {
+        console.log('⚠️ Nenhum texto disponível para extração');
+        return;
     }
 
-    // MÉTODO 1 CORRIGIDO: MÚLTIPLOS PADRÕES SEM DUPLICAÇÃO
-    async extractWithMultiplePatternsFixed(foundProducts) {
-        this.updateCatalogStatus('Aplicando padrões regex...');
+    // ✅ USAR MAP PARA CONTROLE MAIS RIGOROSO DE DUPLICAÇÃO
+    const foundProducts = new Map(); // Chave: código, Valor: produto completo
+    
+    // MÉTODO 1: MÚLTIPLOS PADRÕES
+    await this.extractWithMultiplePatternsFixed(foundProducts);
+    
+    // MÉTODO 2: LINHA POR LINHA (apenas se não encontrou muitos produtos)
+    if (foundProducts.size < 100) {
+        await this.extractLineByLineFixed(foundProducts);
+    }
+    
+    // MÉTODO 3: BLOCOS (apenas se ainda há poucos produtos)
+    if (foundProducts.size < 200) {
+        await this.extractByBlocksFixed(foundProducts);
+    }
+    
+    // ✅ CONVERTER MAP PARA ARRAY (garante produtos únicos)
+    this.extractedProducts = Array.from(foundProducts.values());
+    
+    this.products = this.extractedProducts.map((product, index) => ({
+        id: index + 1,
+        code: product.cod,
+        name: product.produto,
+        price: this.parsePrice(product.preco),
+        formattedPrice: `R$ ${product.preco}`,
+        description: this.generateDescription(product.produto),
+        image: this.generateProductImagePath(product.cod),
+        category: this.categorizeProduct(product.produto),
+        unit: product.vendPor || 'UN'
+    }));
+
+    this.filteredProducts = [...this.products];
+    console.log(`✅ EXTRAÇÃO FINAL SEM DUPLICAÇÃO: ${this.products.length} produtos únicos`);
+}
+// MÉTODO 1 CORRIGIDO: MÚLTIPLOS PADRÕES SEM DUPLICAÇÃO
+async extractWithMultiplePatternsFixed(foundProducts) {
+    this.updateCatalogStatus('Aplicando padrões regex...');
+    
+    const patterns = [
+        /(\d{1,5})\s+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][^\n\r]+?)\s+(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)\s*R?\$?/gi,
+        /(\d{1,5})\s+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][^\n\r]*)\n([^\n\r]+?)\s+(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)\s*R?\$?/gi,
+        /(\d{1,5})\s{2,}([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][^\n\r]+?)\s{2,}(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)/gi
+    ];
+
+    let totalExtracted = 0;
+    
+    for (let patternIndex = 0; patternIndex < patterns.length; patternIndex++) {
+        const pattern = patterns[patternIndex];
+        let matches = 0;
         
+        try {
+            pattern.lastIndex = 0;
+            let match;
+            
+            while ((match = pattern.exec(this.pdfText)) !== null) {
+                let cod, produto, vendPor, preco;
+                
+                if (patternIndex === 1) {
+                    if (match.length >= 6) {
+                        [, cod, produto1, produto2, vendPor, preco] = match;
+                        produto = (produto1 + ' ' + produto2).trim();
+                    } else continue;
+                } else {
+                    if (match.length >= 5) {
+                        [, cod, produto, vendPor, preco] = match;
+                    } else continue;
+                }
+
+                // ✅ VERIFICAR SE JÁ EXISTE NO MAP
+                if (foundProducts.has(cod)) continue;
+
+                const cleanProduto = this.cleanProductNameAdvanced(produto);
+                const cleanPreco = this.formatPrice(preco);
+
+                if (this.isValidProductAdvanced(cod, cleanProduto, vendPor, cleanPreco)) {
+                    // ✅ ADICIONAR NO MAP (garante unicidade)
+                    foundProducts.set(cod, {
+                        cod: cod.trim(),
+                        produto: cleanProduto.toUpperCase(),
+                        vendPor: vendPor.trim().toUpperCase(),
+                        preco: cleanPreco,
+                        method: `regex_${patternIndex + 1}`
+                    });
+                    
+                    matches++;
+                    totalExtracted++;
+                }
+
+                if (matches % 50 === 0) {
+                    await this.sleep(1);
+                    this.updateCatalogStatus(`Padrão ${patternIndex + 1}: ${matches} produtos | Total: ${totalExtracted}`);
+                }
+            }
+        } catch (error) {
+            console.log(`⚠️ Erro no Padrão ${patternIndex + 1}: ${error.message}`);
+        }
+    }
+}
+
+// MÉTODO 2 CORRIGIDO: LINHA POR LINHA SEM DUPLICAÇÃO
+async extractLineByLineFixed(foundProducts) {
+    this.updateCatalogStatus('Parser linha por linha...');
+    
+    const lines = this.pdfText.split(/[\n\r]+/);
+    let extracted = 0;
+
+    for (let i = 0; i < lines.length - 3; i++) {
+        const line1 = lines[i].trim();
+        const line2 = lines[i + 1]?.trim() || '';
+        const line3 = lines[i + 2]?.trim() || '';
+        const line4 = lines[i + 3]?.trim() || '';
+
+        const combinations = [
+            { cod: line1, produto: line2, unitPrice: line3 },
+            { cod: line1, produto: line2 + ' ' + line3, unitPrice: line4 },
+            { combined: line1 }
+        ];
+
+        for (const combo of combinations) {
+            if (combo.combined) {
+                const match = combo.combined.match(/^(\d{1,5})\s+(.+?)\s+(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)/);
+                if (match) {
+                    const [, cod, produto, vendPor, preco] = match;
+                    if (this.tryAddProductToMap(cod, produto, vendPor, preco, foundProducts, 'line_combined')) {
+                        extracted++;
+                    }
+                }
+            } else {
+                const codMatch = combo.cod.match(/^(\d{1,5})$/);
+                const unitPriceMatch = combo.unitPrice.match(/^(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)/);
+                
+                if (codMatch && unitPriceMatch && combo.produto.length > 5) {
+                    if (this.tryAddProductToMap(codMatch[1], combo.produto, unitPriceMatch[1], unitPriceMatch[2], foundProducts, 'line_multi')) {
+                        extracted++;
+                    }
+                }
+            }
+        }
+
+        if (i % 200 === 0) {
+            await this.sleep(1);
+            this.updateCatalogStatus(`Linha por linha: ${extracted} produtos | Linha ${i}/${lines.length}`);
+        }
+    }
+}
+
+// MÉTODO 3 CORRIGIDO: BLOCOS SEM DUPLICAÇÃO
+async extractByBlocksFixed(foundProducts) {
+    this.updateCatalogStatus('Parser por blocos...');
+    
+    const blockSize = 1000;
+    const lines = this.pdfText.split(/[\n\r]+/);
+    let extracted = 0;
+
+    for (let i = 0; i < lines.length; i += blockSize) {
+        const block = lines.slice(i, i + blockSize).join('\n');
+        
+        const blockPatterns = [
+            /(\d{1,5})\s+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][^(]*\([^)]+\)[^(]*)\s+(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)/gi,
+            /(\d{1,5})\s+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][^0-9]*\d+[^0-9]*[A-Z]*)\s+(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)/gi
+        ];
+
+        for (const pattern of blockPatterns) {
+            pattern.lastIndex = 0;
+            let match;
+            
+            while ((match = pattern.exec(block)) !== null) {
+                const [, cod, produto, vendPor, preco] = match;
+                if (this.tryAddProductToMap(cod, produto, vendPor, preco, foundProducts, 'block')) {
+                    extracted++;
+                }
+            }
+        }
+
+        if (i % (blockSize * 5) === 0) {
+            await this.sleep(2);
+            this.updateCatalogStatus(`Blocos: ${extracted} produtos | Bloco ${i / blockSize}/${Math.ceil(lines.length / blockSize)}`);
+        }
+    }
+}
+
+
+
+    // MÉTODO 1: MÚLTIPLOS PADRÕES OTIMIZADOS
+    async extractWithMultiplePatterns(foundCodes) {
+        this.updateCatalogStatus('Aplicando padrões regex...');
+
         const patterns = [
             /(\d{1,5})\s+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][^\n\r]+?)\s+(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)\s*R?\$?/gi,
             /(\d{1,5})\s+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][^\n\r]*)\n([^\n\r]+?)\s+(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)\s*R?\$?/gi,
-            /(\d{1,5})\s{2,}([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][^\n\r]+?)\s{2,}(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)/gi
+            /(\d{1,5})\s{2,}([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][^\n\r]+?)\s{2,}(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)/gi,
+            /(\d{1,5})\s+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][^\n\r]+?)\s+(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)([\d,]+)R\$/gi
         ];
 
         let totalExtracted = 0;
-        
         for (let patternIndex = 0; patternIndex < patterns.length; patternIndex++) {
             const pattern = patterns[patternIndex];
             let matches = 0;
-            
+
             try {
                 pattern.lastIndex = 0;
                 let match;
-                
                 while ((match = pattern.exec(this.pdfText)) !== null) {
                     let cod, produto, vendPor, preco;
-                    
+
                     if (patternIndex === 1) {
                         if (match.length >= 6) {
                             [, cod, produto1, produto2, vendPor, preco] = match;
@@ -508,22 +659,21 @@ class CatalogManager {
                         } else continue;
                     }
 
-                    // ✅ VERIFICAR SE JÁ EXISTE NO MAP
-                    if (foundProducts.has(cod)) continue;
+                    if (foundCodes.has(cod)) continue;
 
                     const cleanProduto = this.cleanProductNameAdvanced(produto);
                     const cleanPreco = this.formatPrice(preco);
 
                     if (this.isValidProductAdvanced(cod, cleanProduto, vendPor, cleanPreco)) {
-                        // ✅ ADICIONAR NO MAP (garante unicidade)
-                        foundProducts.set(cod, {
+                        this.extractedProducts.push({
                             cod: cod.trim(),
                             produto: cleanProduto.toUpperCase(),
                             vendPor: vendPor.trim().toUpperCase(),
                             preco: cleanPreco,
                             method: `regex_${patternIndex + 1}`
                         });
-                        
+
+                        foundCodes.add(cod);
                         matches++;
                         totalExtracted++;
                     }
@@ -539,10 +689,10 @@ class CatalogManager {
         }
     }
 
-    // MÉTODO 2 CORRIGIDO: LINHA POR LINHA SEM DUPLICAÇÃO
-    async extractLineByLineFixed(foundProducts) {
+    // MÉTODO 2: PARSER LINHA POR LINHA
+    async extractLineByLineOptimized(foundCodes) {
         this.updateCatalogStatus('Parser linha por linha...');
-        
+
         const lines = this.pdfText.split(/[\n\r]+/);
         let extracted = 0;
 
@@ -563,16 +713,16 @@ class CatalogManager {
                     const match = combo.combined.match(/^(\d{1,5})\s+(.+?)\s+(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)/);
                     if (match) {
                         const [, cod, produto, vendPor, preco] = match;
-                        if (this.tryAddProductToMap(cod, produto, vendPor, preco, foundProducts, 'line_combined')) {
+                        if (this.tryAddProduct(cod, produto, vendPor, preco, foundCodes, 'line_combined')) {
                             extracted++;
                         }
                     }
                 } else {
                     const codMatch = combo.cod.match(/^(\d{1,5})$/);
                     const unitPriceMatch = combo.unitPrice.match(/^(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)/);
-                    
+
                     if (codMatch && unitPriceMatch && combo.produto.length > 5) {
-                        if (this.tryAddProductToMap(codMatch[1], combo.produto, unitPriceMatch[1], unitPriceMatch[2], foundProducts, 'line_multi')) {
+                        if (this.tryAddProduct(codMatch[1], combo.produto, unitPriceMatch[1], unitPriceMatch[2], foundCodes, 'line_multi')) {
                             extracted++;
                         }
                     }
@@ -586,17 +736,17 @@ class CatalogManager {
         }
     }
 
-    // MÉTODO 3 CORRIGIDO: BLOCOS SEM DUPLICAÇÃO
-    async extractByBlocksFixed(foundProducts) {
+    // MÉTODO 3: PARSER POR BLOCOS
+    async extractByBlocks(foundCodes) {
         this.updateCatalogStatus('Parser por blocos...');
-        
+
         const blockSize = 1000;
         const lines = this.pdfText.split(/[\n\r]+/);
         let extracted = 0;
 
         for (let i = 0; i < lines.length; i += blockSize) {
             const block = lines.slice(i, i + blockSize).join('\n');
-            
+
             const blockPatterns = [
                 /(\d{1,5})\s+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][^(]*\([^)]+\)[^(]*)\s+(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)/gi,
                 /(\d{1,5})\s+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][^0-9]*\d+[^0-9]*[A-Z]*)\s+(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)/gi
@@ -605,10 +755,9 @@ class CatalogManager {
             for (const pattern of blockPatterns) {
                 pattern.lastIndex = 0;
                 let match;
-                
                 while ((match = pattern.exec(block)) !== null) {
                     const [, cod, produto, vendPor, preco] = match;
-                    if (this.tryAddProductToMap(cod, produto, vendPor, preco, foundProducts, 'block')) {
+                    if (this.tryAddProduct(cod, produto, vendPor, preco, foundCodes, 'block')) {
                         extracted++;
                     }
                 }
@@ -622,25 +771,25 @@ class CatalogManager {
     }
 
     // FUNÇÃO AUXILIAR PARA TENTAR ADICIONAR PRODUTO
-    tryAddProductToMap(cod, produto, vendPor, preco, foundProducts, method) {
+    tryAddProduct(cod, produto, vendPor, preco, foundProducts, method) {
         // ✅ VERIFICAR SE JÁ EXISTE NO MAP
-        if (foundProducts.has(cod)) return false;
+    if (foundProducts.has(cod)) return false;
 
-        const cleanProduto = this.cleanProductNameAdvanced(produto);
-        const cleanPreco = this.formatPrice(preco);
+    const cleanProduto = this.cleanProductNameAdvanced(produto);
+    const cleanPreco = this.formatPrice(preco);
 
-        if (this.isValidProductAdvanced(cod, cleanProduto, vendPor, cleanPreco)) {
-            // ✅ ADICIONAR NO MAP (garante unicidade absoluta)
-            foundProducts.set(cod, {
-                cod: cod.trim(),
-                produto: cleanProduto.toUpperCase(),
-                vendPor: vendPor.trim().toUpperCase(),
-                preco: cleanPreco,
-                method: method
-            });
-            return true;
-        }
-        return false;
+    if (this.isValidProductAdvanced(cod, cleanProduto, vendPor, cleanPreco)) {
+        // ✅ ADICIONAR NO MAP (garante unicidade absoluta)
+        foundProducts.set(cod, {
+            cod: cod.trim(),
+            produto: cleanProduto.toUpperCase(),
+            vendPor: vendPor.trim().toUpperCase(),
+            preco: cleanPreco,
+            method: method
+        });
+        return true;
+    }
+    return false;
     }
 
     sleep(ms) {
@@ -665,7 +814,7 @@ class CatalogManager {
         const validUnits = ['LT', 'PCT', 'KG', 'CX', 'GL', 'BD', 'VD', 'FR', 'UN', 'BAG', 'BIS', 'PT', 'SC', 'FD', 'FDO', 'PÇ', 'BARR'];
 
         return cod && cod.length >= 1 && cod.length <= 5 &&
-               producto && producto.length >= 3 && !produto.match(/^\s*$/) &&
+               produto && produto.length >= 3 && !produto.match(/^\s*$/) &&
                vendPor && validUnits.includes(vendPor.toUpperCase()) &&
                preco && /^\d+,\d{2}$/.test(this.formatPrice(preco));
     }
@@ -688,29 +837,49 @@ class CatalogManager {
         return parseFloat(priceStr.replace(',', '.'));
     }
 
-    generateProductImagePath(codigo) {
-        const paddedCode = codigo.toString().padStart(4, '0');
-        return {
-            small: `./FOTOS DE PRODUTOS/${paddedCode}_small.webp`,
-            medium: `./FOTOS DE PRODUTOS/${paddedCode}_medium.webp`,
-            large: `./FOTOS DE PRODUTOS/${paddedCode}.webp`
-        };
+    // CORREÇÃO 1: Modificar generateProductImagePath para retornar string por padrão
+generateProductImagePath(codigo, size = 'large') {
+    const paddedCode = codigo.toString().padStart(4, '0');
+    const paths = {
+        small: `./FOTOS DE PRODUTOS/${paddedCode}_small.webp`,
+        medium: `./FOTOS DE PRODUTOS/${paddedCode}_medium.webp`,
+        large: `./FOTOS DE PRODUTOS/${paddedCode}.webp`
+    };
+    
+    // Se size for especificado, retorna apenas essa URL
+    if (size && paths[size]) {
+        return paths[size];
     }
+    
+    // Caso contrário, retorna o objeto completo
+    return paths;
+}
 
-    generateProductImageHTML(codigo, nome) {
-        const paths = this.generateProductImagePath(codigo);
-        return `
-            <picture>
-                <source media="(max-width: 480px)" srcset="${paths.small}">
-                <source media="(max-width: 768px)" srcset="${paths.medium}">
-                <img src="${paths.large}" 
-                     alt="${nome}" 
-                     class="product-image"
-                     loading="lazy"
-                     onerror="catalogManager.handleImageError(this, '${codigo}')">
-            </picture>
-        `;
+// CORREÇÃO 2: Adicionar função para obter URL da imagem com segurança
+getProductImageUrl(codigo, size = 'large') {
+    const paddedCode = codigo.toString().padStart(4, '0');
+    
+    switch (size) {
+        case 'small':
+            return `./FOTOS DE PRODUTOS/${paddedCode}_small.webp`;
+        case 'medium':
+            return `./FOTOS DE PRODUTOS/${paddedCode}_medium.webp`;
+        case 'large':
+        default:
+            return `./FOTOS DE PRODUTOS/${paddedCode}.webp`;
     }
+}
+
+// CORREÇÃO 3: Modificar generateProductImageHTML para usar a nova função
+generateProductImageHTML(codigo, nome) {
+    const imageUrl = this.getProductImageUrl(codigo, 'medium');
+    return `<img src="${imageUrl}" 
+                 alt="${nome}" 
+                 loading="lazy" 
+                 onerror="window.catalogManager.handleImageError(this, '${codigo}')"
+                 class="product-image-item">`;
+}
+
 
     handleImageError(imgElement, codigo) {
         const paddedCode = codigo.toString().padStart(4, '0');
@@ -774,25 +943,26 @@ class CatalogManager {
     }
 
     getPlaceholderImage(codigo, width = 300, height = 200) {
-        const colors = ['#007bff', '#28a745', '#ffc107', '#dc3545'];
-        const color = colors[codigo.length % colors.length];
-        
-        const svgContent = `
-            <svg xmlns="http://www.w3.org/2000/svg" 
-                 viewBox="0 0 ${width} ${height}" 
-                 style="background:${color};">
-                <text x="50%" y="50%" 
-                      text-anchor="middle" 
-                      dominant-baseline="middle" 
-                      fill="white" 
-                      font-size="16">
-                    ${codigo}
-                </text>
-            </svg>
-        `;
-        
-        return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgContent)}`;
-    }
+    const colors = ['#007bff', '#28a745', '#ffc107', '#dc3545'];
+    const color = colors[codigo.length % colors.length];
+    
+    const svgContent = `
+        <svg xmlns="http://www.w3.org/2000/svg" 
+             viewBox="0 0 ${width} ${height}" 
+             style="background:${color};">
+            <text x="50%" y="50%" 
+                  text-anchor="middle" 
+                  dominant-baseline="middle" 
+                  fill="white" 
+                  font-size="16">
+                ${codigo}
+            </text>
+        </svg>
+    `;
+    
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgContent)}`;
+}
+
 
     categorizeProduct(name) {
         const categories = {
@@ -862,12 +1032,15 @@ class CatalogManager {
             grid.appendChild(productCard);
 
             const imgHTML = `
-                <img src="${product.image}" 
-                     alt="${product.name}"
-                     class="product-image"
-                     loading="lazy"
-                     onerror="catalogManager.handleImageError(this, '${product.code}')">
-            `;
+        <img src="${product.image}" 
+             alt="${product.name}"
+             class="product-image"
+             loading="lazy"
+             onerror="catalogManager.handleImageError(this, '${product.code}')">
+    `;
+
+
+
         });
     }
 
@@ -932,6 +1105,8 @@ class CatalogManager {
 
 📞 Entre em contato para mais informações!
 
+
+
 *Produto sujeito à disponibilidade de estoque.`;
 
         try {
@@ -955,142 +1130,176 @@ class CatalogManager {
     }
 
     // GERAR IMAGEM VISUAL DO PRODUTO (com foto incluída)
-    async generateProductImage(product) {
+async generateProductImage(product) {
+    try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Dimensões do card
+        canvas.width = 400;
+        canvas.height = 350; // Aumentado para acomodar a imagem
+        
+        // Fundo do card
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Borda do card
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
+        
+        // Área para a imagem do produto
+        const imageArea = {
+            x: 20,
+            y: 20,
+            width: 120,
+            height: 120
+        };
+        
+        // Carregar e desenhar a imagem do produto
         try {
-            console.log('🔄 Iniciando geração de imagem para produto:', product.code);
+            const productImg = new Image();
+            productImg.crossOrigin = 'anonymous';
             
-            // Verificar se o navegador suporta canvas
-            const canvas = document.createElement('canvas');
-            if (!canvas.getContext) {
-                throw new Error('Canvas não suportado pelo navegador');
-            }
-            
-            const ctx = canvas.getContext('2d');
-            
-            // Verificar suporte a ClipboardItem
-            if (!window.ClipboardItem) {
-                throw new Error('ClipboardItem não suportado. Use Chrome 76+, Firefox 87+ ou Safari 13.1+');
-            }
-            
-            // Dimensões do card
-            canvas.width = 400;
-            canvas.height = 350;
-            
-            // Fundo do card
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Borda do card
-            ctx.strokeStyle = '#e0e0e0';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
-            
-            // Área para a imagem do produto
-            const imageArea = { x: 20, y: 20, width: 120, height: 120 };
-            
-            // Fundo da área da imagem
-            ctx.fillStyle = '#f8f9fa';
-            ctx.fillRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
-            
-            // Borda da área da imagem
-            ctx.strokeStyle = '#dee2e6';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
-            
-            // Tentar carregar a imagem do produto
-            try {
-                const productImg = await this.loadImageSafely(product.image);
-                if (productImg) {
-                    // Desenhar imagem mantendo proporção
-                    const { drawX, drawY, drawWidth, drawHeight } = this.calculateImageDimensions(
-                        productImg, imageArea
-                    );
+            await new Promise((resolve, reject) => {
+                productImg.onload = () => {
+                    // Desenhar fundo da área da imagem
+                    ctx.fillStyle = '#f8f9fa';
+                    ctx.fillRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
+                    
+                    // Desenhar borda da área da imagem
+                    ctx.strokeStyle = '#dee2e6';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
+                    
+                    // Calcular dimensões para manter proporção
+                    const imgAspect = productImg.width / productImg.height;
+                    const areaAspect = imageArea.width / imageArea.height;
+                    
+                    let drawWidth, drawHeight, drawX, drawY;
+                    
+                    if (imgAspect > areaAspect) {
+                        // Imagem é mais larga - ajustar pela largura
+                        drawWidth = imageArea.width - 4;
+                        drawHeight = drawWidth / imgAspect;
+                        drawX = imageArea.x + 2;
+                        drawY = imageArea.y + (imageArea.height - drawHeight) / 2;
+                    } else {
+                        // Imagem é mais alta - ajustar pela altura
+                        drawHeight = imageArea.height - 4;
+                        drawWidth = drawHeight * imgAspect;
+                        drawX = imageArea.x + (imageArea.width - drawWidth) / 2;
+                        drawY = imageArea.y + 2;
+                    }
+                    
+                    // Desenhar a imagem do produto
                     ctx.drawImage(productImg, drawX, drawY, drawWidth, drawHeight);
-                    console.log('✅ Imagem do produto carregada com sucesso');
-                } else {
-                    throw new Error('Falha ao carregar imagem do produto');
-                }
-            } catch (imgError) {
-                console.warn('⚠️ Usando placeholder para produto:', product.code, imgError.message);
-                // Placeholder
-                ctx.fillStyle = '#6c757d';
-                ctx.font = '32px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText('📦', imageArea.x + imageArea.width/2, imageArea.y + imageArea.height/2 + 10);
+                    resolve();
+                };
                 
-                ctx.fillStyle = '#495057';
-                ctx.font = '12px Arial';
-                ctx.fillText(product.code, imageArea.x + imageArea.width/2, imageArea.y + imageArea.height/2 + 30);
-            }
-            
-            // Cabeçalho com nome do produto
-            const headerY = 160;
-            ctx.fillStyle = '#00ff62ff';
-            ctx.fillRect(20, headerY, canvas.width - 40, 40);
-            
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 14px Arial';
-            ctx.textAlign = 'center';
-            
-            const productName = product.name.length > 35 ? product.name.substring(0, 32) + '...' : product.name;
-            ctx.fillText(productName, canvas.width / 2, headerY + 25);
-            
-            // Preço em destaque
-            ctx.fillStyle = '#28a745';
-            ctx.font = 'bold 32px Arial';
-            ctx.fillText(product.formattedPrice, canvas.width / 2, 240);
-            
-            // Informações do produto
-            ctx.fillStyle = '#333333';
-            ctx.font = '14px Arial';
-            ctx.textAlign = 'left';
-            
-            const infoStartY = 265;
-            ctx.fillText(`🏷️ Código: ${product.code}`, 160, infoStartY);
-            ctx.fillText(`📏 Unidade: ${product.unit}`, 160, infoStartY + 20);
-            ctx.fillText(`🏪 Categoria: ${product.category}`, 160, infoStartY + 40);
-            
-            // Linha separadora
-            ctx.strokeStyle = '#e0e0e0';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(30, 315);
-            ctx.lineTo(canvas.width - 30, 315);
-            ctx.stroke();
-            
-            // Rodapé
-            ctx.fillStyle = '#666666';
-            ctx.font = '11px Arial';
-            ctx.textAlign = 'center';
-            const currentDate = new Date().toLocaleDateString('pt-BR');
-            ctx.fillText(` |  | ${currentDate}`, canvas.width / 2, 335);
-            
-            console.log('🎨 Canvas gerado com sucesso');
-            
-            // Converter e copiar com tratamento de erro
-            await this.copyCanvasToClipboard(canvas, product.code);
-            
+                productImg.onerror = () => {
+                    console.log('Erro ao carregar imagem, usando placeholder');
+                    // Desenhar placeholder
+                    ctx.fillStyle = '#f8f9fa';
+                    ctx.fillRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
+                    
+                    ctx.strokeStyle = '#dee2e6';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
+                    
+                    // Ícone de produto
+                    ctx.fillStyle = '#6c757d';
+                    ctx.font = '32px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('📦', imageArea.x + imageArea.width/2, imageArea.y + imageArea.height/2 + 10);
+                    
+                    // Código do produto
+                    ctx.fillStyle = '#495057';
+                    ctx.font = '12px Arial';
+                    ctx.fillText(product.code, imageArea.x + imageArea.width/2, imageArea.y + imageArea.height/2 + 30);
+                    
+                    resolve();
+                };
+                
+                // Tentar carregar a imagem do produto
+                productImg.src = product.image;
+            });
         } catch (error) {
-            console.error('❌ Erro ao gerar imagem:', error);
-            
-            // Mensagens de erro específicas para o usuário
-            let userMessage = 'Erro ao gerar imagem: ';
-            
-            if (error.message.includes('ClipboardItem')) {
-                userMessage += 'Seu navegador não suporta esta funcionalidade. Use Chrome, Firefox ou Safari mais recentes.';
-            } else if (error.message.includes('Permission')) {
-                userMessage += 'Permissão negada. Clique na página e tente novamente.';
-            } else if (error.message.includes('Canvas')) {
-                userMessage += 'Seu navegador não suporta canvas. Tente usar a opção de texto.';
-            } else {
-                userMessage += 'Use a opção de texto como alternativa.';
-            }
-            
-            alert('❌ ' + userMessage);
+            console.log('Erro ao processar imagem:', error);
         }
+        
+        // Cabeçalho com nome do produto
+        const headerY = 160;
+        ctx.fillStyle = '#007bff';
+        ctx.fillRect(20, headerY, canvas.width - 40, 40);
+        
+        // Nome do produto (quebrar texto se necessário)
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'center';
+        
+        const productName = product.name.length > 35 ? product.name.substring(0, 32) + '...' : product.name;
+        ctx.fillText(productName, canvas.width / 2, headerY + 25);
+        
+        // Preço em destaque
+        ctx.fillStyle = '#28a745';
+        ctx.font = 'bold 32px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(product.formattedPrice, canvas.width / 2, 240);
+        
+        // Informações do produto
+        ctx.fillStyle = '#333333';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'left';
+        
+        const infoStartY = 265;
+        ctx.fillText(`🏷️ Código: ${product.code}`, 160, infoStartY);
+        ctx.fillText(`📏 Unidade: ${product.unit}`, 160, infoStartY + 20);
+        ctx.fillText(`🏪 Categoria: ${product.category}`, 160, infoStartY + 40);
+        
+        // Linha separadora
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(30, 315);
+        ctx.lineTo(canvas.width - 30, 315);
+        ctx.stroke();
+        
+        // Rodapé com informações de contato
+        ctx.fillStyle = '#666666';
+        ctx.font = '11px Arial';
+        ctx.textAlign = 'center';
+        const currentDate = new Date().toLocaleDateString('pt-BR');
+        ctx.fillText(` |  | ${currentDate}`, canvas.width / 2, 335);
+        
+        // Converter canvas para blob e copiar
+        canvas.toBlob(async (blob) => {
+            try {
+                const item = new ClipboardItem({ 'image/png': blob });
+                await navigator.clipboard.write([item]);
+                alert('✅ Imagem do produto copiada para a área de transferência!');
+            } catch (error) {
+                console.error('Erro ao copiar imagem:', error);
+                // Fallback: criar link de download
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `produto-${product.code}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                alert('✅ Imagem baixada! Você pode compartilhar o arquivo baixado.');
+            }
+        }, 'image/png');
+        
+    } catch (error) {
+        console.error('Erro ao gerar imagem:', error);
+        alert('❌ Erro ao gerar imagem. Tente usar a opção de texto.');
     }
+}
 
-    // GERAR IMAGEM VISUAL PARA MÚLTIPLOS PRODUTOS (com fotos e logo)
+// GERAR IMAGEM VISUAL PARA MÚLTIPLOS PRODUTOS (com fotos e logo)
 async generateImageOffersVisual() {
     if (this.selectedProducts.length === 0) {
         alert('❌ Selecione pelo menos um produto!');
@@ -1101,8 +1310,8 @@ async generateImageOffersVisual() {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        // Calcular altura baseado no número de produtos (header aumentado para acomodar logo e texto)
-        const headerHeight = 120; // Aumentado de 100 para 120 para dar mais espaço
+        // Calcular altura baseado no número de produtos (header aumentado para acomodar logo)
+        const headerHeight = 100; // Aumentado de 80 para 100 para o logo
         const productHeight = 80;
         const footerHeight = 80;
         const padding = 20;
@@ -1144,7 +1353,7 @@ async generateImageOffersVisual() {
                     }
                     
                     const logoX = (canvas.width - logoWidth) / 2;
-                    const logoY = 15; // Mantém o logo na parte superior
+                    const logoY = 15;
                     
                     ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
                     resolve();
@@ -1161,15 +1370,15 @@ async generateImageOffersVisual() {
             console.error('Erro ao carregar logo:', error);
         }
         
-        // Texto do cabeçalho (ajustado para abaixo do logo)
+        // Texto do cabeçalho (ajustado para baixo do logo)
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 20px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('🛒 JORNAL DE OFERTAS 🛒', canvas.width / 2, 80); // Ajustado para 70 (abaixo do logo)
+        ctx.fillText('🛒 JORNAL DE OFERTAS 🛒', canvas.width / 2, 60);
         
         const currentDate = new Date().toLocaleDateString('pt-BR');
         ctx.font = '14px Arial';
-        ctx.fillText(`📅 ${currentDate}`, canvas.width / 2, 100); // Ajustado para 90 (abaixo do título)
+        ctx.fillText(`📅 ${currentDate}`, canvas.width / 2, 75);
         
         // Produtos com imagens
         let yPosition = headerHeight + padding;
@@ -1337,6 +1546,8 @@ async generateImageOffersVisual() {
     }
 }
 
+
+
     openProductSelectionModal() {
         this.selectedProducts = [];
         const modal = document.getElementById('modal-product-selection');
@@ -1471,7 +1682,7 @@ async generateImageOffersVisual() {
 
         this.selectedProducts.forEach((product, index) => {
             offersText += `${index + 1}. 📦 **${product.name}**
-   🏷️ Código Cod: ${product.code}
+   🏷️ Código: ${product.code}
    💰 Preço: ${product.formattedPrice}
    📏 Unidade: ${product.unit}
    🏪 Categoria: ${product.category}
@@ -1494,170 +1705,309 @@ async generateImageOffersVisual() {
     }
 
     // Mostrar modal com texto de ofertas
-    showOffersTextModal(text) {
-        const modal = document.getElementById('modal-text-offers');
-        const textarea = document.getElementById('offers-text');
-        
-        if (!modal) {
-            console.error('❌ Modal de texto de ofertas não encontrado!');
-            // Fallback: copiar diretamente para área de transferência
-            this.copyTextDirectly(text);
-            return;
-        }
-        
-        if (textarea) {
-            textarea.value = text;
-            textarea.style.height = '400px';
-            textarea.style.width = '100%';
-        }
-        
-        modal.style.display = 'flex';
-        console.log('✅ Modal de texto de ofertas aberto');
+showOffersTextModal(text) {
+    const modal = document.getElementById('modal-text-offers');
+    const textarea = document.getElementById('offers-text');
+    
+    if (!modal) {
+        console.error('❌ Modal de texto de ofertas não encontrado!');
+        // Fallback: copiar diretamente para área de transferência
+        this.copyTextDirectly(text);
+        return;
+    }
+    
+    if (textarea) {
+        textarea.value = text;
+        textarea.style.height = '400px';
+        textarea.style.width = '100%';
+    }
+    
+    modal.style.display = 'flex';
+    console.log('✅ Modal de texto de ofertas aberto');
+}
+
+// Copiar texto para área de transferência
+async copyTextToClipboard() {
+    const textarea = document.getElementById('offers-text');
+    if (!textarea) {
+        console.error('❌ Textarea de ofertas não encontrado!');
+        return;
     }
 
-    // Copiar texto para área de transferência
-    async copyTextToClipboard() {
-        const textarea = document.getElementById('offers-text');
-        if (!textarea) {
-            console.error('❌ Textarea de ofertas não encontrado!');
-            return;
-        }
-
+    try {
+        await navigator.clipboard.writeText(textarea.value);
+        alert('✅ Jornal de ofertas copiado para a área de transferência!');
+        
+        // Fechar modal após copiar
+        document.getElementById('modal-text-offers').style.display = 'none';
+        
+    } catch (error) {
+        console.error('Erro ao copiar texto:', error);
+        
+        // Fallback
+        textarea.select();
         try {
-            await navigator.clipboard.writeText(textarea.value);
+            document.execCommand('copy');
             alert('✅ Jornal de ofertas copiado para a área de transferência!');
-            
-            // Fechar modal após copiar
             document.getElementById('modal-text-offers').style.display = 'none';
-            
-        } catch (error) {
-            console.error('Erro ao copiar texto:', error);
-            
-            // Fallback
-            textarea.select();
-            try {
-                document.execCommand('copy');
-                alert('✅ Jornal de ofertas copiado para a área de transferência!');
-                document.getElementById('modal-text-offers').style.display = 'none';
-            } catch (fallbackError) {
-                alert('❌ Erro ao copiar texto. Selecione tudo e copie manualmente (Ctrl+C).');
-            }
+        } catch (fallbackError) {
+            alert('❌ Erro ao copiar texto. Selecione tudo e copie manualmente (Ctrl+C).');
         }
     }
+}
 
-    // Função auxiliar para copiar texto diretamente (fallback)
-    async copyTextDirectly(text) {
+
+// Função auxiliar para copiar texto diretamente (fallback)
+async copyTextDirectly(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+        alert('✅ Jornal de ofertas copiado para a área de transferência!');
+    } catch (error) {
+        console.error('Erro ao copiar texto:', error);
+        
+        // Fallback para navegadores mais antigos
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        
         try {
-            await navigator.clipboard.writeText(text);
+            document.execCommand('copy');
             alert('✅ Jornal de ofertas copiado para a área de transferência!');
-        } catch (error) {
-            console.error('Erro ao copiar texto:', error);
-            
-            // Fallback para navegadores mais antigos
-            const textArea = document.createElement('textarea');
-            textArea.value = text;
-            textArea.style.position = 'fixed';
-            textArea.style.left = '-999999px';
-            textArea.style.top = '-999999px';
-            document.body.appendChild(textArea);
-            textArea.select();
-            
-            try {
-                document.execCommand('copy');
-                alert('✅ Jornal de ofertas copiado para a área de transferência!');
-            } catch (fallbackError) {
-                alert('❌ Erro ao copiar texto. Aqui está o conteúdo:\n\n' + text);
+        } catch (fallbackError) {
+            alert('❌ Erro ao copiar texto. Aqui está o conteúdo:\n\n' + text);
+        }
+        
+        document.body.removeChild(textArea);
+    }
+}
+
+
+    // FUNÇÃO CORRIGIDA COM TRATAMENTO DE ERROS
+async generateProductImage(product) {
+    try {
+        console.log('🔄 Iniciando geração de imagem para produto:', product.code);
+        
+        // Verificar se o navegador suporta canvas
+        const canvas = document.createElement('canvas');
+        if (!canvas.getContext) {
+            throw new Error('Canvas não suportado pelo navegador');
+        }
+        
+        const ctx = canvas.getContext('2d');
+        
+        // Verificar suporte a ClipboardItem
+        if (!window.ClipboardItem) {
+            throw new Error('ClipboardItem não suportado. Use Chrome 76+, Firefox 87+ ou Safari 13.1+');
+        }
+        
+        // Dimensões do card
+        canvas.width = 400;
+        canvas.height = 350;
+        
+        // Fundo do card
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Borda do card
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
+        
+        // Área para a imagem do produto
+        const imageArea = { x: 20, y: 20, width: 120, height: 120 };
+        
+        // Fundo da área da imagem
+        ctx.fillStyle = '#f8f9fa';
+        ctx.fillRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
+        
+        // Borda da área da imagem
+        ctx.strokeStyle = '#dee2e6';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
+        
+        // Tentar carregar a imagem do produto
+        try {
+            const productImg = await this.loadImageSafely(product.image);
+            if (productImg) {
+                // Desenhar imagem mantendo proporção
+                const { drawX, drawY, drawWidth, drawHeight } = this.calculateImageDimensions(
+                    productImg, imageArea
+                );
+                ctx.drawImage(productImg, drawX, drawY, drawWidth, drawHeight);
+                console.log('✅ Imagem do produto carregada com sucesso');
+            } else {
+                throw new Error('Falha ao carregar imagem do produto');
             }
+        } catch (imgError) {
+            console.warn('⚠️ Usando placeholder para produto:', product.code, imgError.message);
+            // Placeholder
+            ctx.fillStyle = '#6c757d';
+            ctx.font = '32px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('📦', imageArea.x + imageArea.width/2, imageArea.y + imageArea.height/2 + 10);
             
-            document.body.removeChild(textArea);
+            ctx.fillStyle = '#495057';
+            ctx.font = '12px Arial';
+            ctx.fillText(product.code, imageArea.x + imageArea.width/2, imageArea.y + imageArea.height/2 + 30);
         }
-    }
-
-    // FUNÇÃO AUXILIAR PARA CARREGAR IMAGENS COM SEGURANÇA
-    async loadImageSafely(imageSrc) {
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            
-            const timeout = setTimeout(() => {
-                console.warn('⏰ Timeout ao carregar imagem:', imageSrc);
-                resolve(null);
-            }, 5000);
-            
-            img.onload = () => {
-                clearTimeout(timeout);
-                resolve(img);
-            };
-            
-            img.onerror = () => {
-                clearTimeout(timeout);
-                console.warn('❌ Erro ao carregar imagem:', imageSrc);
-                resolve(null);
-            };
-            
-            img.src = imageSrc;
-        });
-    }
-
-    // FUNÇÃO AUXILIAR PARA CALCULAR DIMENSÕES DA IMAGEM
-    calculateImageDimensions(img, area) {
-        const imgAspect = img.width / img.height;
-        const areaAspect = area.width / area.height;
         
-        let drawWidth, drawHeight, drawX, drawY;
+        // Cabeçalho com nome do produto
+        const headerY = 160;
+        ctx.fillStyle = '#00ff62ff';
+        ctx.fillRect(20, headerY, canvas.width - 40, 40);
         
-        if (imgAspect > areaAspect) {
-            drawWidth = area.width - 4;
-            drawHeight = drawWidth / imgAspect;
-            drawX = area.x + 2;
-            drawY = area.y + (area.height - drawHeight) / 2;
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'center';
+        
+        const productName = product.name.length > 35 ? product.name.substring(0, 32) + '...' : product.name;
+        ctx.fillText(productName, canvas.width / 2, headerY + 25);
+        
+        // Preço em destaque
+        ctx.fillStyle = '#28a745';
+        ctx.font = 'bold 32px Arial';
+        ctx.fillText(product.formattedPrice, canvas.width / 2, 240);
+        
+        // Informações do produto
+        ctx.fillStyle = '#333333';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'left';
+        
+        const infoStartY = 265;
+        ctx.fillText(`🏷️ Código: ${product.code}`, 160, infoStartY);
+        ctx.fillText(`📏 Unidade: ${product.unit}`, 160, infoStartY + 20);
+        ctx.fillText(`🏪 Categoria: ${product.category}`, 160, infoStartY + 40);
+        
+        // Linha separadora
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(30, 315);
+        ctx.lineTo(canvas.width - 30, 315);
+        ctx.stroke();
+        
+        // Rodapé
+        ctx.fillStyle = '#666666';
+        ctx.font = '11px Arial';
+        ctx.textAlign = 'center';
+        const currentDate = new Date().toLocaleDateString('pt-BR');
+        ctx.fillText(` |  | ${currentDate}`, canvas.width / 2, 335);
+        
+        console.log('🎨 Canvas gerado com sucesso');
+        
+        // Converter e copiar com tratamento de erro
+        await this.copyCanvasToClipboard(canvas, product.code);
+        
+    } catch (error) {
+        console.error('❌ Erro ao gerar imagem:', error);
+        
+        // Mensagens de erro específicas para o usuário
+        let userMessage = 'Erro ao gerar imagem: ';
+        
+        if (error.message.includes('ClipboardItem')) {
+            userMessage += 'Seu navegador não suporta esta funcionalidade. Use Chrome, Firefox ou Safari mais recentes.';
+        } else if (error.message.includes('Permission')) {
+            userMessage += 'Permissão negada. Clique na página e tente novamente.';
+        } else if (error.message.includes('Canvas')) {
+            userMessage += 'Seu navegador não suporta canvas. Tente usar a opção de texto.';
         } else {
-            drawHeight = area.height - 4;
-            drawWidth = drawHeight * imgAspect;
-            drawX = area.x + (area.width - drawWidth) / 2;
-            drawY = area.y + 2;
+            userMessage += 'Use a opção de texto como alternativa.';
         }
         
-        return { drawX, drawY, drawWidth, drawHeight };
+        alert('❌ ' + userMessage);
     }
+}
 
-    // FUNÇÃO AUXILIAR PARA COPIAR CANVAS
-    async copyCanvasToClipboard(canvas, productCode) {
-        return new Promise((resolve, reject) => {
-            canvas.toBlob(async (blob) => {
-                try {
-                    // Verificar permissões
-                    const permission = await navigator.permissions.query({ name: 'clipboard-write' });
-                    if (permission.state === 'denied') {
-                        throw new Error('Permissão de área de transferência negada');
-                    }
-                    
-                    const item = new ClipboardItem({ 'image/png': blob });
-                    await navigator.clipboard.write([item]);
-                    
-                    console.log('✅ Imagem copiada com sucesso');
-                    alert('✅ Imagem do produto copiada para a área de transferência!');
-                    resolve();
-                    
-                } catch (clipboardError) {
-                    console.warn('⚠️ Erro ao copiar para clipboard, tentando download...', clipboardError);
-                    
-                    // Fallback: download da imagem
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `produto-${productCode}.png`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    
-                    alert('✅ Não foi possível copiar, mas a imagem foi baixada!');
-                    resolve();
-                }
-            }, 'image/png');
-        });
+// FUNÇÃO AUXILIAR PARA CARREGAR IMAGENS COM SEGURANÇA
+async loadImageSafely(imageSrc) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        
+        const timeout = setTimeout(() => {
+            console.warn('⏰ Timeout ao carregar imagem:', imageSrc);
+            resolve(null);
+        }, 5000);
+        
+        img.onload = () => {
+            clearTimeout(timeout);
+            resolve(img);
+        };
+        
+        img.onerror = () => {
+            clearTimeout(timeout);
+            console.warn('❌ Erro ao carregar imagem:', imageSrc);
+            resolve(null);
+        };
+        
+        img.src = imageSrc;
+    });
+}
+
+// FUNÇÃO AUXILIAR PARA CALCULAR DIMENSÕES DA IMAGEM
+calculateImageDimensions(img, area) {
+    const imgAspect = img.width / img.height;
+    const areaAspect = area.width / area.height;
+    
+    let drawWidth, drawHeight, drawX, drawY;
+    
+    if (imgAspect > areaAspect) {
+        drawWidth = area.width - 4;
+        drawHeight = drawWidth / imgAspect;
+        drawX = area.x + 2;
+        drawY = area.y + (area.height - drawHeight) / 2;
+    } else {
+        drawHeight = area.height - 4;
+        drawWidth = drawHeight * imgAspect;
+        drawX = area.x + (area.width - drawWidth) / 2;
+        drawY = area.y + 2;
     }
+    
+    return { drawX, drawY, drawWidth, drawHeight };
+}
+
+// FUNÇÃO AUXILIAR PARA COPIAR CANVAS
+async copyCanvasToClipboard(canvas, productCode) {
+    return new Promise((resolve, reject) => {
+        canvas.toBlob(async (blob) => {
+            try {
+                // Verificar permissões
+                const permission = await navigator.permissions.query({ name: 'clipboard-write' });
+                if (permission.state === 'denied') {
+                    throw new Error('Permissão de área de transferência negada');
+                }
+                
+                const item = new ClipboardItem({ 'image/png': blob });
+                await navigator.clipboard.write([item]);
+                
+                console.log('✅ Imagem copiada com sucesso');
+                alert('✅ Imagem do produto copiada para a área de transferência!');
+                resolve();
+                
+            } catch (clipboardError) {
+                console.warn('⚠️ Erro ao copiar para clipboard, tentando download...', clipboardError);
+                
+                // Fallback: download da imagem
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `produto-${productCode}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                alert('✅ Não foi possível copiar, mas a imagem foi baixada!');
+                resolve();
+            }
+        }, 'image/png');
+    });
+}
+
 
     // Atualizar status do catálogo
     updateCatalogStatus(message) {
@@ -1667,6 +2017,8 @@ async generateImageOffersVisual() {
         }
     }
 }
+
+
 
 // === INICIALIZAÇÃO SEGURA DO CATALOG MANAGER ===
 
@@ -1860,7 +2212,11 @@ if (typeof window !== 'undefined') {
     console.log('⚠️ Não está em contexto de navegador - inicialização pulada');
 }
 
+
+
 // Exportar para uso em módulos se necessário
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { CatalogManager: CatalogManager, initializeCatalogManager: initializeCatalogManager };
 }
+
+

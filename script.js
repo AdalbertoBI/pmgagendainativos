@@ -530,33 +530,26 @@ async function salvarEdicaoCliente() {
     }
 }
 
-// Configurar PWA
+
 // Configurar PWA
 function setupPWA() {
     try {
-        if ('serviceWorker' in navigator) {
-            // Verificar se o ambiente suporta Service Worker (não é file://)
-            if (window.location.protocol === 'file:') {
-                console.warn('⚠️ Service Worker não pode ser registrado em file://. Execute em um servidor local (ex.: localhost).');
-                return;
-            }
-
-            navigator.serviceWorker.register('./service-worker.js') // Ajuste o caminho se necessário
-                .then(registration => {
-                    console.log('✅ Service Worker registrado');
-                    registration.onupdatefound = () => {
-                        const installingWorker = registration.installing;
-                        installingWorker.onstatechange = () => {
-                            if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                alert('Nova versão disponível, a página será atualizada agora.');
-                                window.location.reload();
-                            }
-                        };
-                    };
-                })
-                .catch(error => console.error('❌ Erro ao registrar Service Worker:', error));
+        // Pular service worker em desenvolvimento local se houver problemas
+        if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+            console.log('⚠️ Service Worker desabilitado para desenvolvimento local');
+            return;
         }
         
+        if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./service-worker.js')
+        .then(registration => {
+            console.log('✅ Service Worker registrado:', registration);
+        })
+        .catch(error => {
+            console.error('❌ Erro ao registrar Service Worker:', error);
+        });
+}
+
         // Botão de instalação
         let deferredPrompt;
         const installBtn = document.getElementById('install-btn');
