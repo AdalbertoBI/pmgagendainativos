@@ -624,174 +624,6 @@ async extractByBlocksFixed(foundProducts) {
     }
 }
 
-
-
-    // MÉTODO 1: MÚLTIPLOS PADRÕES OTIMIZADOS
-    async extractWithMultiplePatterns(foundCodes) {
-        this.updateCatalogStatus('Aplicando padrões regex...');
-
-        const patterns = [
-            /(\d{1,5})\s+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][^\n\r]+?)\s+(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)\s*R?\$?/gi,
-            /(\d{1,5})\s+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][^\n\r]*)\n([^\n\r]+?)\s+(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)\s*R?\$?/gi,
-            /(\d{1,5})\s{2,}([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][^\n\r]+?)\s{2,}(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)/gi,
-            /(\d{1,5})\s+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][^\n\r]+?)\s+(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)([\d,]+)R\$/gi
-        ];
-
-        let totalExtracted = 0;
-        for (let patternIndex = 0; patternIndex < patterns.length; patternIndex++) {
-            const pattern = patterns[patternIndex];
-            let matches = 0;
-
-            try {
-                pattern.lastIndex = 0;
-                let match;
-                while ((match = pattern.exec(this.pdfText)) !== null) {
-                    let cod, produto, vendPor, preco;
-
-                    if (patternIndex === 1) {
-                        if (match.length >= 6) {
-                            [, cod, produto1, produto2, vendPor, preco] = match;
-                            produto = (produto1 + ' ' + produto2).trim();
-                        } else continue;
-                    } else {
-                        if (match.length >= 5) {
-                            [, cod, produto, vendPor, preco] = match;
-                        } else continue;
-                    }
-
-                    if (foundCodes.has(cod)) continue;
-
-                    const cleanProduto = this.cleanProductNameAdvanced(produto);
-                    const cleanPreco = this.formatPrice(preco);
-
-                    if (this.isValidProductAdvanced(cod, cleanProduto, vendPor, cleanPreco)) {
-                        this.extractedProducts.push({
-                            cod: cod.trim(),
-                            produto: cleanProduto.toUpperCase(),
-                            vendPor: vendPor.trim().toUpperCase(),
-                            preco: cleanPreco,
-                            method: `regex_${patternIndex + 1}`
-                        });
-
-                        foundCodes.add(cod);
-                        matches++;
-                        totalExtracted++;
-                    }
-
-                    if (matches % 50 === 0) {
-                        await this.sleep(1);
-                        this.updateCatalogStatus(`Padrão ${patternIndex + 1}: ${matches} produtos | Total: ${totalExtracted}`);
-                    }
-                }
-            } catch (error) {
-                console.log(`⚠️ Erro no Padrão ${patternIndex + 1}: ${error.message}`);
-            }
-        }
-    }
-
-    // MÉTODO 2: PARSER LINHA POR LINHA
-    async extractLineByLineOptimized(foundCodes) {
-        this.updateCatalogStatus('Parser linha por linha...');
-
-        const lines = this.pdfText.split(/[\n\r]+/);
-        let extracted = 0;
-
-        for (let i = 0; i < lines.length - 3; i++) {
-            const line1 = lines[i].trim();
-            const line2 = lines[i + 1]?.trim() || '';
-            const line3 = lines[i + 2]?.trim() || '';
-            const line4 = lines[i + 3]?.trim() || '';
-
-            const combinations = [
-                { cod: line1, produto: line2, unitPrice: line3 },
-                { cod: line1, produto: line2 + ' ' + line3, unitPrice: line4 },
-                { combined: line1 }
-            ];
-
-            for (const combo of combinations) {
-                if (combo.combined) {
-                    const match = combo.combined.match(/^(\d{1,5})\s+(.+?)\s+(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)/);
-                    if (match) {
-                        const [, cod, produto, vendPor, preco] = match;
-                        if (this.tryAddProduct(cod, produto, vendPor, preco, foundCodes, 'line_combined')) {
-                            extracted++;
-                        }
-                    }
-                } else {
-                    const codMatch = combo.cod.match(/^(\d{1,5})$/);
-                    const unitPriceMatch = combo.unitPrice.match(/^(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)/);
-
-                    if (codMatch && unitPriceMatch && combo.produto.length > 5) {
-                        if (this.tryAddProduct(codMatch[1], combo.produto, unitPriceMatch[1], unitPriceMatch[2], foundCodes, 'line_multi')) {
-                            extracted++;
-                        }
-                    }
-                }
-            }
-
-            if (i % 200 === 0) {
-                await this.sleep(1);
-                this.updateCatalogStatus(`Linha por linha: ${extracted} produtos | Linha ${i}/${lines.length}`);
-            }
-        }
-    }
-
-    // MÉTODO 3: PARSER POR BLOCOS
-    async extractByBlocks(foundCodes) {
-        this.updateCatalogStatus('Parser por blocos...');
-
-        const blockSize = 1000;
-        const lines = this.pdfText.split(/[\n\r]+/);
-        let extracted = 0;
-
-        for (let i = 0; i < lines.length; i += blockSize) {
-            const block = lines.slice(i, i + blockSize).join('\n');
-
-            const blockPatterns = [
-                /(\d{1,5})\s+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][^(]*\([^)]+\)[^(]*)\s+(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)/gi,
-                /(\d{1,5})\s+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][^0-9]*\d+[^0-9]*[A-Z]*)\s+(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)/gi
-            ];
-
-            for (const pattern of blockPatterns) {
-                pattern.lastIndex = 0;
-                let match;
-                while ((match = pattern.exec(block)) !== null) {
-                    const [, cod, produto, vendPor, preco] = match;
-                    if (this.tryAddProduct(cod, produto, vendPor, preco, foundCodes, 'block')) {
-                        extracted++;
-                    }
-                }
-            }
-
-            if (i % (blockSize * 5) === 0) {
-                await this.sleep(2);
-                this.updateCatalogStatus(`Blocos: ${extracted} produtos | Bloco ${i / blockSize}/${Math.ceil(lines.length / blockSize)}`);
-            }
-        }
-    }
-
-    // FUNÇÃO AUXILIAR PARA TENTAR ADICIONAR PRODUTO
-    tryAddProduct(cod, produto, vendPor, preco, foundProducts, method) {
-        // ✅ VERIFICAR SE JÁ EXISTE NO MAP
-    if (foundProducts.has(cod)) return false;
-
-    const cleanProduto = this.cleanProductNameAdvanced(produto);
-    const cleanPreco = this.formatPrice(preco);
-
-    if (this.isValidProductAdvanced(cod, cleanProduto, vendPor, cleanPreco)) {
-        // ✅ ADICIONAR NO MAP (garante unicidade absoluta)
-        foundProducts.set(cod, {
-            cod: cod.trim(),
-            produto: cleanProduto.toUpperCase(),
-            vendPor: vendPor.trim().toUpperCase(),
-            preco: cleanPreco,
-            method: method
-        });
-        return true;
-    }
-    return false;
-    }
-
     sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
@@ -1299,253 +1131,291 @@ async generateProductImage(product) {
     }
 }
 
-// GERAR IMAGEM VISUAL PARA MÚLTIPLOS PRODUTOS (com fotos e logo)
+// Geração de imagem visual SEM DATA e SEM DOWNLOAD DUPLO
 async generateImageOffersVisual() {
-    if (this.selectedProducts.length === 0) {
-        alert('❌ Selecione pelo menos um produto!');
+    if (!this.selectedProducts || this.selectedProducts.length === 0) {
+        this.showNotification('Selecione pelo menos um produto para gerar ofertas visuais', 'warning');
         return;
     }
+
+    this.updateCatalogStatus('Gerando imagem visual...');
 
     try {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        // Calcular altura baseado no número de produtos (header aumentado para acomodar logo)
-        const headerHeight = 100; // Aumentado de 80 para 100 para o logo
-        const productHeight = 80;
+        const logoSectionHeight = 100;  
+        const productHeight = 85;
         const footerHeight = 80;
         const padding = 20;
         
         canvas.width = 700;
-        canvas.height = headerHeight + (this.selectedProducts.length * productHeight) + footerHeight + (padding * 2);
+        canvas.height = logoSectionHeight + (this.selectedProducts.length * productHeight) + footerHeight + (padding * 2);
         
-        // Fundo
+        // Fundo branco limpo
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Borda
-        ctx.strokeStyle = '#099438ff';
-        ctx.lineWidth = 3;
+        // Borda sutil
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 2;
         ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
         
-        // Cabeçalho
-        ctx.fillStyle = '#08a32fff';
-        ctx.fillRect(10, 10, canvas.width - 20, headerHeight - 10);
+        let currentY = padding;
         
-        // Carregar e desenhar logo
-        try {
-            const logo = new Image();
-            logo.crossOrigin = 'anonymous';
-            
-            await new Promise((resolve) => {
-                logo.onload = () => {
-                    const logoMaxWidth = 60;
-                    const logoMaxHeight = 40;
-                    const logoAspect = logo.width / logo.height;
-                    
-                    let logoWidth = logoMaxWidth;
-                    let logoHeight = logoMaxHeight;
-                    
-                    if (logoAspect > logoMaxWidth / logoMaxHeight) {
-                        logoHeight = logoMaxWidth / logoAspect;
-                    } else {
-                        logoWidth = logoMaxHeight * logoAspect;
-                    }
-                    
-                    const logoX = (canvas.width - logoWidth) / 2;
-                    const logoY = 15;
-                    
-                    ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
-                    resolve();
-                };
-                
-                logo.onerror = () => {
-                    console.log('Logo não encontrado, continuando sem logo');
-                    resolve();
-                };
-                
-                logo.src = './logo.png';
-            });
-        } catch (error) {
-            console.error('Erro ao carregar logo:', error);
-        }
+        // Desenhar logo
+        await this.drawLogo(ctx, canvas.width, currentY);
+        currentY += logoSectionHeight;
         
-        // Texto do cabeçalho (ajustado para baixo do logo)
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 20px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('🛒 JORNAL DE OFERTAS 🛒', canvas.width / 2, 60);
+        // ❌ REMOVIDO: Data foi retirada completamente
         
-        const currentDate = new Date().toLocaleDateString('pt-BR');
-        ctx.font = '14px Arial';
-        ctx.fillText(`📅 ${currentDate}`, canvas.width / 2, 75);
-        
-        // Produtos com imagens
-        let yPosition = headerHeight + padding;
-        
-        for (let index = 0; index < this.selectedProducts.length; index++) {
-            const product = this.selectedProducts[index];
-            
-            // Linha separadora entre produtos
-            if (index > 0) {
-                ctx.strokeStyle = '#e0e0e0';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(30, yPosition - 10);
-                ctx.lineTo(canvas.width - 30, yPosition - 10);
-                ctx.stroke();
-            }
-            
-            // Área da imagem do produto
-            const imgSize = 60;
-            const imgX = 30;
-            const imgY = yPosition + 10;
-            
-            // Carregar e desenhar imagem do produto
-            try {
-                const productImg = new Image();
-                productImg.crossOrigin = 'anonymous';
-                
-                await new Promise((resolve) => {
-                    productImg.onload = () => {
-                        // Fundo da imagem
-                        ctx.fillStyle = '#f8f9fa';
-                        ctx.fillRect(imgX, imgY, imgSize, imgSize);
-                        
-                        // Borda da imagem
-                        ctx.strokeStyle = '#dee2e6';
-                        ctx.lineWidth = 1;
-                        ctx.strokeRect(imgX, imgY, imgSize, imgSize);
-                        
-                        // Desenhar imagem mantendo proporção
-                        const imgAspect = productImg.width / productImg.height;
-                        let drawSize = imgSize - 4;
-                        let drawX = imgX + 2;
-                        let drawY = imgY + 2;
-                        
-                        if (imgAspect !== 1) {
-                            if (imgAspect > 1) {
-                                drawSize = (imgSize - 4) / imgAspect;
-                                drawY = imgY + (imgSize - drawSize) / 2;
-                            } else {
-                                drawSize = (imgSize - 4) * imgAspect;
-                                drawX = imgX + (imgSize - drawSize) / 2;
-                            }
-                        }
-                        
-                        ctx.drawImage(productImg, drawX, drawY, drawSize, drawSize);
-                        resolve();
-                    };
-                    
-                    productImg.onerror = () => {
-                        // Placeholder
-                        ctx.fillStyle = '#f8f9fa';
-                        ctx.fillRect(imgX, imgY, imgSize, imgSize);
-                        
-                        ctx.strokeStyle = '#dee2e6';
-                        ctx.lineWidth = 1;
-                        ctx.strokeRect(imgX, imgY, imgSize, imgSize);
-                        
-                        ctx.fillStyle = '#6c757d';
-                        ctx.font = '20px Arial';
-                        ctx.textAlign = 'center';
-                        ctx.fillText('📦', imgX + imgSize/2, imgY + imgSize/2 + 7);
-                        
-                        resolve();
-                    };
-                    
-                    productImg.src = product.image;
-                });
-            } catch (error) {
-                // Se der erro, desenhar placeholder simples
-                ctx.fillStyle = '#f8f9fa';
-                ctx.fillRect(imgX, imgY, imgSize, imgSize);
-                ctx.strokeStyle = '#dee2e6';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(imgX, imgY, imgSize, imgSize);
-                ctx.fillStyle = '#6c757d';
-                ctx.font = '20px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText('📦', imgX + imgSize/2, imgY + imgSize/2 + 7);
-            }
-            
-            // Número do produto
-            ctx.fillStyle = '#007bff';
-            ctx.font = 'bold 16px Arial';
-            ctx.textAlign = 'left';
-            ctx.fillText(`${index + 1}.`, 110, yPosition + 25);
-            
-            // Nome do produto (limitado)
-            ctx.fillStyle = '#333333';
-            ctx.font = 'bold 14px Arial';
-            const productName = product.name.length > 40 ? product.name.substring(0, 37) + '...' : product.name;
-            ctx.fillText(productName, 130, yPosition + 25);
-            
-            // Detalhes do produto
-            ctx.fillStyle = '#666666';
-            ctx.font = '12px Arial';
-            ctx.fillText(`🏷️ Cód: ${product.code}`, 130, yPosition + 45);
-            ctx.fillText(`📏 ${product.unit}`, 250, yPosition + 45);
-            ctx.fillText(`🏪 ${product.category}`, 320, yPosition + 45);
-            
-            // Preço em destaque
-            ctx.fillStyle = '#28a745';
-            ctx.font = 'bold 18px Arial';
-            ctx.textAlign = 'right';
-            ctx.fillText(`💰 ${product.formattedPrice}`, canvas.width - 30, yPosition + 35);
-            
-            yPosition += productHeight;
-        }
-        
-        // Rodapé
-        const footerY = canvas.height - footerHeight;
-        
+        // Área de produtos
         ctx.fillStyle = '#f8f9fa';
-        ctx.fillRect(10, footerY, canvas.width - 20, footerHeight - 10);
+        ctx.fillRect(15, currentY, canvas.width - 30, this.selectedProducts.length * productHeight);
         
-        ctx.fillStyle = '#007bff';
-        ctx.font = 'bold 14px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('📞 ENTRE EM CONTATO:', canvas.width / 2, footerY + 20);
+        // Desenhar produtos
+        for (let index = 0; index < this.selectedProducts.length; index++) {
+            await this.drawProduct(ctx, this.selectedProducts[index], index, currentY);
+            currentY += productHeight;
+        }
         
-        ctx.fillStyle = '#333333';
-        ctx.font = '12px Arial';
-        ctx.fillText('', canvas.width / 2, footerY + 35);
-        ctx.fillText('', canvas.width / 2, footerY + 50);
+        // Desenhar rodapé (sem data)
+        await this.drawFooter(ctx, canvas);
         
-        ctx.font = '10px Arial';
-        ctx.fillStyle = '#666666';
-        ctx.fillText('⚠️ Produtos sujeitos à disponibilidade | 🚛 Entregamos em toda região', canvas.width / 2, footerY + 65);
+        // Copiar APENAS (sem download)
+        await this.copyCanvasAsImage(canvas);
         
-        // Converter e copiar
-        canvas.toBlob(async (blob) => {
-            try {
-                const item = new ClipboardItem({ 'image/png': blob });
-                await navigator.clipboard.write([item]);
-                alert('✅ Jornal de ofertas (imagem) copiado para a área de transferência!');
-                document.getElementById('modal-product-selection').style.display = 'none';
-            } catch (error) {
-                console.error('Erro ao copiar imagem:', error);
-                // Fallback: download
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `jornal-ofertas-${currentDate.replace(/\//g, '-')}.png`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                alert('✅ Jornal de ofertas baixado! Você pode compartilhar o arquivo baixado.');
-                document.getElementById('modal-product-selection').style.display = 'none';
-            }
-        }, 'image/png');
+        this.updateCatalogStatus(`Imagem visual gerada com ${this.selectedProducts.length} produtos`);
         
     } catch (error) {
         console.error('Erro ao gerar imagem:', error);
-        alert('❌ Erro ao gerar imagem. Tente usar a opção de texto.');
+        this.showNotification('Erro ao gerar imagem visual', 'error');
+        this.updateCatalogStatus('Erro ao gerar imagem visual');
     }
 }
 
+
+// Função auxiliar para desenhar logo
+async drawLogo(ctx, canvasWidth, currentY) {
+    try {
+        const logo = new Image();
+        logo.crossOrigin = 'anonymous';
+        
+        await new Promise((resolve) => {
+            logo.onload = () => {
+                const logoMaxWidth = 150;
+                const logoMaxHeight = 70;
+                const logoAspect = logo.width / logo.height;
+                
+                let logoWidth = logoMaxWidth;
+                let logoHeight = logoMaxHeight;
+                
+                if (logoAspect > logoMaxWidth / logoMaxHeight) {
+                    logoHeight = logoMaxWidth / logoAspect;
+                } else {
+                    logoWidth = logoMaxHeight * logoAspect;
+                }
+                
+                const logoX = (canvasWidth - logoWidth) / 2;
+                const logoY = currentY + 10;
+                
+                ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
+                resolve();
+            };
+            
+            logo.onerror = () => {
+                // Fallback: texto no lugar do logo
+                ctx.fillStyle = '#007bff';
+                ctx.font = 'bold 24px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('🏪 OFERTAS ESPECIAIS', canvasWidth / 2, currentY + 40);
+                resolve();
+            };
+            
+            logo.src = './logo.png';
+        });
+    } catch (error) {
+        console.error('Erro ao carregar logo:', error);
+    }
+}
+
+// Função auxiliar para desenhar produto
+async drawProduct(ctx, product, index, yPosition) {
+    // Linha separadora entre produtos
+    if (index > 0) {
+        ctx.strokeStyle = '#e9ecef';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(30, yPosition - 5);
+        ctx.lineTo(670, yPosition - 5);
+        ctx.stroke();
+    }
+    
+    // Área da imagem do produto
+    const imgSize = 60;
+    const imgX = 30;
+    const imgY = yPosition + 12;
+    
+    // Desenhar imagem do produto
+    await this.drawProductImage(ctx, product.image, imgX, imgY, imgSize);
+    
+    // Número do produto
+    ctx.fillStyle = '#007bff';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${index + 1}.`, 110, yPosition + 25);
+    
+    // Nome do produto (limitado)
+    ctx.fillStyle = '#333333';
+    ctx.font = 'bold 13px Arial';
+    const productName = product.name.length > 40 ? product.name.substring(0, 37) + '...' : product.name;
+    ctx.fillText(productName, 130, yPosition + 25);
+    
+    // Detalhes do produto
+    ctx.fillStyle = '#666666';
+    ctx.font = '11px Arial';
+    ctx.fillText(`Cód: ${product.code}`, 130, yPosition + 45);
+    ctx.fillText(`${product.unit}`, 230, yPosition + 45);
+    ctx.fillText(`Disponível`, 280, yPosition + 45);
+    
+    // Preço em destaque
+    ctx.fillStyle = '#28a745';
+    ctx.font = 'bold 18px Arial';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${product.formattedPrice}`, 665, yPosition + 35);
+}
+
+// Função auxiliar para desenhar imagem do produto
+async drawProductImage(ctx, imageSrc, x, y, size) {
+    try {
+        const productImg = new Image();
+        productImg.crossOrigin = 'anonymous';
+        
+        await new Promise((resolve) => {
+            productImg.onload = () => {
+                // Fundo da imagem
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(x, y, size, size);
+                
+                // Borda da imagem
+                ctx.strokeStyle = '#dee2e6';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x, y, size, size);
+                
+                // Calcular dimensões mantendo proporção
+                const imgAspect = productImg.width / productImg.height;
+                let drawWidth = size - 4;
+                let drawHeight = size - 4;
+                let drawX = x + 2;
+                let drawY = y + 2;
+                
+                if (imgAspect > 1) {
+                    drawHeight = drawWidth / imgAspect;
+                    drawY = y + (size - drawHeight) / 2;
+                } else if (imgAspect < 1) {
+                    drawWidth = drawHeight * imgAspect;
+                    drawX = x + (size - drawWidth) / 2;
+                }
+                
+                ctx.drawImage(productImg, drawX, drawY, drawWidth, drawHeight);
+                resolve();
+            };
+            
+            productImg.onerror = () => {
+                // Placeholder
+                this.drawPlaceholder(ctx, x, y, size);
+                resolve();
+            };
+            
+            productImg.src = imageSrc;
+        });
+    } catch (error) {
+        this.drawPlaceholder(ctx, x, y, size);
+    }
+}
+
+// Função auxiliar para desenhar rodapé SEM data
+async drawFooter(ctx, canvas) {
+    const footerY = canvas.height - 70;
+    
+    ctx.fillStyle = '#f8f9fa';
+    ctx.fillRect(15, footerY, canvas.width - 30, 55);
+    
+    // Linha separadora do rodapé
+    ctx.strokeStyle = '#e9ecef';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(30, footerY);
+    ctx.lineTo(canvas.width - 30, footerY);
+    ctx.stroke();
+    
+    ctx.fillStyle = '#007bff';
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('📞 ENTRE EM CONTATO:', canvas.width / 2, footerY + 20);
+    
+    ctx.fillStyle = '#333333';
+    ctx.font = '12px Arial';
+    ctx.fillText('PMG, a entrega nos move até você!', canvas.width / 2, footerY + 35);
+    
+    ctx.font = '10px Arial';
+    ctx.fillStyle = '#666666';
+    ctx.fillText('⚠️ Produtos sujeitos à disponibilidade | 🚛 Entregamos em toda região', canvas.width / 2, footerY + 50);
+}
+
+// Função auxiliar para copiar canvas APENAS (sem download)
+async copyCanvasAsImage(canvas) {
+    return new Promise((resolve, reject) => {
+        canvas.toBlob(async (blob) => {
+            if (!blob) {
+                this.showNotification('Erro ao gerar imagem', 'error');
+                reject(new Error('Falha ao gerar blob da imagem'));
+                return;
+            }
+
+            try {
+                const item = new ClipboardItem({ 'image/png': blob });
+                await navigator.clipboard.write([item]);
+                
+                this.showNotification('✅ Imagem copiada! Cole onde desejar (Ctrl+V)', 'success');
+                
+                
+                
+                resolve();
+                
+            } catch (clipboardError) {
+                console.error('Erro ao copiar para área de transferência:', clipboardError);
+                this.showNotification('❌ Não foi possível copiar. Verifique as permissões do navegador', 'error');
+                reject(clipboardError);
+            }
+        }, 'image/png');
+
+        alert('imagem criada com sucesso, cole onde desejar (Ctrl+V)');
+        this.updateCatalogStatus('Imagem copiada para a área de transferência');
+    });
+}
+
+// Função auxiliar corrigida para tentar adicionar produto no Map
+tryAddProductToMap(cod, produto, vendPor, preco, foundProducts, method) {
+    // Verificar se já existe no Map
+    if (foundProducts.has(cod)) return false;
+
+    const cleanProduto = this.cleanProductNameAdvanced(produto);
+    const cleanPreco = this.formatPrice(preco);
+
+    if (this.isValidProductAdvanced(cod, cleanProduto, vendPor, cleanPreco)) {
+        // Adicionar no Map (garante unicidade absoluta)
+        foundProducts.set(cod, {
+            cod: cod.trim(),
+            produto: cleanProduto.toUpperCase(),
+            vendPor: vendPor.trim().toUpperCase(),
+            preco: cleanPreco,
+            method: method
+        });
+        return true;
+    }
+    return false;
+}
 
 
     openProductSelectionModal() {
@@ -1786,141 +1656,99 @@ async copyTextDirectly(text) {
 }
 
 
-    // FUNÇÃO CORRIGIDA COM TRATAMENTO DE ERROS
+    // GERAR IMAGEM INDIVIDUAL - MESMO PADRÃO DOS MÚLTIPLOS PRODUTOS
 async generateProductImage(product) {
     try {
-        console.log('🔄 Iniciando geração de imagem para produto:', product.code);
+        console.log('🔄 Gerando imagem individual para produto:', product.code);
         
-        // Verificar se o navegador suporta canvas
         const canvas = document.createElement('canvas');
-        if (!canvas.getContext) {
-            throw new Error('Canvas não suportado pelo navegador');
-        }
-        
         const ctx = canvas.getContext('2d');
         
-        // Verificar suporte a ClipboardItem
-        if (!window.ClipboardItem) {
-            throw new Error('ClipboardItem não suportado. Use Chrome 76+, Firefox 87+ ou Safari 13.1+');
-        }
+        // Dimensões seguindo o padrão dos múltiplos (proporcionalmente menores)
+        const logoSectionHeight = 100;
+        const productHeight = 85; // Mesmo height dos múltiplos
+        const footerHeight = 80;
+        const padding = 20;
         
-        // Dimensões do card
-        canvas.width = 400;
-        canvas.height = 350;
+        canvas.width = 700; // MESMA largura dos múltiplos para consistência
+        canvas.height = logoSectionHeight + productHeight + footerHeight + (padding * 2);
         
-        // Fundo do card
+        // Fundo branco limpo (IGUAL aos múltiplos)
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Borda do card
+        // Borda sutil (IGUAL aos múltiplos)
         ctx.strokeStyle = '#e0e0e0';
         ctx.lineWidth = 2;
         ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
         
-        // Área para a imagem do produto
-        const imageArea = { x: 20, y: 20, width: 120, height: 120 };
+        let currentY = padding;
         
-        // Fundo da área da imagem
+        // LOGO (IGUAL aos múltiplos)
+        await this.drawLogo(ctx, canvas.width, currentY);
+        currentY += logoSectionHeight;
+        
+        // Área do produto com fundo cinza (IGUAL aos múltiplos)
         ctx.fillStyle = '#f8f9fa';
-        ctx.fillRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
+        ctx.fillRect(15, currentY, canvas.width - 30, productHeight);
         
-        // Borda da área da imagem
-        ctx.strokeStyle = '#dee2e6';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
+        // Desenhar produto usando EXATAMENTE o mesmo método dos múltiplos
+        await this.drawSingleProductLikeMultiple(ctx, product, 0, currentY);
         
-        // Tentar carregar a imagem do produto
-        try {
-            const productImg = await this.loadImageSafely(product.image);
-            if (productImg) {
-                // Desenhar imagem mantendo proporção
-                const { drawX, drawY, drawWidth, drawHeight } = this.calculateImageDimensions(
-                    productImg, imageArea
-                );
-                ctx.drawImage(productImg, drawX, drawY, drawWidth, drawHeight);
-                console.log('✅ Imagem do produto carregada com sucesso');
-            } else {
-                throw new Error('Falha ao carregar imagem do produto');
-            }
-        } catch (imgError) {
-            console.warn('⚠️ Usando placeholder para produto:', product.code, imgError.message);
-            // Placeholder
-            ctx.fillStyle = '#6c757d';
-            ctx.font = '32px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('📦', imageArea.x + imageArea.width/2, imageArea.y + imageArea.height/2 + 10);
-            
-            ctx.fillStyle = '#495057';
-            ctx.font = '12px Arial';
-            ctx.fillText(product.code, imageArea.x + imageArea.width/2, imageArea.y + imageArea.height/2 + 30);
-        }
+        currentY += productHeight;
         
-        // Cabeçalho com nome do produto
-        const headerY = 160;
-        ctx.fillStyle = '#00ff62ff';
-        ctx.fillRect(20, headerY, canvas.width - 40, 40);
+        // Rodapé (IGUAL aos múltiplos)
+        await this.drawFooter(ctx, canvas);
         
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 14px Arial';
-        ctx.textAlign = 'center';
+        // Copiar para área de transferência (IGUAL aos múltiplos)
+        await this.copyCanvasAsImage(canvas);
         
-        const productName = product.name.length > 35 ? product.name.substring(0, 32) + '...' : product.name;
-        ctx.fillText(productName, canvas.width / 2, headerY + 25);
-        
-        // Preço em destaque
-        ctx.fillStyle = '#28a745';
-        ctx.font = 'bold 32px Arial';
-        ctx.fillText(product.formattedPrice, canvas.width / 2, 240);
-        
-        // Informações do produto
-        ctx.fillStyle = '#333333';
-        ctx.font = '14px Arial';
-        ctx.textAlign = 'left';
-        
-        const infoStartY = 265;
-        ctx.fillText(`🏷️ Código: ${product.code}`, 160, infoStartY);
-        ctx.fillText(`📏 Unidade: ${product.unit}`, 160, infoStartY + 20);
-        ctx.fillText(`🏪 Categoria: ${product.category}`, 160, infoStartY + 40);
-        
-        // Linha separadora
-        ctx.strokeStyle = '#e0e0e0';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(30, 315);
-        ctx.lineTo(canvas.width - 30, 315);
-        ctx.stroke();
-        
-        // Rodapé
-        ctx.fillStyle = '#666666';
-        ctx.font = '11px Arial';
-        ctx.textAlign = 'center';
-        const currentDate = new Date().toLocaleDateString('pt-BR');
-        ctx.fillText(` |  | ${currentDate}`, canvas.width / 2, 335);
-        
-        console.log('🎨 Canvas gerado com sucesso');
-        
-        // Converter e copiar com tratamento de erro
-        await this.copyCanvasToClipboard(canvas, product.code);
+        console.log('✅ Imagem individual gerada com sucesso');
         
     } catch (error) {
-        console.error('❌ Erro ao gerar imagem:', error);
-        
-        // Mensagens de erro específicas para o usuário
-        let userMessage = 'Erro ao gerar imagem: ';
-        
-        if (error.message.includes('ClipboardItem')) {
-            userMessage += 'Seu navegador não suporta esta funcionalidade. Use Chrome, Firefox ou Safari mais recentes.';
-        } else if (error.message.includes('Permission')) {
-            userMessage += 'Permissão negada. Clique na página e tente novamente.';
-        } else if (error.message.includes('Canvas')) {
-            userMessage += 'Seu navegador não suporta canvas. Tente usar a opção de texto.';
-        } else {
-            userMessage += 'Use a opção de texto como alternativa.';
-        }
-        
-        alert('❌ ' + userMessage);
+        console.error('❌ Erro ao gerar imagem individual:', error);
+        this.showNotification('Erro ao gerar imagem do produto', 'error');
     }
+    alert('imagem criada com sucesso, cole onde desejar (Ctrl+V)');
+        this.updateCatalogStatus('Imagem copiada para a área de transferência');
 }
+
+// Função auxiliar para desenhar produto individual IGUAL aos múltiplos
+async drawSingleProductLikeMultiple(ctx, product, index, yPosition) {
+    // Área da imagem do produto (EXATAMENTE igual aos múltiplos)
+    const imgSize = 60;
+    const imgX = 30;
+    const imgY = yPosition + 12;
+    
+    // Desenhar imagem do produto (MESMO método dos múltiplos)
+    await this.drawProductImage(ctx, product.image, imgX, imgY, imgSize);
+    
+    // Número do produto (IGUAL aos múltiplos)
+    ctx.fillStyle = '#007bff';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(`1.`, 110, yPosition + 25); // Sempre "1." para produto único
+    
+    // Nome do produto (IGUAL aos múltiplos)
+    ctx.fillStyle = '#333333';
+    ctx.font = 'bold 13px Arial';
+    const productName = product.name.length > 40 ? product.name.substring(0, 37) + '...' : product.name;
+    ctx.fillText(productName, 130, yPosition + 25);
+    
+    // Detalhes do produto (IGUAL aos múltiplos)
+    ctx.fillStyle = '#666666';
+    ctx.font = '11px Arial';
+    ctx.fillText(`Cód: ${product.code}`, 130, yPosition + 45);
+    ctx.fillText(`${product.unit}`, 230, yPosition + 45);
+    ctx.fillText(`Disponível`, 280, yPosition + 45);
+    
+    // Preço em destaque (IGUAL aos múltiplos)
+    ctx.fillStyle = '#28a745';
+    ctx.font = 'bold 18px Arial';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${product.formattedPrice}`, 665, yPosition + 35);
+}
+
 
 // FUNÇÃO AUXILIAR PARA CARREGAR IMAGENS COM SEGURANÇA
 async loadImageSafely(imageSrc) {
@@ -2018,6 +1846,68 @@ async copyCanvasToClipboard(canvas, productCode) {
     }
 }
 
+// Função para mostrar notificações
+showNotification(message, type = 'info'); {
+    console.log(`📢 [${type.toUpperCase()}] ${message}`);
+    
+    let notification = document.getElementById('notification');
+    if (!notification) {
+        notification = document.createElement('div');
+        notification.id = 'notification';
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 5px;
+            color: white;
+            font-weight: 500;
+            z-index: 10000;
+            transition: all 0.3s ease;
+            max-width: 300px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        `;
+        document.body.appendChild(notification);
+    }
+
+    const colors = {
+        info: '#007bff',
+        success: '#28a745',
+        warning: '#ffc107',
+        error: '#dc3545'
+    };
+
+    notification.style.backgroundColor = colors[type] || colors.info;
+    notification.textContent = message;
+    notification.style.display = 'block';
+    notification.style.opacity = '1';
+
+    setTimeout(() => {
+        if (notification) {
+            notification.style.opacity = '0';
+            setTimeout(() => {
+                if (notification && notification.parentNode) {
+                    notification.style.display = 'none';
+                }
+            }, 300);
+        }
+    }, 4000);
+}
+
+// Placeholder para produtos sem imagem
+drawPlaceholder(ctx, x, y, size); {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(x, y, size, size);
+    
+    ctx.strokeStyle = '#dee2e6';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, size, size);
+    
+    ctx.fillStyle = '#6c757d';
+    ctx.font = `${Math.floor(size/3)}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.fillText('📦', x + size/2, y + size/2 + 8);
+}
 
 
 // === INICIALIZAÇÃO SEGURA DO CATALOG MANAGER ===
