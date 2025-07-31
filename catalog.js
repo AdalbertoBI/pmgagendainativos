@@ -967,25 +967,25 @@ async generateProductImage(product) {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        // Dimensões do card
-        canvas.width = 400;
-        canvas.height = 350; // Aumentado para acomodar a imagem
+        // Dimensões do card aumentadas significativamente
+        canvas.width = 1200; // Aumentado para melhor visibilidade
+        canvas.height = 1000; // Aumentado para melhor visibilidade
         
         // Fundo do card
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Borda do card
+        // Borda do card com largura aumentada
         ctx.strokeStyle = '#e0e0e0';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
+        ctx.lineWidth = 10; // Borda mais espessa
+        ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
         
         // Área para a imagem do produto
         const imageArea = {
-            x: 20,
-            y: 20,
-            width: 120,
-            height: 120
+            x: 80,
+            y: 80,
+            width: 700, // Imagem muito maior
+            height: 700 // Imagem muito maior
         };
         
         // Carregar e desenhar a imagem do produto
@@ -995,114 +995,105 @@ async generateProductImage(product) {
             
             await new Promise((resolve, reject) => {
                 productImg.onload = () => {
-                    // Desenhar fundo da área da imagem
                     ctx.fillStyle = '#f8f9fa';
                     ctx.fillRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
-                    
-                    // Desenhar borda da área da imagem
                     ctx.strokeStyle = '#dee2e6';
-                    ctx.lineWidth = 1;
+                    ctx.lineWidth = 4; // Borda interna mais visível
                     ctx.strokeRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
                     
-                    // Calcular dimensões para manter proporção
                     const imgAspect = productImg.width / productImg.height;
                     const areaAspect = imageArea.width / imageArea.height;
                     
                     let drawWidth, drawHeight, drawX, drawY;
                     
                     if (imgAspect > areaAspect) {
-                        // Imagem é mais larga - ajustar pela largura
-                        drawWidth = imageArea.width - 4;
+                        drawWidth = imageArea.width - 10;
                         drawHeight = drawWidth / imgAspect;
-                        drawX = imageArea.x + 2;
+                        drawX = imageArea.x + 5;
                         drawY = imageArea.y + (imageArea.height - drawHeight) / 2;
                     } else {
-                        // Imagem é mais alta - ajustar pela altura
-                        drawHeight = imageArea.height - 4;
+                        drawHeight = imageArea.height - 10;
                         drawWidth = drawHeight * imgAspect;
                         drawX = imageArea.x + (imageArea.width - drawWidth) / 2;
-                        drawY = imageArea.y + 2;
+                        drawY = imageArea.y + 5;
                     }
                     
-                    // Desenhar a imagem do produto
                     ctx.drawImage(productImg, drawX, drawY, drawWidth, drawHeight);
                     resolve();
                 };
                 
                 productImg.onerror = () => {
                     console.log('Erro ao carregar imagem, usando placeholder');
-                    // Desenhar placeholder
                     ctx.fillStyle = '#f8f9fa';
                     ctx.fillRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
-                    
                     ctx.strokeStyle = '#dee2e6';
-                    ctx.lineWidth = 1;
+                    ctx.lineWidth = 4;
                     ctx.strokeRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
-                    
-                    // Ícone de produto
                     ctx.fillStyle = '#6c757d';
-                    ctx.font = '32px Arial';
+                    ctx.font = '200px Arial'; // Texto muito maior
                     ctx.textAlign = 'center';
-                    ctx.fillText('📦', imageArea.x + imageArea.width/2, imageArea.y + imageArea.height/2 + 10);
-                    
-                    // Código do produto
+                    ctx.fillText('📦', imageArea.x + imageArea.width/2, imageArea.y + imageArea.height/2 + 80);
                     ctx.fillStyle = '#495057';
-                    ctx.font = '12px Arial';
-                    ctx.fillText(product.code, imageArea.x + imageArea.width/2, imageArea.y + imageArea.height/2 + 30);
-                    
+                    ctx.font = '70px Arial'; // Texto muito maior
+                    ctx.fillText(product.code, imageArea.x + imageArea.width/2, imageArea.y + imageArea.height/2 + 200);
                     resolve();
                 };
                 
-                // Tentar carregar a imagem do produto
                 productImg.src = product.image;
             });
         } catch (error) {
             console.log('Erro ao processar imagem:', error);
         }
         
-        // Cabeçalho com nome do produto
-        const headerY = 160;
+        // Cabeçalho com nome do produto com quebras de linha
+        const headerY = 800; // Ajustado para imagem maior
         ctx.fillStyle = '#007bff';
-        ctx.fillRect(20, headerY, canvas.width - 40, 40);
-        
-        // Nome do produto (quebrar texto se necessário)
+        ctx.fillRect(80, headerY, canvas.width - 160, 150); // Aumentado o tamanho do cabeçalho
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 14px Arial';
+        ctx.font = 'bold 50px Arial'; // Texto muito maior
         ctx.textAlign = 'center';
-        
-        const productName = product.name.length > 35 ? product.name.substring(0, 32) + '...' : product.name;
-        ctx.fillText(productName, canvas.width / 2, headerY + 25);
+        const maxCharsPerLine = 20; // Limite de caracteres por linha
+        const lines = [];
+        let currentLine = '';
+        product.name.split(' ').forEach(word => {
+            const testLine = currentLine + (currentLine ? ' ' : '') + word;
+            if (testLine.length > maxCharsPerLine) {
+                lines.push(currentLine);
+                currentLine = word;
+            } else {
+                currentLine = testLine;
+            }
+        });
+        if (currentLine) lines.push(currentLine);
+        const maxLines = 3; // Limite de linhas
+        const displayedLines = lines.slice(0, maxLines);
+        if (lines.length > maxLines) displayedLines[maxLines - 1] += '...';
+        displayedLines.forEach((line, index) => {
+            ctx.fillText(line, canvas.width / 2, headerY + 60 + (index * 60));
+        });
         
         // Preço em destaque
         ctx.fillStyle = '#28a745';
-        ctx.font = 'bold 32px Arial';
+        ctx.font = 'bold 80px Arial'; // Texto muito maior
         ctx.textAlign = 'center';
-        ctx.fillText(product.formattedPrice, canvas.width / 2, 240);
+        ctx.fillText(product.formattedPrice, canvas.width / 2, 920); // Ajustado para layout
         
         // Informações do produto
         ctx.fillStyle = '#333333';
-        ctx.font = '14px Arial';
+        ctx.font = '40px Arial'; // Texto muito maior
         ctx.textAlign = 'left';
-        
-        const infoStartY = 265;
-        ctx.fillText(`🏷️ Código: ${product.code}`, 160, infoStartY);
-        ctx.fillText(`📏 Unidade: ${product.unit}`, 160, infoStartY + 20);
-        ctx.fillText(`🏪 Categoria: ${product.category}`, 160, infoStartY + 40);
+        const infoStartY = 960; // Ajustado para layout
+        ctx.fillText(`🏷️ Código: ${product.code}`, 300, infoStartY);
+        ctx.fillText(`📏 Unidade: ${product.unit}`, 300, infoStartY + 60);
+        ctx.fillText(`🏪 Categoria: ${product.category}`, 300, infoStartY + 120);
         
         // Linha separadora
         ctx.strokeStyle = '#e0e0e0';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.moveTo(30, 315);
-        ctx.lineTo(canvas.width - 30, 315);
+        ctx.moveTo(100, 980); // Ajustado para layout
+        ctx.lineTo(canvas.width - 100, 980); // Ajustado para layout
         ctx.stroke();
-        
-        // Rodapé com informações de contato
-        ctx.fillStyle = '#666666';
-        ctx.font = '11px Arial';
-        ctx.textAlign = 'center';
-        const currentDate = new Date().toLocaleDateString('pt-BR');
-        ctx.fillText(` |  | ${currentDate}`, canvas.width / 2, 335);
         
         // Converter canvas para blob e copiar
         canvas.toBlob(async (blob) => {
@@ -1112,7 +1103,6 @@ async generateProductImage(product) {
                 alert('✅ Imagem do produto copiada para a área de transferência!');
             } catch (error) {
                 console.error('Erro ao copiar imagem:', error);
-                // Fallback: criar link de download
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
@@ -1131,7 +1121,7 @@ async generateProductImage(product) {
     }
 }
 
-// Geração de imagem visual SEM DATA e SEM DOWNLOAD DUPLO
+// Geração de imagem visual com 4 produtos por linha, borda verde externa, imagens maiores, fundo branco
 async generateImageOffersVisual() {
     if (!this.selectedProducts || this.selectedProducts.length === 0) {
         this.showNotification('Selecione pelo menos um produto para gerar ofertas visuais', 'warning');
@@ -1141,46 +1131,132 @@ async generateImageOffersVisual() {
     this.updateCatalogStatus('Gerando imagem visual...');
 
     try {
+        const productsPerRow = 4;
+        const productWidth = 900; // Aumentado significativamente
+        const productHeight = 1000; // Aumentado significativamente
+        const padding = 40; // Aumentado para melhor espaçamento
+        const logoSectionHeight = 200; // Aumentado ainda mais para logo maior
+
+        const rows = Math.ceil(this.selectedProducts.length / productsPerRow);
+        const canvasWidth = productsPerRow * (productWidth + padding) + padding;
+        const canvasHeight = logoSectionHeight + (rows * (productHeight + padding)) + padding;
+
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        const logoSectionHeight = 100;  
-        const productHeight = 85;
-        const footerHeight = 80;
-        const padding = 20;
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
         
-        canvas.width = 700;
-        canvas.height = logoSectionHeight + (this.selectedProducts.length * productHeight) + footerHeight + (padding * 2);
-        
-        // Fundo branco limpo
+        // Fundo branco completo
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Borda sutil
-        ctx.strokeStyle = '#e0e0e0';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
+        // Borda verde externa ao redor de toda a imagem com largura aumentada
+        ctx.strokeStyle = '#28a745';
+        ctx.lineWidth = 50; // Borda muito mais espessa
+        ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
         
-        let currentY = padding;
+        // Logo centralizado no topo com tamanho ajustado
+        await this.drawLogo(ctx, canvas.width, padding / 2, 800); // Aumentado para logo muito maior
         
-        // Desenhar logo
-        await this.drawLogo(ctx, canvas.width, currentY);
-        currentY += logoSectionHeight;
-        
-        // ❌ REMOVIDO: Data foi retirada completamente
-        
-        // Área de produtos
-        ctx.fillStyle = '#f8f9fa';
-        ctx.fillRect(15, currentY, canvas.width - 30, this.selectedProducts.length * productHeight);
-        
-        // Desenhar produtos
-        for (let index = 0; index < this.selectedProducts.length; index++) {
-            await this.drawProduct(ctx, this.selectedProducts[index], index, currentY);
-            currentY += productHeight;
+        // Desenhar produtos em grade
+        for (let i = 0; i < this.selectedProducts.length; i++) {
+            const row = Math.floor(i / productsPerRow);
+            const col = i % productsPerRow;
+            const x = padding + col * (productWidth + padding);
+            const y = logoSectionHeight + padding + row * (productHeight + padding);
+
+            // Desenhar produto individual
+            const product = this.selectedProducts[i];
+            const imageArea = {
+                x: x + 80,
+                y: y + 80,
+                width: 700, // Imagem muito maior
+                height: 700 // Imagem muito maior
+            };
+
+            try {
+                const productImg = new Image();
+                productImg.crossOrigin = 'anonymous';
+                
+                await new Promise((resolve) => {
+                    productImg.onload = () => {
+                        const imgAspect = productImg.width / productImg.height;
+                        let drawWidth, drawHeight, drawX, drawY;
+                        
+                        if (imgAspect > 1) {
+                            drawWidth = imageArea.width - 10;
+                            drawHeight = drawWidth / imgAspect;
+                            drawX = imageArea.x + 5;
+                            drawY = imageArea.y + (imageArea.height - drawHeight) / 2;
+                        } else {
+                            drawHeight = imageArea.height - 10;
+                            drawWidth = drawHeight * imgAspect;
+                            drawX = imageArea.x + (imageArea.width - drawWidth) / 2;
+                            drawY = imageArea.y + 5;
+                        }
+                        
+                        ctx.drawImage(productImg, drawX, drawY, drawWidth, drawHeight);
+                        resolve();
+                    };
+                    
+                    productImg.onerror = () => {
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
+                        ctx.fillStyle = '#6c757d';
+                        ctx.font = '200px Arial'; // Texto muito maior
+                        ctx.textAlign = 'center';
+                        ctx.fillText('📦', imageArea.x + imageArea.width/2, imageArea.y + imageArea.height/2 + 80);
+                        ctx.fillStyle = '#495057';
+                        ctx.font = '70px Arial'; // Texto muito maior
+                        ctx.fillText(product.code, imageArea.x + imageArea.width/2, imageArea.y + imageArea.height/2 + 200);
+                        resolve();
+                    };
+                    
+                    productImg.src = product.image;
+                });
+            } catch (error) {
+                console.log('Erro ao processar imagem:', error);
+            }
+
+            
+            // Preço em destaque
+            ctx.fillStyle = '#dc3545';
+            ctx.font = 'bold 80px Arial'; // Texto muito maior
+            ctx.textAlign = 'center';
+            ctx.fillText(product.formattedPrice, x + productWidth / 2, y + 720); // Ajustado para layout
+
+            // Unidade
+            ctx.fillStyle = '#dc3545';
+            ctx.font = '40px Arial'; // Texto muito maior
+            ctx.textAlign = 'center';
+            ctx.fillText(`(${product.unit})`, x + productWidth / 2, y + 780); // Ajustado para layout
+
+            // Nome do produto com quebras de linha
+            ctx.fillStyle = '#333333';
+            ctx.font = 'bold 50px Arial'; // Texto muito maior
+            ctx.textAlign = 'center';
+            const maxCharsPerLine = 20; // Limite de caracteres por linha
+            const lines = [];
+            let currentLine = '';
+            product.name.split(' ').forEach(word => {
+                const testLine = currentLine + (currentLine ? ' ' : '') + word;
+                if (testLine.length > maxCharsPerLine) {
+                    lines.push(currentLine);
+                    currentLine = word;
+                } else {
+                    currentLine = testLine;
+                }
+            });
+            if (currentLine) lines.push(currentLine);
+            const maxLines = 3; // Limite de linhas
+            const displayedLines = lines.slice(0, maxLines);
+            if (lines.length > maxLines) displayedLines[maxLines - 1] += '...';
+            displayedLines.forEach((line, index) => {
+                ctx.fillText(line, x + productWidth / 2, y + 850 + (index * 60));
+            });
+            
         }
-        
-        // Desenhar rodapé (sem data)
-        await this.drawFooter(ctx, canvas);
         
         // Copiar APENAS (sem download)
         await this.copyCanvasAsImage(canvas);
@@ -1203,8 +1279,8 @@ async drawLogo(ctx, canvasWidth, currentY) {
         
         await new Promise((resolve) => {
             logo.onload = () => {
-                const logoMaxWidth = 150;
-                const logoMaxHeight = 70;
+                const logoMaxWidth = 450;
+                const logoMaxHeight = 350;
                 const logoAspect = logo.width / logo.height;
                 
                 let logoWidth = logoMaxWidth;
@@ -1217,7 +1293,7 @@ async drawLogo(ctx, canvasWidth, currentY) {
                 }
                 
                 const logoX = (canvasWidth - logoWidth) / 2;
-                const logoY = currentY + 10;
+                const logoY = currentY + 30;
                 
                 ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
                 resolve();
