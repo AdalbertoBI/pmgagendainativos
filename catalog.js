@@ -1741,12 +1741,12 @@ async generateProductImage(product) {
         const ctx = canvas.getContext('2d');
         
         // Dimensões seguindo o padrão dos múltiplos (proporcionalmente menores)
-        const logoSectionHeight = 100;
-        const productHeight = 85; // Mesmo height dos múltiplos
-        const footerHeight = 80;
-        const padding = 20;
+        const logoSectionHeight = 10;
+        const productHeight = 80; // Mesmo height dos múltiplos
+        const footerHeight = 10;
+        const padding = 5;
         
-        canvas.width = 700; // MESMA largura dos múltiplos para consistência
+        canvas.width = 500; // MESMA largura dos múltiplos para consistência
         canvas.height = logoSectionHeight + productHeight + footerHeight + (padding * 2);
         
         // Fundo branco limpo (IGUAL aos múltiplos)
@@ -1760,12 +1760,9 @@ async generateProductImage(product) {
         
         let currentY = padding;
         
-        // LOGO (IGUAL aos múltiplos)
-        await this.drawLogo(ctx, canvas.width, currentY);
-        currentY += logoSectionHeight;
-        
+               
         // Área do produto com fundo cinza (IGUAL aos múltiplos)
-        ctx.fillStyle = '#f8f9fa';
+        ctx.fillStyle = '#ffffffff';
         ctx.fillRect(15, currentY, canvas.width - 30, productHeight);
         
         // Desenhar produto usando EXATAMENTE o mesmo método dos múltiplos
@@ -1773,9 +1770,7 @@ async generateProductImage(product) {
         
         currentY += productHeight;
         
-        // Rodapé (IGUAL aos múltiplos)
-        await this.drawFooter(ctx, canvas);
-        
+                
         // Copiar para área de transferência (IGUAL aos múltiplos)
         await this.copyCanvasAsImage(canvas);
         
@@ -1792,9 +1787,9 @@ async generateProductImage(product) {
 // Função auxiliar para desenhar produto individual IGUAL aos múltiplos
 async drawSingleProductLikeMultiple(ctx, product, index, yPosition) {
     // Área da imagem do produto (EXATAMENTE igual aos múltiplos)
-    const imgSize = 60;
-    const imgX = 30;
-    const imgY = yPosition + 12;
+    const imgSize = 90;
+    const imgX = 10;
+    const imgY = yPosition + 4;
     
     // Desenhar imagem do produto (MESMO método dos múltiplos)
     await this.drawProductImage(ctx, product.image, imgX, imgY, imgSize);
@@ -1808,7 +1803,7 @@ async drawSingleProductLikeMultiple(ctx, product, index, yPosition) {
     // Nome do produto (IGUAL aos múltiplos)
     ctx.fillStyle = '#333333';
     ctx.font = 'bold 13px Arial';
-    const productName = product.name.length > 40 ? product.name.substring(0, 37) + '...' : product.name;
+    const productName = product.name.length > 50 ? product.name.substring(0, 70) + '...' : product.name;
     ctx.fillText(productName, 130, yPosition + 25);
     
     // Detalhes do produto (IGUAL aos múltiplos)
@@ -1819,10 +1814,10 @@ async drawSingleProductLikeMultiple(ctx, product, index, yPosition) {
     ctx.fillText(`Disponível`, 280, yPosition + 45);
     
     // Preço em destaque (IGUAL aos múltiplos)
-    ctx.fillStyle = '#28a745';
-    ctx.font = 'bold 18px Arial';
+    ctx.fillStyle = '#e00f0fff';
+    ctx.font = 'bold 22px Arial';
     ctx.textAlign = 'right';
-    ctx.fillText(`${product.formattedPrice}`, 665, yPosition + 35);
+    ctx.fillText(`${product.formattedPrice}`, 200, yPosition + 80);
 }
 
 
