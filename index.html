@@ -3,113 +3,140 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prospecção de Clientes</title>
+    <title>Prospecção de Clientes Inativos</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icon-192.png" type="image/png">
-    <!-- CORREÇÃO: Script do Leaflet CSS mantido aqui -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
 </head>
 <body>
+    <h1>Prospecção de Clientes Inativos</h1>
+    
+    <div id="upload">
+        <input type="file" id="xlsxFile" accept=".xlsx" />
+        <button id="cadastrar-cliente-btn">➕ Cadastrar Cliente</button>
+    </div>
 
-    <header class="main-header">
-        <h1>Prospecção de Clientes</h1>
-        <div id="upload">
-            <input type="file" id="xlsxFile" accept=".xlsx" />
-            <button id="cadastrar-cliente-btn">➕ Cadastrar Cliente</button>
-        </div>
-    </header>
-
-    <nav id="tabs">
+    <div id="tabs">
         <button onclick="openTab('inativos')" class="active">Inativos</button>
         <button onclick="openTab('ativos')">Ativos</button>
         <button onclick="openTab('agenda')">Agenda</button>
         <button onclick="openTab('mapa')">Mapa</button>
         <button onclick="openTab('catalogo')">Catálogo</button>
-    </nav>
+    </div>
 
-    <main>
-        <div id="inativos-content" class="tab-content active">
-            <div id="filters">
-                <input type="number" id="saldoFilter" placeholder="Saldo mínimo" min="0">
-                <select id="sortOption">
-                    <option value="nome-az">Nome Fantasia (A-Z)</option>
-                    <option value="nome-za">Nome Fantasia (Z-A)</option>
-                    <option value="saldo-desc">Saldo de Crédito (Maior-Menor)</option>
-                    <option value="saldo-asc">Saldo de Crédito (Menor-Maior)</option>
-                    <option value="data-asc">Data Último Pedido (Antigo-Recente)</option>
-                    <option value="data-desc">Data Último Pedido (Recente-Antigo)</option>
-                </select>
-                <div id="cidadeSelector">
-                    <span id="cidadeSelectorText">Selecionar cidades</span>
-                    <span class="seta">▼</span>
-                </div>
-                <div id="cidadeList" class="escondido"></div>
-                <button id="exportar-inativos" class="export-btn">📊 Exportar Inativos</button>
+    <div id="inativos-content" class="tab-content active">
+        <div id="filters">
+            <input type="number" id="saldoFilter" placeholder="Saldo mínimo" min="0">
+            <select id="sortOption">
+                <option value="nome-az">Nome Fantasia (A-Z)</option>
+                <option value="nome-za">Nome Fantasia (Z-A)</option>
+                <option value="saldo-desc">Saldo de Crédito (Maior-Menor)</option>
+                <option value="saldo-asc">Saldo de Crédito (Menor-Maior)</option>
+                <option value="data-asc">Data Último Pedido (Antigo-Recente)</option>
+                <option value="data-desc">Data Último Pedido (Recente-Antigo)</option>
+            </select>
+            <div id="cidadeSelector">
+                <span id="cidadeSelectorText">Selecionar cidades</span>
+                <span class="seta">▼</span>
             </div>
-            <ul id="list"></ul>
+            <div id="cidadeList" class="escondido"></div>
+            <button id="exportar-inativos" class="export-btn">📊 Exportar Inativos</button>
         </div>
+        <ul id="list"></ul>
+    </div>
 
-        <div id="ativos-content" class="tab-content">
-            <div style="text-align: center; margin: 10px 0;">
-                <button id="exportar-ativos" class="export-btn">📊 Exportar Ativos</button>
-            </div>
-            <ul id="ativos-list"></ul>
+    <div id="ativos-content" class="tab-content">
+        <div style="text-align: center; margin: 10px 0;">
+            <button id="exportar-ativos" class="export-btn">📊 Exportar Ativos</button>
         </div>
+        <ul id="ativos-list"></ul>
+    </div>
 
-        <div id="agenda-content" class="tab-content">
-            <div id="agenda-list"></div>
-        </div>
+    <div id="agenda-content" class="tab-content">
+        <div id="agenda-list"></div>
+    </div>
 
-        <div id="mapa-content" class="tab-content">
-            <div id="mapa-controls">
-                <button id="edit-mode-btn" class="map-control-btn">✏️ Editar Localizações</button>
-                <label class="checkbox-container">
-                    <input type="checkbox" id="include-inativos-checkbox">
-                    <span class="checkmark"></span>
-                    Incluir inativos
-                </label>
-                <span id="map-status">Carregando mapa...</span>
-            </div>
-            <div id="map" style="height: 400px;"></div>
+    <div id="mapa-content" class="tab-content">
+        <div id="mapa-controls">
+            <button id="edit-mode-btn" class="map-control-btn">✏️ Editar Localizações</button>
+            <label class="checkbox-container">
+                <input type="checkbox" id="include-inativos-checkbox">
+                <span class="checkmark"></span>
+                Incluir inativos
+            </label>
+            <span id="map-status">Carregando mapa...</span>
         </div>
+        <div id="map" style="height: 400px;"></div>
+    </div>
 
-        <div id="catalogo-content" class="tab-content">
-            <div id="catalog-controls">
-                <input type="text" id="product-search" placeholder="Buscar produtos...">
-                <button id="refresh-catalog" class="catalog-btn">🔄 Atualizar Catálogo</button>
-                <button id="select-multiple-products" class="catalog-btn">📋 Selecionar Múltiplos</button>
-                <button class="catalog-btn" onclick="document.getElementById('catalog-file-input').click()">
-                    📁 Carregar Novo Catálogo (.pdf)
-                </button>
-                <input type="file" id="catalog-file-input" accept=".pdf" style="display: none">
-            </div>
-            <div id="catalog-status">Carregando catálogo...</div>
-            <div id="products-grid"></div>
+    <div id="catalogo-content" class="tab-content">
+        <div id="catalog-controls">
+            <input type="text" id="product-search" placeholder="Buscar produtos...">
+            <button id="refresh-catalog" class="catalog-btn">🔄 Atualizar Catálogo</button>
+            <button id="select-multiple-products" class="catalog-btn">📋 Selecionar Múltiplos</button>
+             <button class="catalog-btn" onclick="document.getElementById('catalog-file-input').click()">
+                📁 Carregar Novo Catálogo (.pdf)
+            </button>
+
+            <!-- ✅ INPUT FILE ADICIONADO -->
+            <input type="file" id="catalog-file-input" accept=".pdf" style="display: none">
+            
         </div>
-    </main>
+        <div id="catalog-status">Carregando catálogo...</div>
+        <div id="products-grid"></div>
+    </div>
 
     <!-- Modal de Detalhes -->
-    <div id="modal" class="modal-container">
+    <div id="modal">
         <div id="modal-content">
-            <span id="close" class="close-btn">&times;</span>
-            <div id="modal-body"><!-- Conteúdo será inserido dinamicamente --></div>
+            <span id="close">&times;</span>
+            <div id="modal-body">
+                <!-- Conteúdo será inserido dinamicamente -->
+            </div>
             <div id="modal-actions">
                 <a id="whatsapp-btn" href="#" target="_blank" class="whatsapp-btn">📱 WhatsApp</a>
                 <a id="maps-btn" href="#" target="_blank" class="maps-btn">🗺️ Traçar Rota</a>
             </div>
             <div id="agendamento-section">
                 <h3>Agendamento</h3>
-                <div class="form-group"><label for="diaSemana">Dia da Semana:</label><select id="diaSemana"><option value="">Selecione</option><option value="Domingo">Domingo</option><option value="Segunda">Segunda</option><option value="Terça">Terça</option><option value="Quarta">Quarta</option><option value="Quinta">Quinta</option><option value="Sexta">Sexta</option><option value="Sábado">Sábado</option></select></div>
-                <div class="form-group"><label for="horario">Horário:</label><input type="time" id="horario"></div>
-                <div class="form-group"><label for="tipoAgendamento">Tipo:</label><select id="tipoAgendamento"><option value="">Selecione</option><option value="Visita">Visita</option><option value="Ligação">Ligação</option><option value="WhatsApp">WhatsApp</option></select></div>
-                <div class="form-group"><label for="repeticao">Repetição:</label><select id="repeticao"><option value="Semanal">Semanal</option><option value="Quinzenal">Quinzenal</option><option value="Mensal">Mensal</option></select></div>
-                <button onclick="salvarAgendamento()">Salvar Agendamento</button>
+                <label>Dia da Semana:</label>
+                <select id="diaSemana">
+                    <option value="">Selecione</option>
+                    <option value="Domingo">Domingo</option>
+                    <option value="Segunda">Segunda</option>
+                    <option value="Terça">Terça</option>
+                    <option value="Quarta">Quarta</option>
+                    <option value="Quinta">Quinta</option>
+                    <option value="Sexta">Sexta</option>
+                    <option value="Sábado">Sábado</option>
+                </select>
+                <label>Horário:</label>
+                <input type="time" id="horario">
+                <label>Tipo:</label>
+                <select id="tipoAgendamento">
+                    <option value="">Selecione</option>
+                    <option value="Visita">Visita</option>
+                    <option value="Ligação">Ligação</option>
+                    <option value="WhatsApp">WhatsApp</option>
+                </select>
+                <label>Repetição:</label>
+                <select id="repeticao">
+                    <option value="Semanal">Semanal</option>
+                    <option value="Quinzenal">Quinzenal</option>
+                    <option value="Mensal">Mensal</option>
+                </select>
+                <button onclick="salvarAgendamento()">Salvar agendamento</button>
             </div>
             <div id="status-section">
                 <h3>Status</h3>
-                <div class="form-group"><label for="editDataPedido" id="labelEditDataPedido">Data Último Pedido:</label><input type="text" id="editDataPedido" placeholder="DD/MM/AAAA" maxlength="10"></div>
-                <button id="tornarAtivo">Tornar Ativo</button><button id="confirmarAtivo">Confirmar Ativo</button><button id="excluirAtivo">Excluir dos Ativos</button>
+                <label id="labelEditDataPedido">Data Último Pedido:</label>
+                <input type="text" id="editDataPedido" placeholder="DD/MM/AAAA" maxlength="10">
+                <button id="tornarAtivo">Tornar Ativo</button>
+                <button id="confirmarAtivo">Confirmar Ativo</button>
+                <button id="excluirAtivo">Excluir dos Ativos</button>
             </div>
             <div id="observacoes-section">
                 <h3>Observações</h3>
@@ -121,28 +148,58 @@
     </div>
 
     <!-- Modal de Cadastro -->
-    <div id="modal-cadastro" class="modal-container">
+    <div id="modal-cadastro">
         <div id="modal-cadastro-content">
-            <span id="close-cadastro" class="close-btn">&times;</span>
-            <h2>Cadastrar Cliente</h2>
+            <span id="close-cadastro">&times;</span>
+            <h2>Cadastrar Novo Cliente</h2>
             <form id="form-cadastro">
-                <div class="form-group"><label for="nome-fantasia">Nome Fantasia:</label><input type="text" id="nome-fantasia" required></div>
-                <div class="form-group"><label for="cliente">Cliente:</label><input type="text" id="cliente"></div>
-                <div class="form-group"><label for="cnpj-cpf">CNPJ/CPF:</label><input type="text" id="cnpj-cpf"></div>
-                <div class="form-group"><label for="contato">Contato:</label><input type="text" id="contato"></div>
-                <div class="form-group"><label for="telefone-comercial">Telefone Comercial:</label><input type="tel" id="telefone-comercial"></div>
-                <div class="form-group"><label for="celular">Celular:</label><input type="tel" id="celular"></div>
-                <div class="form-group"><label for="email">Email:</label><input type="email" id="email"></div>
-                <div class="form-group"><label for="endereco">Endereço:</label><input type="text" id="endereco"></div>
-                <div class="form-group"><label for="numero">Número:</label><input type="text" id="numero"></div>
-                <div class="form-group"><label for="bairro">Bairro:</label><input type="text" id="bairro"></div>
-                <div class="form-group"><label for="cidade">Cidade:</label><input type="text" id="cidade"></div>
-                <div class="form-group"><label for="uf">UF:</label><input type="text" id="uf" maxlength="2"></div>
-                <div class="form-group"><label for="cep">CEP:</label><input type="text" id="cep" maxlength="9"></div>
-                <div class="form-group"><label for="saldo-credito">Saldo de Crédito:</label><input type="number" id="saldo-credito" min="0" step="0.01"></div>
-                <div class="form-group"><label for="data-ultimo-pedido">Data Último Pedido:</label><input type="date" id="data-ultimo-pedido"></div>
+                <label>Nome Fantasia:</label>
+                <input type="text" id="nome-fantasia" required>
+                
+                <label>Cliente:</label>
+                <input type="text" id="cliente">
+                
+                <label>CNPJ/CPF:</label>
+                <input type="text" id="cnpj-cpf">
+                
+                <label>Contato:</label>
+                <input type="text" id="contato">
+                
+                <label>Telefone Comercial:</label>
+                <input type="tel" id="telefone-comercial">
+                
+                <label>Celular:</label>
+                <input type="tel" id="celular">
+                
+                <label>Email:</label>
+                <input type="email" id="email">
+                
+                <label>Endereço:</label>
+                <input type="text" id="endereco">
+                
+                <label>Número:</label>
+                <input type="text" id="numero">
+                
+                <label>Bairro:</label>
+                <input type="text" id="bairro">
+                
+                <label>Cidade:</label>
+                <input type="text" id="cidade">
+                
+                <label>UF:</label>
+                <input type="text" id="uf" maxlength="2">
+                
+                <label>CEP:</label>
+                <input type="text" id="cep" maxlength="9">
+                
+                <label>Saldo de Crédito:</label>
+                <input type="number" id="saldo-credito" min="0" step="0.01">
+                
+                <label>Data Último Pedido:</label>
+                <input type="date" id="data-ultimo-pedido">
+                
                 <div class="form-actions">
-                    <button type="submit">Cadastrar Cliente</button>
+                    <button type="submit">Cadastrar</button>
                     <button type="button" id="cancelar-cadastro">Cancelar</button>
                 </div>
             </form>
@@ -150,9 +207,9 @@
     </div>
 
     <!-- Modal de Sucesso -->
-    <div id="modal-sucesso" class="modal-container">
+    <div id="modal-sucesso">
         <div id="modal-sucesso-content">
-            <span id="close-sucesso" class="close-btn">&times;</span>
+            <span id="close-sucesso">&times;</span>
             <div class="success-icon">✅</div>
             <h2>Cliente Cadastrado com Sucesso!</h2>
             <div id="cliente-cadastrado-info"></div>
@@ -176,8 +233,10 @@
         <div id="modal-product-selection-content" class="modal-content">
             <span id="close-product-selection" class="close">&times;</span>
             <h2>📋 Selecionar Produtos para Jornal de Ofertas</h2>
+            
             <div id="product-selection-controls">
                 <input type="text" id="search-products-selection" placeholder="Buscar produtos...">
+                
                 <div class="selection-info">
                     <span id="selected-count">0 produtos selecionados</span>
                     <div class="selection-buttons">
@@ -186,7 +245,9 @@
                     </div>
                 </div>
             </div>
+
             <div id="products-selection-list"></div>
+
             <div class="format-selection">
                 <h3>Como deseja gerar o jornal de ofertas?</h3>
                 <div class="format-buttons">
@@ -202,9 +263,11 @@
         <div id="modal-text-offers-content" class="modal-content">
             <span id="close-text-offers" class="close">&times;</span>
             <h2>📝 Jornal de Ofertas - Texto</h2>
+            
             <div id="offers-text-container">
                 <textarea id="offers-text" readonly></textarea>
             </div>
+            
             <div style="text-align: center; margin-top: 20px;">
                 <button id="copy-offers-text" class="format-btn text-btn">📋 Copiar para Área de Transferência</button>
                 <button id="close-text-modal" class="format-btn cancel-btn">Fechar</button>
@@ -212,9 +275,10 @@
         </div>
     </div>
 
+    
+
     <button id="install-btn">📱 Instalar App</button>
 
-    <!-- CORREÇÃO: Scripts centralizados no final do body para melhor performance -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -228,10 +292,8 @@
     
     <script>
         // Inicializar managers globais
-        document.addEventListener('DOMContentLoaded', () => {
-            window.clientManager = new ClientManager();
-            window.catalogManager = new CatalogManager();
-        });
+        window.clientManager = new ClientManager();
+        window.catalogManager = new CatalogManager();
     </script>
     
 </body>
