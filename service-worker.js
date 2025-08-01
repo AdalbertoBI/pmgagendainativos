@@ -1,4 +1,4 @@
-const CACHE_NAME = 'agenda-inativos-v1.0.0.10'; // Incrementar versão
+const CACHE_NAME = 'agenda-inativos-v1.0.0.2'; // Incrementar versão
 
 // Detectar ambiente
 const isProduction = location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
