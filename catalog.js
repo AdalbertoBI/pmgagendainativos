@@ -9,8 +9,11 @@ class CatalogManager {
         this.isLoading = false;
         this.pdfText = '';
         this.extractedProducts = [];
+         this.imagesMap = {}; // <- Aqui você guarda o mapping
     }
     // === MÉTODOS DE PERSISTÊNCIA ===
+
+    
 
 // Salvar catálogo no localStorage
 saveCatalogToCache(catalogData) {
@@ -62,6 +65,8 @@ loadCatalogFromCache() {
         console.error('❌ Erro ao carregar catálogo do cache:', error);
         return null;
     }
+
+    
 }
 
 // Limpar cache do catálogo
@@ -84,6 +89,18 @@ hasCustomCatalogCached() {
     // Inicializar catálogo com verificação de cache
 async init() {
     console.log('📦 Inicializando CatalogManager...');
+
+    try {
+        const resp = await fetch('imagens.json');
+        this.imagesMap = await resp.json();
+        window.imageMap = this.imagesMap; // torna global, se desejar compatibilidade
+        console.log('✅ imagens.json carregado:', Object.keys(this.imagesMap).length, 'itens');
+    } catch (e) {
+        this.imagesMap = {};
+        window.imageMap = {};
+        console.error('❌ Falha ao carregar imagens.json', e);
+    }
+    
     try {
         // Tentar carregar do cache
         const cachedCatalog = this.loadCatalogFromCache();
@@ -669,38 +686,32 @@ async extractByBlocksFixed(foundProducts) {
         return parseFloat(priceStr.replace(',', '.'));
     }
 
-    // CORREÇÃO 1: Modificar generateProductImagePath para retornar string por padrão
+    // Função 1: gerar caminhos para diferentes tamanhos de imagem (small, medium, large)
 generateProductImagePath(codigo, size = 'large') {
-    const paddedCode = codigo.toString().padStart(4, '0');
-    const paths = {
-        small: `./FOTOS DE PRODUTOS/${paddedCode}_small.webp`,
-        medium: `./FOTOS DE PRODUTOS/${paddedCode}_medium.webp`,
-        large: `./FOTOS DE PRODUTOS/${paddedCode}.webp`
-    };
-    
-    // Se size for especificado, retorna apenas essa URL
-    if (size && paths[size]) {
-        return paths[size];
+    const codeStr = String(parseInt(codigo, 10)); // Sem padStart, o código é do próprio JSON
+    // Checa se há imagem para o código
+    if (!window.imageMap || !window.imageMap[codeStr]) {
+        return this.getPlaceholderImage(codeStr);
     }
-    
-    // Caso contrário, retorna o objeto completo
-    return paths;
+    // Não há suporte a _small/_medium.png via JSON! Só retorna a versão "large".
+    if (size === 'large' || !size) {
+        return window.imageMap[codeStr];
+    }
+    // Se seu JSON só contém uma versão, ignora small/medium
+    return window.imageMap[codeStr];
 }
 
-// CORREÇÃO 2: Adicionar função para obter URL da imagem com segurança
+
+// Função 2: Retorna a URL segura da imagem considerando o tamanho (default: large)
 getProductImageUrl(codigo, size = 'large') {
-    const paddedCode = codigo.toString().padStart(4, '0');
-    
-    switch (size) {
-        case 'small':
-            return `./FOTOS DE PRODUTOS/${paddedCode}_small.webp`;
-        case 'medium':
-            return `./FOTOS DE PRODUTOS/${paddedCode}_medium.webp`;
-        case 'large':
-        default:
-            return `./FOTOS DE PRODUTOS/${paddedCode}.webp`;
+    const codeStr = String(parseInt(codigo, 10));
+    if (window.imageMap && window.imageMap[codeStr]) {
+        return window.imageMap[codeStr];
     }
+    // Se não existe, retorna placeholder
+    return this.getPlaceholderImage(codeStr);
 }
+
 
 // CORREÇÃO 3: Modificar generateProductImageHTML para usar a nova função
 generateProductImageHTML(codigo, nome) {
@@ -713,20 +724,17 @@ generateProductImageHTML(codigo, nome) {
 }
 
 
-    handleImageError(imgElement, codigo) {
-        const paddedCode = codigo.toString().padStart(4, '0');
+    // Função 3: Tratamento de erro ao carregar a imagem (fallback para .jpg ou placeholder)
+handleImageError(imgElement, codigo) {
+    const codeStr = String(parseInt(codigo, 10));
+    imgElement.onerror = () => {
+        imgElement.src = this.getPlaceholderImage(codeStr);
+        imgElement.onerror = null;
+    };
+    // Não tenta troca para .jpg: no seu JSON só há um link exato.
+    imgElement.src = this.getPlaceholderImage(codeStr);
+}
 
-        if (imgElement.src.includes('.webp')) {
-            imgElement.onerror = () => {
-                imgElement.src = this.getPlaceholderImage(paddedCode);
-                imgElement.onerror = null;
-            };
-            imgElement.src = `./FOTOS DE PRODUTOS/${paddedCode}.jpg`;
-        } else {
-            imgElement.src = this.getPlaceholderImage(paddedCode);
-            imgElement.onerror = null;
-        }
-    }
 
     // Carregar produtos de exemplo
     loadMockProducts() {
