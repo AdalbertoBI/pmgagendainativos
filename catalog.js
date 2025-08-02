@@ -100,7 +100,7 @@ async init() {
         window.imageMap = {};
         console.error('❌ Falha ao carregar imagens.json', e);
     }
-    
+
     try {
         // Tentar carregar do cache
         const cachedCatalog = this.loadCatalogFromCache();
@@ -992,8 +992,8 @@ async generateProductImage(product) {
         const imageArea = {
             x: 80,
             y: 80,
-            width: 700, // Imagem muito maior
-            height: 700 // Imagem muito maior
+            width: 900, // Imagem muito maior
+            height: 900 // Imagem muito maior
         };
         
         // Carregar e desenhar a imagem do produto
@@ -1143,7 +1143,7 @@ async generateImageOffersVisual() {
         const productWidth = 900; // Aumentado significativamente
         const productHeight = 1000; // Aumentado significativamente
         const padding = 40; // Aumentado para melhor espaçamento
-        const logoSectionHeight = 200; // Aumentado ainda mais para logo maior
+        const logoSectionHeight = 400; // Aumentado ainda mais para logo maior
 
         const rows = Math.ceil(this.selectedProducts.length / productsPerRow);
         const canvasWidth = productsPerRow * (productWidth + padding) + padding;
@@ -1165,7 +1165,7 @@ async generateImageOffersVisual() {
         ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
         
         // Logo centralizado no topo com tamanho ajustado
-        await this.drawLogo(ctx, canvas.width, padding / 2, 800); // Aumentado para logo muito maior
+        await this.drawLogo(ctx, canvas.width, padding / 2, 1000); // Aumentado para logo muito maior
         
         // Desenhar produtos em grade
         for (let i = 0; i < this.selectedProducts.length; i++) {
