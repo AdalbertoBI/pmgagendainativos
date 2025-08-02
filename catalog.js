@@ -130,7 +130,6 @@ async init() {
     }
 }
 
-
     // Configurar event listeners
     setupEventListeners() {
         console.log('🔧 Configurando event listeners...');
@@ -386,8 +385,6 @@ async loadNewCatalog(pdfFile) {
     }
 }
 
-
-
     // Carregar catálogo otimizado
     async loadPdfCatalog() {
         if (this.isLoading) return;
@@ -494,6 +491,7 @@ async processProductsAdvanced() {
     this.filteredProducts = [...this.products];
     console.log(`✅ EXTRAÇÃO FINAL SEM DUPLICAÇÃO: ${this.products.length} produtos únicos`);
 }
+
 // MÉTODO 1 CORRIGIDO: MÚLTIPLOS PADRÕES SEM DUPLICAÇÃO
 async extractWithMultiplePatternsFixed(foundProducts) {
     this.updateCatalogStatus('Aplicando padrões regex...');
@@ -735,16 +733,15 @@ handleImageError(imgElement, codigo) {
     imgElement.src = this.getPlaceholderImage(codeStr);
 }
 
-
     // Carregar produtos de exemplo
     loadMockProducts() {
         this.products = [
             {
                 id: 1,
                 code: '8474',
-                name: 'ACÉM BOVINO RESFRIADO MATOSO 14 KG',
+                name: 'Produto Exemplo 1',
                 price: 28.41,
-                formattedPrice: 'R$ 28,41',
+                formattedPrice: 'R$ 38,41',
                 description: 'Produto disponível para venda conforme disponibilidade de estoque',
                 image: this.generateProductImagePath('8474'),
                 category: 'Carnes',
@@ -945,8 +942,6 @@ handleImageError(imgElement, codigo) {
 
 📞 Entre em contato para mais informações!
 
-
-
 *Produto sujeito à disponibilidade de estoque.`;
 
         try {
@@ -969,43 +964,38 @@ handleImageError(imgElement, codigo) {
         }
     }
 
-    // GERAR IMAGEM VISUAL DO PRODUTO (com foto incluída)
+    // GERAR IMAGEM INDIVIDUAL COM MESMO PADRÃO DOS MÚLTIPLOS PRODUTOS - CORRIGIDO
 async generateProductImage(product) {
     try {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        // Dimensões do card aumentadas significativamente
-        canvas.width = 1200; // Aumentado para melhor visibilidade
-        canvas.height = 1000; // Aumentado para melhor visibilidade
+        // MESMAS DIMENSÕES DOS PRODUTOS MÚLTIPLOS (dimensões de um quadrante)
+        canvas.width = 900; // Largura individual igual aos múltiplos
+        canvas.height = 1000; // Altura individual igual aos múltiplos
         
-        // Fundo do card
+        // Fundo branco completo (IGUAL AOS MÚLTIPLOS)
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Borda do card com largura aumentada
-        ctx.strokeStyle = '#e0e0e0';
-        ctx.lineWidth = 10; // Borda mais espessa
-        ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
-        
-        // Área para a imagem do produto
+        // MESMA ÁREA DE IMAGEM DOS MÚLTIPLOS PRODUTOS
         const imageArea = {
             x: 80,
             y: 80,
-            width: 700, // Imagem muito maior
-            height: 700 // Imagem muito maior
+            width: 700, // Imagem muito maior (IGUAL AOS MÚLTIPLOS)
+            height: 700 // Imagem muito maior (IGUAL AOS MÚLTIPLOS)
         };
         
-        // Carregar e desenhar a imagem do produto
+        // Carregar e desenhar a imagem do produto (MÉTODO IDÊNTICO)
         try {
             const productImg = new Image();
             productImg.crossOrigin = 'anonymous';
             
             await new Promise((resolve, reject) => {
                 productImg.onload = () => {
-                    ctx.fillStyle = '#f8f9fa';
+                    ctx.fillStyle = '#ffffffff';
                     ctx.fillRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
-                    ctx.strokeStyle = '#dee2e6';
+                    ctx.strokeStyle = '#ffffffff';
                     ctx.lineWidth = 4; // Borda interna mais visível
                     ctx.strokeRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
                     
@@ -1034,14 +1024,14 @@ async generateProductImage(product) {
                     console.log('Erro ao carregar imagem, usando placeholder');
                     ctx.fillStyle = '#f8f9fa';
                     ctx.fillRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
-                    ctx.strokeStyle = '#dee2e6';
+                    ctx.strokeStyle = '#ffffffff';
                     ctx.lineWidth = 4;
                     ctx.strokeRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
-                    ctx.fillStyle = '#6c757d';
+                    ctx.fillStyle = '#ffffffff';
                     ctx.font = '200px Arial'; // Texto muito maior
                     ctx.textAlign = 'center';
                     ctx.fillText('📦', imageArea.x + imageArea.width/2, imageArea.y + imageArea.height/2 + 80);
-                    ctx.fillStyle = '#495057';
+                    ctx.fillStyle = '#ffffffff';
                     ctx.font = '70px Arial'; // Texto muito maior
                     ctx.fillText(product.code, imageArea.x + imageArea.width/2, imageArea.y + imageArea.height/2 + 200);
                     resolve();
@@ -1053,14 +1043,23 @@ async generateProductImage(product) {
             console.log('Erro ao processar imagem:', error);
         }
         
-        // Cabeçalho com nome do produto com quebras de linha
-        const headerY = 800; // Ajustado para imagem maior
-        ctx.fillStyle = '#007bff';
-        ctx.fillRect(80, headerY, canvas.width - 160, 150); // Aumentado o tamanho do cabeçalho
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 50px Arial'; // Texto muito maior
+        // PREÇO EM DESTAQUE (POSIÇÃO E ESTILO IDÊNTICOS AOS MÚLTIPLOS)
+        ctx.fillStyle = '#dc3545';
+        ctx.font = 'bold 80px Arial'; // Texto muito maior (IGUAL AOS MÚLTIPLOS)
         ctx.textAlign = 'center';
-        const maxCharsPerLine = 20; // Limite de caracteres por linha
+        ctx.fillText(product.formattedPrice, canvas.width / 2, 720); // Posição igual aos múltiplos
+
+        // UNIDADE (POSIÇÃO E ESTILO IDÊNTICOS AOS MÚLTIPLOS)
+        ctx.fillStyle = '#dc3545';
+        ctx.font = '40px Arial'; // Texto muito maior (IGUAL AOS MÚLTIPLOS)
+        ctx.textAlign = 'center';
+        ctx.fillText(`(${product.unit})`, canvas.width / 2, 780); // Posição igual aos múltiplos
+
+        // NOME DO PRODUTO COM QUEBRAS DE LINHA (MÉTODO IDÊNTICO)
+        ctx.fillStyle = '#333333';
+        ctx.font = 'bold 50px Arial'; // Texto muito maior (IGUAL AOS MÚLTIPLOS)
+        ctx.textAlign = 'center';
+        const maxCharsPerLine = 20; // Limite de caracteres por linha (IGUAL AOS MÚLTIPLOS)
         const lines = [];
         let currentLine = '';
         product.name.split(' ').forEach(word => {
@@ -1073,37 +1072,14 @@ async generateProductImage(product) {
             }
         });
         if (currentLine) lines.push(currentLine);
-        const maxLines = 3; // Limite de linhas
+        const maxLines = 3; // Limite de linhas (IGUAL AOS MÚLTIPLOS)
         const displayedLines = lines.slice(0, maxLines);
         if (lines.length > maxLines) displayedLines[maxLines - 1] += '...';
         displayedLines.forEach((line, index) => {
-            ctx.fillText(line, canvas.width / 2, headerY + 60 + (index * 60));
+            ctx.fillText(line, canvas.width / 2, 850 + (index * 60)); // Posições iguais aos múltiplos
         });
         
-        // Preço em destaque
-        ctx.fillStyle = '#28a745';
-        ctx.font = 'bold 80px Arial'; // Texto muito maior
-        ctx.textAlign = 'center';
-        ctx.fillText(product.formattedPrice, canvas.width / 2, 920); // Ajustado para layout
-        
-        // Informações do produto
-        ctx.fillStyle = '#333333';
-        ctx.font = '40px Arial'; // Texto muito maior
-        ctx.textAlign = 'left';
-        const infoStartY = 960; // Ajustado para layout
-        ctx.fillText(`🏷️ Código: ${product.code}`, 300, infoStartY);
-        ctx.fillText(`📏 Unidade: ${product.unit}`, 300, infoStartY + 60);
-        ctx.fillText(`🏪 Categoria: ${product.category}`, 300, infoStartY + 120);
-        
-        // Linha separadora
-        ctx.strokeStyle = '#e0e0e0';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(100, 980); // Ajustado para layout
-        ctx.lineTo(canvas.width - 100, 980); // Ajustado para layout
-        ctx.stroke();
-        
-        // Converter canvas para blob e copiar
+        // Converter canvas para blob e copiar (MÉTODO IDÊNTICO)
         canvas.toBlob(async (blob) => {
             try {
                 const item = new ClipboardItem({ 'image/png': blob });
@@ -1129,7 +1105,8 @@ async generateProductImage(product) {
     }
 }
 
-// Geração de imagem visual com 4 produtos por linha, borda verde externa, imagens maiores, fundo branco
+    // Geração de imagem visual com 4 produtos por linha, borda verde externa, imagens maiores, fundo branco
+// Geração de imagem visual auto-ajustável para 3, 4 ou 5 produtos por linha
 async generateImageOffersVisual() {
     if (!this.selectedProducts || this.selectedProducts.length === 0) {
         this.showNotification('Selecione pelo menos um produto para gerar ofertas visuais', 'warning');
@@ -1139,7 +1116,9 @@ async generateImageOffersVisual() {
     this.updateCatalogStatus('Gerando imagem visual...');
 
     try {
-        const productsPerRow = 4;
+        // ✅ NOVA LÓGICA AUTO-AJUSTÁVEL PARA PRODUTOS POR LINHA
+        const productsPerRow = this.selectOptimalProductsPerRow(this.selectedProducts.length);
+        
         const productWidth = 900; // Aumentado significativamente
         const productHeight = 1000; // Aumentado significativamente
         const padding = 40; // Aumentado para melhor espaçamento
@@ -1166,6 +1145,9 @@ async generateImageOffersVisual() {
         
         // Logo centralizado no topo com tamanho ajustado
         await this.drawLogo(ctx, canvas.width, padding / 2, 1200); // Aumentado para logo muito maior
+        
+        // ✅ INFORMAÇÃO VISUAL DO LAYOUT ESCOLHIDO
+        console.log(`📐 Layout escolhido: ${productsPerRow} produtos por linha para ${this.selectedProducts.length} produtos total`);
         
         // Desenhar produtos em grade
         for (let i = 0; i < this.selectedProducts.length; i++) {
@@ -1227,7 +1209,6 @@ async generateImageOffersVisual() {
                 console.log('Erro ao processar imagem:', error);
             }
 
-            
             // Preço em destaque
             ctx.fillStyle = '#dc3545';
             ctx.font = 'bold 80px Arial'; // Texto muito maior
@@ -1263,13 +1244,12 @@ async generateImageOffersVisual() {
             displayedLines.forEach((line, index) => {
                 ctx.fillText(line, x + productWidth / 2, y + 850 + (index * 60));
             });
-            
         }
         
         // Copiar APENAS (sem download)
         await this.copyCanvasAsImage(canvas);
         
-        this.updateCatalogStatus(`Imagem visual gerada com ${this.selectedProducts.length} produtos`);
+        this.updateCatalogStatus(`Imagem visual gerada com ${this.selectedProducts.length} produtos em layout ${productsPerRow}x${rows}`);
         
     } catch (error) {
         console.error('Erro ao gerar imagem:', error);
@@ -1278,8 +1258,37 @@ async generateImageOffersVisual() {
     }
 }
 
+// ✅ NOVA FUNÇÃO PARA ESCOLHER AUTOMATICAMENTE O MELHOR LAYOUT
+selectOptimalProductsPerRow(numProducts) {
+    // Priorizar layouts que resultam em múltiplos exatos
+    if (numProducts % 4 === 0) {
+        console.log(`📐 Layout otimizado: ${numProducts} produtos é múltiplo de 4 - usando 4 por linha`);
+        return 4;
+    } else if (numProducts % 3 === 0) {
+        console.log(`📐 Layout otimizado: ${numProducts} produtos é múltiplo de 3 - usando 3 por linha`);
+        return 3;
+    } else if (numProducts % 5 === 0) {
+        console.log(`📐 Layout otimizado: ${numProducts} produtos é múltiplo de 5 - usando 5 por linha`);
+        return 5;
+    } else {
+        // Escolher o divisor que deixa o menor resto (layout mais equilibrado)
+        const remainders = {
+            4: numProducts % 4,
+            3: numProducts % 3,
+            5: numProducts % 5
+        };
+        
+        const bestDivisor = Object.keys(remainders).reduce((a, b) => 
+            remainders[a] < remainders[b] ? a : b
+        );
+        
+        console.log(`📐 Layout adaptado: ${numProducts} produtos - melhor divisor é ${bestDivisor} (resto: ${remainders[bestDivisor]})`);
+        return parseInt(bestDivisor);
+    }
+}
 
-// Função auxiliar para desenhar logo
+
+    // Função auxiliar para desenhar logo
 async drawLogo(ctx, canvasWidth, currentY) {
     try {
         const logo = new Image();
@@ -1447,37 +1456,65 @@ async drawFooter(ctx, canvas) {
     ctx.fillText('⚠️ Produtos sujeitos à disponibilidade | 🚛 Entregamos em toda região', canvas.width / 2, footerY + 50);
 }
 
-// Função auxiliar para copiar canvas APENAS (sem download)
+// ✅ MÉTODO PARA COPIAR CANVAS (DENTRO DA CLASSE)
 async copyCanvasAsImage(canvas) {
-    return new Promise((resolve, reject) => {
-        canvas.toBlob(async (blob) => {
-            if (!blob) {
-                this.showNotification('Erro ao gerar imagem', 'error');
-                reject(new Error('Falha ao gerar blob da imagem'));
-                return;
-            }
+    try {
+        // Verificar se o Clipboard API está disponível
+        if (!navigator.clipboard || !navigator.clipboard.write) {
+            throw new Error('Clipboard API não suportado neste navegador');
+        }
 
-            try {
-                const item = new ClipboardItem({ 'image/png': blob });
-                await navigator.clipboard.write([item]);
-                
-                this.showNotification('✅ Imagem copiada! Cole onde desejar (Ctrl+V)', 'success');
-                
-                
-                
-                resolve();
-                
-            } catch (clipboardError) {
-                console.error('Erro ao copiar para área de transferência:', clipboardError);
-                this.showNotification('❌ Não foi possível copiar. Verifique as permissões do navegador', 'error');
-                reject(clipboardError);
-            }
-        }, 'image/png');
+        // Converter canvas para blob
+        const blob = await new Promise(resolve => {
+            canvas.toBlob(resolve, 'image/png', 1.0);
+        });
 
-        alert('imagem criada com sucesso, cole onde desejar (Ctrl+V)');
-        this.updateCatalogStatus('Imagem copiada para a área de transferência');
-    });
+        if (!blob) {
+            throw new Error('Erro ao gerar imagem do canvas');
+        }
+
+        // Criar item de clipboard
+        const clipboardItem = new ClipboardItem({
+            'image/png': blob
+        });
+
+        // Copiar para área de transferência
+        await navigator.clipboard.write([clipboardItem]);
+
+        // ✅ AGORA FUNCIONA CORRETAMENTE
+        this.showNotification(
+            'Imagem criada com sucesso! Cole onde desejar (Ctrl+V)', 
+            'success', 
+            4000
+        );
+
+        console.log('✅ Imagem copiada para área de transferência com sucesso');
+
+    } catch (error) {
+        console.error('❌ Erro ao copiar para área de transferência:', error);
+        
+        // ✅ FALLBACK: Tentar download se clipboard falhar
+        try {
+            const link = document.createElement('a');
+            link.download = `ofertas-${new Date().toISOString().slice(0,10)}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+            
+            this.showNotification(
+                'Não foi possível copiar. Imagem foi baixada automaticamente!', 
+                'warning', 
+                4000
+            );
+        } catch (downloadError) {
+            this.showNotification(
+                'Erro ao processar imagem. Tente novamente.', 
+                'error', 
+                4000
+            );
+        }
+    }
 }
+
 
 // Função auxiliar corrigida para tentar adicionar produto no Map
 tryAddProductToMap(cod, produto, vendPor, preco, foundProducts, method) {
@@ -1500,7 +1537,6 @@ tryAddProductToMap(cod, produto, vendPor, preco, foundProducts, method) {
     }
     return false;
 }
-
 
     openProductSelectionModal() {
         this.selectedProducts = [];
@@ -1646,9 +1682,6 @@ tryAddProductToMap(cod, produto, vendPor, preco, foundProducts, method) {
 
         offersText += `📞 **ENTRE EM CONTATO:**
 
-
-
-
 ⚠️ *Produtos sujeitos à disponibilidade de estoque.
 💯 *Ofertas válidas por tempo limitado.
 
@@ -1740,59 +1773,7 @@ async copyTextDirectly(text) {
 }
 
 
-    // GERAR IMAGEM INDIVIDUAL - MESMO PADRÃO DOS MÚLTIPLOS PRODUTOS
-async generateProductImage(product) {
-    try {
-        console.log('🔄 Gerando imagem individual para produto:', product.code);
-        
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        // Dimensões seguindo o padrão dos múltiplos (proporcionalmente menores)
-        const logoSectionHeight = 10;
-        const productHeight = 80; // Mesmo height dos múltiplos
-        const footerHeight = 10;
-        const padding = 5;
-        
-        canvas.width = 500; // MESMA largura dos múltiplos para consistência
-        canvas.height = logoSectionHeight + productHeight + footerHeight + (padding * 2);
-        
-        // Fundo branco limpo (IGUAL aos múltiplos)
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Borda sutil (IGUAL aos múltiplos)
-        ctx.strokeStyle = '#e0e0e0';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
-        
-        let currentY = padding;
-        
-               
-        // Área do produto com fundo cinza (IGUAL aos múltiplos)
-        ctx.fillStyle = '#ffffffff';
-        ctx.fillRect(15, currentY, canvas.width - 30, productHeight);
-        
-        // Desenhar produto usando EXATAMENTE o mesmo método dos múltiplos
-        await this.drawSingleProductLikeMultiple(ctx, product, 0, currentY);
-        
-        currentY += productHeight;
-        
-                
-        // Copiar para área de transferência (IGUAL aos múltiplos)
-        await this.copyCanvasAsImage(canvas);
-        
-        console.log('✅ Imagem individual gerada com sucesso');
-        
-    } catch (error) {
-        console.error('❌ Erro ao gerar imagem individual:', error);
-        this.showNotification('Erro ao gerar imagem do produto', 'error');
-    }
-    alert('imagem criada com sucesso, cole onde desejar (Ctrl+V)');
-        this.updateCatalogStatus('Imagem copiada para a área de transferência');
-}
-
-// Função auxiliar para desenhar produto individual IGUAL aos múltiplos
+    // Função auxiliar para desenhar produto individual IGUAL aos múltiplos
 async drawSingleProductLikeMultiple(ctx, product, index, yPosition) {
     // Área da imagem do produto (EXATAMENTE igual aos múltiplos)
     const imgSize = 90;
@@ -1914,6 +1895,113 @@ async copyCanvasToClipboard(canvas, productCode) {
         }, 'image/png');
     });
 }
+// ✅ IMPLEMENTAR A FUNÇÃO showNotification DENTRO DA CLASSE
+showNotification(message, type = 'info', duration = 3000) {
+    // Remover notificações anteriores
+    const existingNotifications = document.querySelectorAll('.custom-notification');
+    existingNotifications.forEach(notification => notification.remove());
+
+    // Criar elemento de notificação
+    const notification = document.createElement('div');
+    notification.className = `custom-notification ${type}`;
+    
+    // Definir cores baseadas no tipo
+    const colors = {
+        success: { bg: '#d4edda', border: '#c3e6cb', text: '#155724' },
+        error: { bg: '#f8d7da', border: '#f5c6cb', text: '#721c24' },
+        warning: { bg: '#fff3cd', border: '#ffeaa7', text: '#856404' },
+        info: { bg: '#d1ecf1', border: '#bee5eb', text: '#0c5460' }
+    };
+
+    const color = colors[type] || colors.info;
+
+    // Estilizar notificação
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background-color: ${color.bg};
+        border: 1px solid ${color.border};
+        color: ${color.text};
+        padding: 15px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 9999;
+        max-width: 350px;
+        word-wrap: break-word;
+        animation: slideInRight 0.3s ease-out;
+    `;
+
+    // Adicionar ícone baseado no tipo
+    const icons = {
+        success: '✅',
+        error: '❌', 
+        warning: '⚠️',
+        info: 'ℹ️'
+    };
+
+    notification.innerHTML = `
+        <span style="margin-right: 8px;">${icons[type] || icons.info}</span>
+        ${message}
+    `;
+
+    // Adicionar animação CSS se não existir
+    if (!document.querySelector('#notification-styles')) {
+        const style = document.createElement('style');
+        style.id = 'notification-styles';
+        style.textContent = `
+            @keyframes slideInRight {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOutRight {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Adicionar ao DOM
+    document.body.appendChild(notification);
+
+    // Auto-remover após o tempo especificado
+    setTimeout(() => {
+        if (notification && notification.parentNode) {
+            notification.style.animation = 'slideOutRight 0.3s ease-out';
+            setTimeout(() => {
+                if (notification && notification.parentNode) {
+                    notification.remove();
+                }
+            }, 300);
+        }
+    }, duration);
+
+    // Permitir clique para fechar
+    notification.addEventListener('click', () => {
+        notification.style.animation = 'slideOutRight 0.3s ease-out';
+        setTimeout(() => notification.remove(), 300);
+    });
+}
+
+// ✅ FUNÇÃO DE ATUALIZAÇÃO DE STATUS MELHORADA (manter como está)
+updateCatalogStatus(message, type = 'info') {
+    const statusElement = document.getElementById('catalog-status');
+    if (statusElement) {
+        statusElement.textContent = message;
+        
+        // Agora this.showNotification() funcionará!
+        if (message.includes('erro') || message.includes('sucesso') || message.includes('carregado')) {
+            const notificationType = message.toLowerCase().includes('erro') ? 'error' : 
+                                   message.toLowerCase().includes('sucesso') ? 'success' : 'info';
+            this.showNotification(message, notificationType, 2000);
+        }
+    }
+    
+    console.log(`📊 Status: ${message}`);
+}
 
 
     // Atualizar status do catálogo
@@ -1925,56 +2013,10 @@ async copyCanvasToClipboard(canvas, productCode) {
     }
 }
 
-// Função para mostrar notificações
-showNotification(message, type = 'info'); {
-    console.log(`📢 [${type.toUpperCase()}] ${message}`);
-    
-    let notification = document.getElementById('notification');
-    if (!notification) {
-        notification = document.createElement('div');
-        notification.id = 'notification';
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 20px;
-            border-radius: 5px;
-            color: white;
-            font-weight: 500;
-            z-index: 10000;
-            transition: all 0.3s ease;
-            max-width: 300px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        `;
-        document.body.appendChild(notification);
-    }
 
-    const colors = {
-        info: '#007bff',
-        success: '#28a745',
-        warning: '#ffc107',
-        error: '#dc3545'
-    };
-
-    notification.style.backgroundColor = colors[type] || colors.info;
-    notification.textContent = message;
-    notification.style.display = 'block';
-    notification.style.opacity = '1';
-
-    setTimeout(() => {
-        if (notification) {
-            notification.style.opacity = '0';
-            setTimeout(() => {
-                if (notification && notification.parentNode) {
-                    notification.style.display = 'none';
-                }
-            }, 300);
-        }
-    }, 4000);
-}
 
 // Placeholder para produtos sem imagem
-drawPlaceholder(ctx, x, y, size); {
+function drawPlaceholder(ctx, x, y, size) {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(x, y, size, size);
     
@@ -1982,12 +2024,11 @@ drawPlaceholder(ctx, x, y, size); {
     ctx.lineWidth = 1;
     ctx.strokeRect(x, y, size, size);
     
-    ctx.fillStyle = '#6c757d';
+    ctx.fillStyle = '#ffffffff';
     ctx.font = `${Math.floor(size/3)}px Arial`;
     ctx.textAlign = 'center';
     ctx.fillText('📦', x + size/2, y + size/2 + 8);
 }
-
 
 // === INICIALIZAÇÃO SEGURA DO CATALOG MANAGER ===
 
@@ -2175,17 +2216,264 @@ if (typeof window !== 'undefined') {
         }
     });
     
-    console.log('✅ Sistema de inicialização do catálogo configurado');
+    // Listener para mudanças de visibilidade da página
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden && window.catalogManager) {
+            // Página voltou a ser visível, verificar se catálogo ainda está funcionando
+            setTimeout(function() {
+                if (window.catalogManager && !window.catalogManager.products?.length) {
+                    console.log('⚠️ Catálogo perdido após mudança de visibilidade, recarregando...');
+                    window.catalogManager.init();
+                }
+            }, 500);
+        }
+    });
+    
+    // Função para forçar reinicialização do catálogo
+    window.forceCatalogReload = function() {
+        console.log('🔄 Forçando reinicialização do catálogo...');
+        if (window.catalogManager) {
+            window.catalogManager.clearCatalogCache();
+            window.catalogManager.init();
+        } else {
+            tryInitializeWithRetry(3, 500);
+        }
+    };
+    
+    // Verificação periódica de saúde do catálogo
+    setInterval(function() {
+        if (window.catalogManager && typeof window.catalogManager.products === 'undefined') {
+            console.warn('⚠️ Produtos não definidos, tentando reinicializar...');
+            tryInitializeWithRetry(1, 1000);
+        }
+    }, 30000); // Verificar a cada 30 segundos
+    
+    console.log('✅ Sistema de inicialização do catálogo configurado com verificações avançadas');
     
 } else {
     console.log('⚠️ Não está em contexto de navegador - inicialização pulada');
 }
 
-
-
 // Exportar para uso em módulos se necessário
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { CatalogManager: CatalogManager, initializeCatalogManager: initializeCatalogManager };
+    module.exports = { 
+        CatalogManager: CatalogManager, 
+        initializeCatalogManager: initializeCatalogManager,
+        tryInitializeWithRetry: tryInitializeWithRetry
+    };
 }
 
+// Polyfill para ClipboardItem em navegadores mais antigos
+if (typeof window !== 'undefined' && !window.ClipboardItem) {
+    console.log('⚠️ ClipboardItem não disponível, usando polyfill básico');
+    window.ClipboardItem = class ClipboardItem {
+        constructor(data) {
+            this.data = data;
+        }
+    };
+}
 
+// Função global de utilidade para mostrar notificações
+window.showCatalogNotification = function(message, type = 'info') {
+    console.log(`📢 [${type.toUpperCase()}] ${message}`);
+    
+    let notification = document.getElementById('catalog-notification');
+    if (!notification) {
+        notification = document.createElement('div');
+        notification.id = 'catalog-notification';
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 10000;
+            transition: all 0.3s ease;
+            max-width: 350px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.4;
+        `;
+        document.body.appendChild(notification);
+    }
+
+    const colors = {
+        info: '#17a2b8',
+        success: '#28a745',
+        warning: '#ffc107',
+        error: '#dc3545'
+    };
+
+    notification.style.backgroundColor = colors[type] || colors.info;
+    notification.textContent = message;
+    notification.style.display = 'block';
+    notification.style.opacity = '1';
+    notification.style.transform = 'translateY(0)';
+
+    // Auto-hide após 5 segundos
+    setTimeout(() => {
+        if (notification) {
+            notification.style.opacity = '0';
+            notification.style.transform = 'translateY(-20px)';
+            setTimeout(() => {
+                if (notification && notification.parentNode) {
+                    notification.style.display = 'none';
+                }
+            }, 300);
+        }
+    }, 5000);
+};
+
+// Função global para placeholder de produtos sem imagem
+window.createPlaceholder = function(codigo, width = 300, height = 200) {
+    const colors = ['#007bff', '#28a745', '#ffc107', '#dc3545', '#6f42c1', '#fd7e14'];
+    const color = colors[codigo.toString().length % colors.length];
+    
+    const svgContent = `
+        <svg xmlns="http://www.w3.org/2000/svg" 
+             viewBox="0 0 ${width} ${height}" 
+             style="background:${color};">
+            <rect width="100%" height="100%" fill="${color}"/>
+            <text x="50%" y="40%" 
+                  text-anchor="middle" 
+                  dominant-baseline="middle" 
+                  fill="white" 
+                  font-size="24" 
+                  font-weight="bold">
+                📦
+            </text>
+            <text x="50%" y="60%" 
+                  text-anchor="middle" 
+                  dominant-baseline="middle" 
+                  fill="white" 
+                  font-size="16" 
+                  font-weight="bold">
+                ${codigo}
+            </text>
+        </svg>
+    `;
+    
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgContent)}`;
+};
+
+// Função global para verificar se uma imagem existe
+window.checkImageExists = function(url) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+        img.src = url;
+        
+        // Timeout após 5 segundos
+        setTimeout(() => resolve(false), 5000);
+    });
+};
+
+// Listener para capturar erros de imagem globalmente
+document.addEventListener('error', function(e) {
+    if (e.target.tagName === 'IMG' && e.target.src) {
+        console.warn('⚠️ Erro ao carregar imagem:', e.target.src);
+        
+        // Se a imagem tem um código de produto, usar placeholder
+        const productCode = e.target.getAttribute('data-product-code');
+        if (productCode) {
+            e.target.src = window.createPlaceholder(productCode);
+        }
+    }
+}, true);
+
+// Função de utilitário para formatação de preços
+window.formatPrice = function(price) {
+    if (typeof price === 'number') {
+        return price.toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
+        });
+    }
+    
+    if (typeof price === 'string') {
+        // Se já está formatado como "R$ X,XX"
+        if (price.includes('R$')) {
+            return price;
+        }
+        
+        // Se está no formato "X,XX"
+        const numericValue = parseFloat(price.replace(',', '.'));
+        if (!isNaN(numericValue)) {
+            return numericValue.toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'  
+            });
+        }
+    }
+    
+    return 'R$ 0,00';
+};
+
+// Função de utilitário para debounce
+window.debounce = function(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+};
+
+// Função global para salvar logs do catálogo
+window.saveCatalogLogs = function() {
+    const logs = {
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        catalogManager: !!window.catalogManager,
+        productsCount: window.catalogManager?.products?.length || 0,
+        cacheStatus: localStorage.getItem('hasCustomCatalog') === 'true',
+        errors: window.catalogErrors || []
+    };
+    
+    console.log('📊 Logs do Catálogo:', logs);
+    
+    // Tentar copiar para clipboard para debug
+    try {
+        navigator.clipboard.writeText(JSON.stringify(logs, null, 2));
+        console.log('✅ Logs copiados para área de transferência');
+    } catch (error) {
+        console.log('⚠️ Não foi possível copiar logs automaticamente');
+    }
+    
+    return logs;
+};
+
+// Array global para capturar erros do catálogo
+window.catalogErrors = [];
+
+// Capturar erros específicos do catálogo
+window.addEventListener('error', function(event) {
+    if (event.filename && (event.filename.includes('catalog') || event.message.includes('catalog'))) {
+        window.catalogErrors.push({
+            message: event.message,
+            filename: event.filename,
+            lineno: event.lineno,
+            colno: event.colno,
+            timestamp: new Date().toISOString()
+        });
+        
+        // Manter apenas os últimos 10 erros
+        if (window.catalogErrors.length > 10) {
+            window.catalogErrors = window.catalogErrors.slice(-10);
+        }
+    }
+});
+
+console.log('🎯 Sistema de catálogo completamente inicializado e pronto para uso!');
+console.log('💡 Comandos disponíveis:');
+console.log('  - window.debugCatalog() - Debug completo');
+console.log('  - window.forceCatalogReload() - Forçar recarga');
+console.log('  - window.saveCatalogLogs() - Salvar logs');
+console.log('  - window.showCatalogNotification(msg, type) - Mostrar notificação');
