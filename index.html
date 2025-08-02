@@ -147,11 +147,17 @@
         </div>
     </div>
 
-    <!-- Modal de Cadastro -->
+     <!-- Modal de Cadastro -->
     <div id="modal-cadastro">
         <div id="modal-cadastro-content">
             <span id="close-cadastro">&times;</span>
             <h2>Cadastrar Novo Cliente</h2>
+            
+            <!-- Mensagens de status -->
+            <div id="loadingMsg" class="message loading-msg">🔄 Buscando dados do CNPJ...</div>
+            <div id="errorMsg" class="message error-msg"></div>
+            <div id="successMsg" class="message success-msg"></div>
+            
             <form id="form-cadastro">
                 <label>Nome Fantasia:</label>
                 <input type="text" id="nome-fantasia" required>
@@ -160,7 +166,10 @@
                 <input type="text" id="cliente">
                 
                 <label>CNPJ/CPF:</label>
-                <input type="text" id="cnpj-cpf">
+                <div class="cnpj-container">
+                    <input type="text" id="cnpj-cpf" placeholder="Digite o CNPJ">
+                    <button type="button" id="reloadBtn" class="reload-btn" onclick="buscarDadosCNPJ()" title="Buscar dados do CNPJ">🔄</button>
+                </div>
                 
                 <label>Contato:</label>
                 <input type="text" id="contato">
@@ -288,6 +297,7 @@
     <script src="client-manager.js"></script>
     <script src="catalog.js"></script>
     <script src="map.js"></script>
+    <script src="cnpj-api.js"></script>
     <script src="script.js"></script>
     
     <script>
