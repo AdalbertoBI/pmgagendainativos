@@ -1713,35 +1713,56 @@ showOffersTextModal(text) {
     console.log('✅ Modal de texto de ofertas aberto');
 }
 
-// Copiar texto para área de transferência
-async copyTextToClipboard() {
-    const textarea = document.getElementById('offers-text');
-    if (!textarea) {
-        console.error('❌ Textarea de ofertas não encontrado!');
-        return;
-    }
-
+// ✅ FUNÇÃO CORRIGIDA PARA COPIAR TEXTO PARA ÁREA DE TRANSFERÊNCIA
+async copyTextToClipboard(text = '') {
     try {
-        await navigator.clipboard.writeText(textarea.value);
-        alert('✅ Jornal de ofertas copiado para a área de transferência!');
-        
-        // Fechar modal após copiar
-        document.getElementById('modal-text-offers').style.display = 'none';
-        
-    } catch (error) {
-        console.error('Erro ao copiar texto:', error);
-        
-        // Fallback
-        textarea.select();
-        try {
-            document.execCommand('copy');
-            alert('✅ Jornal de ofertas copiado para a área de transferência!');
-            document.getElementById('modal-text-offers').style.display = 'none';
-        } catch (fallbackError) {
-            alert('❌ Erro ao copiar texto. Selecione tudo e copie manualmente (Ctrl+C).');
+        // ✅ OBTER TEXTO DO TEXTAREA DE OFERTAS
+        if (!text) {
+            const textarea = document.getElementById('offers-text');
+            if (textarea) {
+                text = textarea.value || textarea.textContent || textarea.innerHTML;
+                console.log('📝 Texto obtido do textarea:', text.length, 'caracteres');
+            }
         }
+
+        // ✅ VERIFICAR SE HÁ TEXTO VÁLIDO
+        if (!text || !text.trim()) {
+            console.warn('⚠️ Nenhum texto encontrado para copiar');
+            this.showNotification('Nenhum texto para copiar', 'warning');
+            return false;
+        }
+
+        // ✅ COPIAR PARA ÁREA DE TRANSFERÊNCIA
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text.trim());
+            console.log('✅ Texto copiado usando Clipboard API');
+        } else {
+            // ✅ FALLBACK PARA NAVEGADORES ANTIGOS
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = text.trim();
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+            console.log('✅ Texto copiado usando execCommand');
+        }
+
+        // ✅ NOTIFICAÇÃO DE SUCESSO (APENAS UMA VEZ)
+        this.showNotification(
+            'Texto copiado com sucesso! Cole onde desejar (Ctrl+V)', 
+            'success',
+            3000
+        );
+
+        return true;
+
+    } catch (error) {
+        console.error('❌ Erro ao copiar texto:', error);
+        this.showNotification('Erro ao copiar texto para área de transferência', 'error');
+        return false;
     }
 }
+
 
 
 // Função auxiliar para copiar texto diretamente (fallback)
@@ -1986,22 +2007,18 @@ showNotification(message, type = 'info', duration = 3000) {
     });
 }
 
-// ✅ FUNÇÃO DE ATUALIZAÇÃO DE STATUS MELHORADA (manter como está)
 updateCatalogStatus(message, type = 'info') {
     const statusElement = document.getElementById('catalog-status');
     if (statusElement) {
         statusElement.textContent = message;
-        
-        // Agora this.showNotification() funcionará!
-        if (message.includes('erro') || message.includes('sucesso') || message.includes('carregado')) {
-            const notificationType = message.toLowerCase().includes('erro') ? 'error' : 
-                                   message.toLowerCase().includes('sucesso') ? 'success' : 'info';
-            this.showNotification(message, notificationType, 2000);
-        }
     }
     
     console.log(`📊 Status: ${message}`);
+    
+    // ✅ NÃO MOSTRAR NOTIFICAÇÃO AUTOMÁTICA AQUI
+    
 }
+
 
 
     // Atualizar status do catálogo
