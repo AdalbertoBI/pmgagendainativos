@@ -1165,7 +1165,7 @@ async generateImageOffersVisual() {
         ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
         
         // Logo centralizado no topo com tamanho ajustado
-        await this.drawLogo(ctx, canvas.width, padding / 2, 800); // Aumentado para logo muito maior
+        await this.drawLogo(ctx, canvas.width, padding / 2, 1200); // Aumentado para logo muito maior
         
         // Desenhar produtos em grade
         for (let i = 0; i < this.selectedProducts.length; i++) {
@@ -1287,8 +1287,8 @@ async drawLogo(ctx, canvasWidth, currentY) {
         
         await new Promise((resolve) => {
             logo.onload = () => {
-                const logoMaxWidth = 450;
-                const logoMaxHeight = 350;
+                const logoMaxWidth = 650;
+                const logoMaxHeight = 550;
                 const logoAspect = logo.width / logo.height;
                 
                 let logoWidth = logoMaxWidth;
