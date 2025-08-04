@@ -385,39 +385,62 @@ async loadNewCatalog(pdfFile) {
     }
 }
 
-    // Carregar catálogo otimizado
-    async loadPdfCatalog() {
-        if (this.isLoading) return;
-
-        this.isLoading = true;
+    // Carregar catálogo otimizado com recarregamento forçado de imagens
+async loadPdfCatalog() {
+    if (this.isLoading) return;
+    
+    this.isLoading = true;
+    this.updateCatalogStatus('Recarregando imagens...');
+    
+    try {
+        // ✅ FORÇAR RECARREGAMENTO DAS IMAGENS PRIMEIRO
+        await this.forceReloadImages();
+        
         this.updateCatalogStatus('Carregando catálogo do PDF...');
-
-        try {
-            const response = await fetch('./GERAL_1.pdf');
-            if (!response.ok) {
-                throw new Error('PDF não encontrado');
-            }
-
-            const arrayBuffer = await response.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-            this.updateCatalogStatus('Extraindo texto do PDF...');
-            await this.extractTextFromPDFComplete(pdf);
-
-            this.updateCatalogStatus('Processando produtos com múltiplos métodos...');
-            await this.processProductsAdvanced();
-
-            this.updateCatalogStatus(`${this.products.length} produtos encontrados`);
-            this.renderProductsGrid();
-
-        } catch (error) {
-            console.error('❌ Erro ao carregar PDF:', error);
-            this.updateCatalogStatus('Erro ao carregar catálogo. Carregando produtos de exemplo...');
-            this.loadMockProducts();
-        } finally {
-            this.isLoading = false;
+        
+        const response = await fetch('./GERAL_1.pdf');
+        if (!response.ok) {
+            throw new Error('PDF não encontrado');
         }
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        
+        this.updateCatalogStatus('Extraindo texto do PDF...');
+        await this.extractTextFromPDFComplete(pdf);
+        
+        this.updateCatalogStatus('Processando produtos com múltiplos métodos...');
+        await this.processProductsAdvanced();
+        
+        // ✅ FORÇAR ATUALIZAÇÃO DAS IMAGENS NA GRID
+        this.updateCatalogStatus('Atualizando imagens dos produtos...');
+        this.forceUpdateProductImages();
+        
+        this.updateCatalogStatus(`${this.products.length} produtos encontrados - Imagens atualizadas`);
+        this.renderProductsGrid();
+        
+    } catch (error) {
+        console.error('❌ Erro ao carregar PDF:', error);
+        this.updateCatalogStatus('Erro ao carregar catálogo. Carregando produtos de exemplo...');
+        this.loadMockProducts();
+    } finally {
+        this.isLoading = false;
     }
+}
+// Forçar atualização das imagens dos produtos
+forceUpdateProductImages() {
+    // Atualizar URLs das imagens nos produtos existentes
+    this.products.forEach(product => {
+        const newImageUrl = this.getProductImageUrl(product.code, 'large');
+        product.image = newImageUrl;
+    });
+    
+    // Atualizar também os produtos filtrados
+    this.filteredProducts = [...this.products];
+    
+    console.log('✅ URLs das imagens atualizadas para todos os produtos');
+}
+
 
     
 
@@ -1877,6 +1900,34 @@ calculateImageDimensions(img, area) {
     }
     
     return { drawX, drawY, drawWidth, drawHeight };
+}
+// Método para forçar recarregamento das imagens
+async forceReloadImages() {
+    try {
+        // Adiciona timestamp para evitar cache do browser
+        const timestamp = new Date().getTime();
+        const resp = await fetch(`imagens.json?v=${timestamp}`, {
+            cache: 'no-cache',
+            headers: {
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            }
+        });
+        
+        if (resp.ok) {
+            this.imagesMap = await resp.json();
+            window.imageMap = this.imagesMap;
+            console.log('✅ Imagens recarregadas:', Object.keys(this.imagesMap).length, 'itens');
+            return true;
+        } else {
+            throw new Error(`Erro HTTP: ${resp.status}`);
+        }
+    } catch (e) {
+        console.error('❌ Falha ao recarregar imagens.json', e);
+        this.imagesMap = {};
+        window.imageMap = {};
+        return false;
+    }
 }
 
 // FUNÇÃO AUXILIAR PARA COPIAR CANVAS
