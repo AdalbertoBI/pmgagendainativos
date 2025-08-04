@@ -167,12 +167,14 @@ if (catalogFileInput) {
         }
 
         // Botão de atualizar catálogo
-        const refreshBtn = document.getElementById('refresh-catalog');
-        if (refreshBtn) {
-            refreshBtn.addEventListener('click', () => {
-                this.loadPdfCatalog();
-            });
-        }
+const refreshBtn = document.getElementById('refresh-catalog');
+if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+        this.clearCatalogCache(); // ✅ LIMPA O CACHE ANTES DE ATUALIZAR
+        this.loadPdfCatalog();
+    });
+}
+
 
         // Botão de seleção múltipla
         const selectMultipleBtn = document.getElementById('select-multiple-products');
