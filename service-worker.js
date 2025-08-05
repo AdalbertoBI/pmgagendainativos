@@ -1,10 +1,7 @@
-const CACHE_NAME = 'agenda-inativos-v1.0.0.9'; // Incrementar versão
-
-// Detectar ambiente
+const CACHE_NAME = 'agenda-inativos-v1.0.1.0'; // Nova versão incrementada
 const isProduction = location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
 const basePath = isProduction ? '/pmgagendainativos/' : './';
 
-// URLs para cache - APENAS STRINGS VÁLIDAS
 const urlsToCache = [
     basePath,
     basePath + 'index.html',
@@ -22,25 +19,24 @@ const urlsToCache = [
 // Função para validar URLs
 function isValidUrl(url) {
     try {
-        return typeof url === 'string' && 
-               url.length > 0 && 
-               !url.includes('[object') && 
-               !url.includes('undefined') &&
-               (url.startsWith('http') || url.startsWith('./') || url.startsWith('/'));
+        return typeof url === 'string' &&
+            url.length > 0 &&
+            !url.includes('[object') &&
+            !url.includes('undefined') &&
+            (url.startsWith('http') || url.startsWith('./') || url.startsWith('/'));
     } catch {
         return false;
     }
 }
 
-// Instalação do SW com validação rigorosa
+// INSTALAÇÃO COM FORÇA DE ATUALIZAÇÃO
 self.addEventListener('install', event => {
-    console.log('Service Worker: Instalando...', urlsToCache);
+    console.log('🔄 Service Worker: Instalando versão', CACHE_NAME);
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => {
-                // Filtrar apenas URLs válidas
                 const validUrls = urlsToCache.filter(isValidUrl);
-                console.log('URLs válidas para cache:', validUrls);
+                console.log('✅ URLs válidas para cache:', validUrls);
                 
                 if (validUrls.length === 0) {
                     throw new Error('Nenhuma URL válida encontrada');
@@ -49,11 +45,12 @@ self.addEventListener('install', event => {
                 return cache.addAll(validUrls);
             })
             .then(() => {
-                console.log('✅ Todas as URLs foram cachadas com sucesso');
+                console.log('✅ Cache atualizado com sucesso');
+                // FORÇA ATIVAÇÃO IMEDIATA - CRUCIAL PARA ATUALIZAÇÃO
+                return self.skipWaiting();
             })
             .catch(error => {
                 console.error('❌ Erro durante instalação do SW:', error);
-                
                 // Fallback: tentar cachear individualmente
                 return caches.open(CACHE_NAME).then(cache => {
                     const validUrls = urlsToCache.filter(isValidUrl);
@@ -67,26 +64,30 @@ self.addEventListener('install', event => {
                 });
             })
     );
-    self.skipWaiting();
 });
 
-// Ativação: limpa caches antigos
+// ATIVAÇÃO COM LIMPEZA FORÇADA DE TODOS OS CACHES ANTIGOS
 self.addEventListener('activate', event => {
+    console.log('🗑️ Service Worker: Ativando e limpando caches antigos');
     event.waitUntil(
-        caches.keys().then(keys =>
-            Promise.all(
-                keys.filter(key => key !== CACHE_NAME)
-                    .map(key => {
-                        console.log('🗑️ Removendo cache antigo:', key);
-                        return caches.delete(key);
-                    })
-            )
-        )
+        caches.keys().then(cacheNames => {
+            return Promise.all(
+                cacheNames.map(cacheName => {
+                    if (cacheName !== CACHE_NAME) {
+                        console.log('🗑️ Removendo cache antigo:', cacheName);
+                        return caches.delete(cacheName);
+                    }
+                })
+            );
+        }).then(() => {
+            console.log('✅ Todos os caches antigos removidos');
+            // FORÇA CONTROLE IMEDIATO DE TODAS AS PÁGINAS
+            return self.clients.claim();
+        })
     );
-    self.clients.claim();
 });
 
-// Intercepta fetch com validação
+// INTERCEPTAÇÃO DE FETCH COM ESTRATÉGIA CACHE-FIRST
 self.addEventListener('fetch', event => {
     // Ignorar requisições não-GET
     if (event.request.method !== 'GET') return;
@@ -99,37 +100,42 @@ self.addEventListener('fetch', event => {
     
     event.respondWith(
         caches.match(event.request).then(response => {
-            // Cache first, então network
+            // Se encontrou no cache, retorna
             if (response) {
                 return response;
             }
             
-            // Buscar da rede
-            return fetch(event.request)
-                .then(networkResponse => {
-                    // Cachear apenas respostas válidas
-                    if (networkResponse && networkResponse.status === 200) {
-                        const responseToCache = networkResponse.clone();
-                        caches.open(CACHE_NAME).then(cache => {
-                            cache.put(event.request, responseToCache);
-                        });
-                    }
-                    return networkResponse;
-                })
-                .catch(() => {
-                    // Fallback para offline
-                    return new Response('Conteúdo não disponível offline', { 
-                        status: 503,
-                        statusText: 'Service Unavailable'
+            // Se não encontrou, busca da rede
+            return fetch(event.request).then(networkResponse => {
+                // Cachear apenas respostas válidas
+                if (networkResponse && networkResponse.status === 200) {
+                    const responseToCache = networkResponse.clone();
+                    caches.open(CACHE_NAME).then(cache => {
+                        cache.put(event.request, responseToCache);
                     });
+                }
+                return networkResponse;
+            }).catch(() => {
+                // Fallback para offline
+                return new Response('Conteúdo não disponível offline', {
+                    status: 503,
+                    statusText: 'Service Unavailable'
                 });
+            });
         })
     );
 });
 
+// LISTENER PARA DETECTAR ATUALIZAÇÕES E NOTIFICAR O CLIENTE
+self.addEventListener('message', event => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        console.log('🔄 Recebido comando para pular espera');
+        self.skipWaiting();
+    }
+});
 
-
-
-
-
-
+// NOTIFICAR CLIENTES SOBRE NOVA VERSÃO DISPONÍVEL
+self.addEventListener('controllerchange', () => {
+    console.log('🔄 Controller alterado - nova versão ativa');
+});
+//teste

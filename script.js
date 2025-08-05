@@ -531,66 +531,97 @@ async function salvarEdicaoCliente() {
 }
 
 
-// Configurar PWA
+// Configurar PWA com atualização forçada
 function setupPWA() {
     try {
-        // Pular service worker em desenvolvimento local se houver problemas
+        // Pular service worker em desenvolvimento local
         if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
             console.log('⚠️ Service Worker desabilitado para desenvolvimento local');
             return;
         }
-        
-        if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./service-worker.js')
-        .then(registration => {
-            console.log('✅ Service Worker registrado:', registration);
-        })
-        .catch(error => {
-            console.error('❌ Erro ao registrar Service Worker:', error);
-        });
-}
 
-        // Botão de instalação
+        if ('serviceWorker' in navigator) {
+            // DESREGISTRAR SERVICE WORKER ANTIGO PRIMEIRO
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+                registrations.forEach(registration => {
+                    console.log('🗑️ Removendo service worker antigo:', registration.scope);
+                    registration.unregister();
+                });
+            });
+
+            // REGISTRAR NOVO SERVICE WORKER
+            navigator.serviceWorker.register('./service-worker.js')
+                .then(registration => {
+                    console.log('✅ Service Worker registrado:', registration);
+                    
+                    // VERIFICAR POR ATUALIZAÇÕES
+                    registration.addEventListener('updatefound', () => {
+                        const newWorker = registration.installing;
+                        console.log('🔄 Nova versão do Service Worker encontrada');
+                        
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // NOVA VERSÃO DISPONÍVEL - RECARREGAR AUTOMATICAMENTE
+                                console.log('🔄 Nova versão detectada! Recarregando...');
+                                window.location.reload();
+                            }
+                        });
+                    });
+
+                    // FORÇAR VERIFICAÇÃO DE ATUALIZAÇÃO
+                    setInterval(() => {
+                        registration.update();
+                    }, 60000); // Verificar a cada 1 minuto
+                })
+                .catch(error => {
+                    console.error('❌ Erro ao registrar Service Worker:', error);
+                });
+        }
+
+        // Botão de instalação PWA
         let deferredPrompt;
         const installBtn = document.getElementById('install-btn');
-        
+
         function isPWAInstalled() {
-            return window.matchMedia('(display-mode: standalone)').matches ||
-                   window.navigator.standalone === true ||
+            return window.matchMedia('(display-mode: standalone)').matches || 
+                   window.navigator.standalone === true || 
                    document.referrer.includes('android-app://');
         }
-        
+
         function updateInstallButton() {
             if (isPWAInstalled()) {
-                installBtn.style.display = 'none';
+                if (installBtn) installBtn.style.display = 'none';
             }
         }
-        
+
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            if (!isPWAInstalled()) {
+            if (!isPWAInstalled() && installBtn) {
                 installBtn.style.display = 'block';
             }
         });
-        
-        installBtn.addEventListener('click', async () => {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                if (outcome === 'accepted') {
-                    installBtn.style.display = 'none';
+
+        if (installBtn) {
+            installBtn.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    if (outcome === 'accepted') {
+                        installBtn.style.display = 'none';
+                    }
+                    deferredPrompt = null;
                 }
-                deferredPrompt = null;
-            }
-        });
-        
+            });
+        }
+
         window.addEventListener('appinstalled', () => {
-            installBtn.style.display = 'none';
+            if (installBtn) installBtn.style.display = 'none';
             deferredPrompt = null;
         });
-        
+
         updateInstallButton();
+
     } catch (error) {
         console.error('❌ Erro ao configurar PWA:', error);
     }
@@ -1237,3 +1268,4 @@ function removerAgendamento(clientId) {
         alert('❌ Erro ao remover agendamento: ' + error.message);
     }
 }
+//teste
