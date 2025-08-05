@@ -686,7 +686,7 @@ async extractByBlocksFixed(foundProducts) {
         const validUnits = ['LT', 'PCT', 'KG', 'CX', 'GL', 'BD', 'VD', 'FR', 'UN', 'BAG', 'BIS', 'PT', 'SC', 'FD', 'FDO', 'PÇ', 'BARR'];
 
         return cod && cod.length >= 1 && cod.length <= 5 &&
-               produto && produto.length >= 3 && !produto.match(/^\s*$/) &&
+               produto && produto.length >= 7 && !produto.match(/^\s*$/) &&
                vendPor && validUnits.includes(vendPor.toUpperCase()) &&
                preco && /^\d+,\d{2}$/.test(this.formatPrice(preco));
     }
