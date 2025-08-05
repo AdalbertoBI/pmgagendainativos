@@ -1268,4 +1268,34 @@ function removerAgendamento(clientId) {
         alert('❌ Erro ao remover agendamento: ' + error.message);
     }
 }
+// FUNÇÃO DE EMERGÊNCIA - LIMPAR TUDO
+function limparTudoERecarregar() {
+    if (confirm('⚠️ Isso vai limpar todos os dados salvos. Continuar?')) {
+        // Limpar Service Workers
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+            registrations.forEach(reg => reg.unregister());
+        });
+        
+        // Limpar todos os storages
+        localStorage.clear();
+        sessionStorage.clear();
+        
+        // Limpar IndexedDB
+        if (window.dbManager) {
+            window.dbManager.clearAllData();
+        }
+        
+        // Limpar caches
+        caches.keys().then(names => {
+            names.forEach(name => caches.delete(name));
+        });
+        
+        alert('✅ Limpeza concluída! A página será recarregada.');
+        window.location.reload(true);
+    }
+}
+
+// Disponibilizar no console para emergências
+window.limparTudoERecarregar = limparTudoERecarregar;
+
 //teste
