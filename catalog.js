@@ -611,7 +611,7 @@ async extractLineByLineFixed(foundProducts) {
                     }
                 }
             } else {
-                const codMatch = combo.cod.match(/^(\d{1,5})$/);
+                const codMatch = combo.cod.match(/^(\d{1,4})$/);
                 const unitPriceMatch = combo.unitPrice.match(/^(LT|PCT|KG|CX|GL|BD|VD|FR|UN|BAG|BIS|PT|SC|FD|FDO|PÇ|BARR)\s*([\d,]+)/);
                 
                 if (codMatch && unitPriceMatch && combo.produto.length > 5) {
@@ -685,7 +685,7 @@ async extractByBlocksFixed(foundProducts) {
     isValidProductAdvanced(cod, produto, vendPor, preco) {
         const validUnits = ['LT', 'PCT', 'KG', 'CX', 'GL', 'BD', 'VD', 'FR', 'UN', 'BAG', 'BIS', 'PT', 'SC', 'FD', 'FDO', 'PÇ', 'BARR'];
 
-        return cod && cod.length >= 1 && cod.length <= 5 &&
+        return cod && cod.length >= 1 && cod.length <= 4 &&
                produto && produto.length >= 7 && !produto.match(/^\s*$/) &&
                vendPor && validUnits.includes(vendPor.toUpperCase()) &&
                preco && /^\d+,\d{2}$/.test(this.formatPrice(preco));
