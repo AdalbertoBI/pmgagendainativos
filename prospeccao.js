@@ -355,7 +355,7 @@ extractKeywordsFromName(productName) {
     // Extrair palavras significativas
     const words = name
         .split(/\s+/) // Divide apenas por espaços (após limpeza)
-        .filter(word => word.length > 2 && !['com', 'sem', 'para', 'tipo', 'marca', 'sem acucar',' h ','de', 'a', 'o', 'e'].includes(word)); // Remove palavras irrelevantes
+        .filter(word => word.length > 2 && !['com', 'sem acucar', ' h ','sem','para', 'tipo', 'marca', 'de', 'a', 'o', 'e'].includes(word)); // Remove palavras irrelevantes
     words.forEach(word => keywords.add(word));
 
     // Identificar padrões contextuais
@@ -998,7 +998,7 @@ formatCNPJDisplay(cnpj) {
         if (menuItems.length === 0) {
             // Tentar método alternativo se não encontrou nada
             const alternativeItems = this.extractMenuItemsAlternative(content);
-            console.log('🍽️ Método alternativo encontrou:', alternativeItems.length, 'itens');
+            console.log('🍽️ Método alternativo encontrou:', alternativeItems.length, 'Cracteres');
             
             if (alternativeItems.length > 0) {
                 const categories = this.categorizeMenuItems(alternativeItems);
@@ -1346,73 +1346,29 @@ findProductMatches(menuItems) {
     console.log(`🎯 ${matches.length} produtos encontraram correspondências`);
     return matches;
 }
-normalizeText(text) {
-        if (!text || typeof text !== 'string') return '';
-        return text
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^a-z\s]/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-    }
-
-    // Calculate cosine similarity between two texts
-    calculateTextSimilarity(text1, text2) {
-        // Split texts into words
-        const words1 = text1.split(' ').filter(word => word.length > 2);
-        const words2 = text2.split(' ').filter(word => word.length > 2);
-
-        // Create word frequency vectors
-        const wordSet = new Set([...words1, ...words2]);
-        const vector1 = Array.from(wordSet).map(word => words1.filter(w => w === word).length);
-        const vector2 = Array.from(wordSet).map(word => words2.filter(w => w === word).length);
-
-        // Calculate dot product
-        const dotProduct = vector1.reduce((sum, val, i) => sum + val * vector2[i], 0);
-
-        // Calculate magnitudes
-        const magnitude1 = Math.sqrt(vector1.reduce((sum, val) => sum + val * val, 0));
-        const magnitude2 = Math.sqrt(vector2.reduce((sum, val) => sum + val * val, 0));
-
-        // Avoid division by zero
-        if (magnitude1 === 0 || magnitude2 === 0) return 0;
-
-        // Calculate cosine similarity
-        return dotProduct / (magnitude1 * magnitude2);
-    }
-
-    // Updated method to suggest products based solely on text similarity
-    async analyzeMenuAndSuggestProducts(menuText) {
-        try {
-            console.log('🔍 Analisando cardápio para sugestão de produtos...');
-            
-            // Normalize menu text for comparison
-            const normalizedMenuText = this.normalizeText(menuText);
-            if (!normalizedMenuText) {
-                console.warn('⚠️ Nenhum texto válido extraído do cardápio');
-                return [];
-            }
-
-            // Calculate text similarity for each product
-            const productsWithScores = this.catalog.map(product => {
-                const similarity = this.calculateTextSimilarity(normalizedMenuText, product.searchText);
-                return { ...product, similarity, reason: `Similaridade de texto: ${Math.round(similarity * 100)}%` };
-            });
-
-            // Sort by similarity score and take top 5
-            const suggestedProducts = productsWithScores
-                .sort((a, b) => b.similarity - a.similarity)
-                .slice(0, 5)
-                .filter(product => product.similarity > 0.1); // Minimum similarity threshold
-
-            console.log(`✅ ${suggestedProducts.length} produtos sugeridos com base em similaridade de texto`);
-            return suggestedProducts;
-        } catch (error) {
-            console.error('❌ Erro ao sugerir produtos:', error);
-            return [];
-        }
-    }
+// Análise melhorada de similaridade textual
+calculateTextSimilarity(text1, text2) {
+    // Normalizar textos
+    const normalize = (str) => str
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    
+    const norm1 = normalize(text1);
+    const norm2 = normalize(text2);
+    
+    // Jaccard similarity para conjuntos de palavras
+    const words1 = new Set(norm1.split(' ').filter(w => w.length > 2));
+    const words2 = new Set(norm2.split(' ').filter(w => w.length > 2));
+    
+    const intersection = new Set([...words1].filter(w => words2.has(w)));
+    const union = new Set([...words1, ...words2]);
+    
+    return union.size > 0 ? intersection.size / union.size : 0;
+}
 // Contar matches de keywords
 countKeywordMatches(text, keywords) {
     if (!keywords || keywords.length === 0) return 0;

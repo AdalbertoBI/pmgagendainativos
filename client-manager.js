@@ -442,7 +442,7 @@ class ClientManager {
                     <p><strong>Cidade:</strong> <span id="display-cidade">${item.Cidade || ''}</span></p>
                     <p><strong>UF:</strong> <span id="display-uf">${item.UF || ''}</span></p>
                     <p><strong>CEP:</strong> <span id="display-cep">${item.CEP || ''}</span></p>
-                    <p><strong>Limite de Crédito:</strong> <span id="display-saldo">R$ ${item['Saldo de Credito'] || '0'}</span></p>
+                    <p><strong>Saldo de Crédito:</strong> <span id="display-saldo">R$ ${item['Saldo de Credito'] || '0'}</span></p>
                     <p><strong>Data Último Pedido:</strong> <span id="display-data">${this.formatDateUS2BR(item['Data Ultimo Pedido']) || ''}</span></p>
                 </div>
                 
@@ -514,7 +514,7 @@ class ClientManager {
                     </div>
                     
                     <div class="edit-row">
-                        <label><strong>Limite de Crédito:</strong></label>
+                        <label><strong>Saldo de Crédito:</strong></label>
                         <input type="number" id="edit-saldo-credito" class="edit-input" min="0" step="0.01" value="${item['Saldo de Credito'] || ''}">
                     </div>
                 </div>
