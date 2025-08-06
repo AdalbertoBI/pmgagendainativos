@@ -2456,7 +2456,6 @@ convertAnalysisToHtml(analysisText) {
         message += `✅ Entrega programada\n`;
         message += `✅ Qualidade garantida\n`;
         message += `✅ Condições especiais de pagamento\n\n`;
-        message += `📞 Entre em contato: (11) 99999-9999\n`;
         message += `🌐 www.pmg.com.br`;
 
         const encodedMessage = encodeURIComponent(message);
