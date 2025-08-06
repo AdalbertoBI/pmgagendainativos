@@ -230,16 +230,50 @@ body {
     gap: 2rem;
 }
 
-.company-info, .menu-analysis, .product-suggestions, .sales-script {
-    min-height: 200px;
+.company-info,
+.menu-analysis,
+.sales-script {
+    min-height: 200px; /* Keep for other sections if needed */
+}
+
+.product-suggestions {
+    min-height: 0; /* Remove min-height constraint for product suggestions */
+    /* Alternatively, use a higher value like 400px if some minimum height is desired: min-height: 400px; */
 }
 
 .product-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Ajusta dinamicamente com base no espaço disponível */
     gap: 1rem;
     margin: 1rem 0;
+    max-height: none; /* Remove qualquer limite de altura */
+    overflow-y: auto; /* Adiciona rolagem vertical se necessário */
 }
+
+@media (max-width: 1200px) {
+    .product-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Mantém flexibilidade */
+    }
+}
+
+@media (max-width: 1024px) {
+    .product-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Reduz para 3 ou menos dinamicamente */
+    }
+}
+
+@media (max-width: 768px) {
+    .product-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Reduz para 2 ou menos dinamicamente */
+    }
+}
+
+@media (max-width: 500px) {
+    .product-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Reduz para 1 ou menos dinamicamente */
+    }
+}
+
 
 .product-card {
     border: 2px solid #e0e0e0;

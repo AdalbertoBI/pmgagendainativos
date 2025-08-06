@@ -45,6 +45,11 @@ class ProspeccaoManager {
         const catalogIntegrated = await this.integrateCatalogManager();
         if (catalogIntegrated) {
             console.log('✅ Catálogo carregado via CatalogManager');
+            // Garantir pelo menos 50 produtos, se possível
+            if (this.catalog.length < 50) {
+                const additionalProducts = this.createBasicCatalog().slice(0, 50 - this.catalog.length);
+                this.catalog = [...this.catalog, ...additionalProducts];
+            }
             return;
         }
         
@@ -52,12 +57,21 @@ class ProspeccaoManager {
         console.log('📦 Carregando catálogo do sistema principal...');
         this.catalog = await this.loadProductsFromMainCatalog();
         
-        if (this.catalog.length === 0) {
+       if (this.catalog.length === 0) {
             console.log('⚠️ Nenhum produto encontrado, carregando catálogo básico...');
-            this.catalog = this.reateBasicCatalog();
+            this.catalog = this.createBasicCatalog().slice(0, 50); // Limita a 50
+        }
+        if (this.catalog.length < 50) {
+            const additionalProducts = this.createBasicCatalog().slice(0, 50 - this.catalog.length);
+            this.catalog = [...this.catalog, ...additionalProducts];
         }
         
         console.log(`✅ Catálogo carregado: ${this.catalog.length} produtos`);
+        this.catalog = this.catalog.map(product => ({
+            ...product,
+            keywords: this.extractKeywordsFromName(product.name),
+            searchText: this.createSearchableText(product)
+        }));
         
         // Processar keywords automaticamente para todos os produtos
         this.catalog = this.catalog.map(product => ({
@@ -67,18 +81,15 @@ class ProspeccaoManager {
         }));
         
         console.log('🔄 Keywords automáticas geradas para todos os produtos');
-        
     } catch (error) {
         console.error('❌ Erro ao carregar catálogo:', error);
         console.log('🔄 Carregando catálogo básico como fallback final...');
-        
-        // Fallback final: sempre garantir que há produtos
-        this.catalog = this.reateBasicCatalog().map(product => ({
+        this.catalog = this.createBasicCatalog().slice(0, 50); // Fallback com 50 produtos
+        this.catalog = this.catalog.map(product => ({
             ...product,
             keywords: this.extractKeywordsFromName(product.name),
             searchText: this.createSearchableText(product)
         }));
-        
         console.log(`✅ Catálogo básico carregado: ${this.catalog.length} produtos`);
     }
 }
@@ -779,7 +790,7 @@ analyzeMenuAndSuggestProducts(menu) {
 
     return {
         analysis: this.formatProximityReport(analysisResult),
-        suggestions: suggestions.slice(0, 12),
+        suggestions: suggestions.slice(0, 50), // Limitar a 50 sugestões
         score: adequacyScore,
         keywords: analysisResult.detectedKeywords,
         businessType: analysisResult.businessType
@@ -1271,7 +1282,7 @@ async suggestProducts(companyData, menuData) {
         // Converter matches para sugestões
         const sortedMatches = matches
             .sort((a, b) => b.score - a.score)
-            .slice(0, 12);
+            .slice(0, 50);
 
         for (const match of sortedMatches) {
             suggestions.push({
@@ -1346,29 +1357,74 @@ findProductMatches(menuItems) {
     console.log(`🎯 ${matches.length} produtos encontraram correspondências`);
     return matches;
 }
-// Análise melhorada de similaridade textual
-calculateTextSimilarity(text1, text2) {
-    // Normalizar textos
-    const normalize = (str) => str
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9\s]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-    
-    const norm1 = normalize(text1);
-    const norm2 = normalize(text2);
-    
-    // Jaccard similarity para conjuntos de palavras
-    const words1 = new Set(norm1.split(' ').filter(w => w.length > 2));
-    const words2 = new Set(norm2.split(' ').filter(w => w.length > 2));
-    
-    const intersection = new Set([...words1].filter(w => words2.has(w)));
-    const union = new Set([...words1, ...words2]);
-    
-    return union.size > 0 ? intersection.size / union.size : 0;
-}
+// Normalize text for comparison
+    normalizeText(text) {
+        if (!text || typeof text !== 'string') return '';
+        return text
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z\s]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    // Calculate cosine similarity between two texts
+    calculateTextSimilarity(text1, text2) {
+        // Split texts into words
+        const words1 = text1.split(' ').filter(word => word.length > 2);
+        const words2 = text2.split(' ').filter(word => word.length > 2);
+
+        // Create word frequency vectors
+        const wordSet = new Set([...words1, ...words2]);
+        const vector1 = Array.from(wordSet).map(word => words1.filter(w => w === word).length);
+        const vector2 = Array.from(wordSet).map(word => words2.filter(w => w === word).length);
+
+        // Calculate dot product
+        const dotProduct = vector1.reduce((sum, val, i) => sum + val * vector2[i], 0);
+
+        // Calculate magnitudes
+        const magnitude1 = Math.sqrt(vector1.reduce((sum, val) => sum + val * val, 0));
+        const magnitude2 = Math.sqrt(vector2.reduce((sum, val) => sum + val * val, 0));
+
+        // Avoid division by zero
+        if (magnitude1 === 0 || magnitude2 === 0) return 0;
+
+        // Calculate cosine similarity
+        return dotProduct / (magnitude1 * magnitude2);
+    }
+
+    // Updated method to suggest products based solely on text similarity
+    async analyzeMenuAndSuggestProducts(menuText) {
+        try {
+            console.log('🔍 Analisando cardápio para sugestão de produtos...');
+            
+            // Normalize menu text for comparison
+            const normalizedMenuText = this.normalizeText(menuText);
+            if (!normalizedMenuText) {
+                console.warn('⚠️ Nenhum texto válido extraído do cardápio');
+                return [];
+            }
+
+            // Calculate text similarity for each product
+            const productsWithScores = this.catalog.map(product => {
+                const similarity = this.calculateTextSimilarity(normalizedMenuText, product.searchText);
+                return { ...product, similarity, reason: `Similaridade de texto: ${Math.round(similarity * 100)}%` };
+            });
+
+            // Sort by similarity score and take top 5
+            const suggestedProducts = productsWithScores
+                .sort((a, b) => b.similarity - a.similarity)
+                .slice(0, 5)
+                .filter(product => product.similarity > 0.1); // Minimum similarity threshold
+
+            console.log(`✅ ${suggestedProducts.length} produtos sugeridos com base em similaridade de texto`);
+            return suggestedProducts;
+        } catch (error) {
+            console.error('❌ Erro ao sugerir produtos:', error);
+            return [];
+        }
+    }
 // Contar matches de keywords
 countKeywordMatches(text, keywords) {
     if (!keywords || keywords.length === 0) return 0;
