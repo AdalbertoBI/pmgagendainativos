@@ -5,11 +5,14 @@
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    min-height: 100vh;
-    color: #333;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  
+  background-size: cover; /* Garante que o gradiente cubra toda a tela sem distorção */
+  min-height: 100%;
+  color: #333;
 }
+
 
 .header {
     background: rgba(255, 255, 255, 0.95);
@@ -79,6 +82,10 @@ body {
     grid-template-columns: 1fr 1fr;
     gap: 2rem;
     align-items: start;
+}
+
+.main-container > .card:only-child {
+    grid-column: 1 / -1; /* Ocupa toda a largura quando só há um card */
 }
 
 .card {
@@ -230,27 +237,62 @@ body {
     gap: 2rem;
 }
 
+@media (max-width: 768px) {
+    .results-section {
+        grid-template-columns: 1fr; /* Mantém uma coluna em telas menores */
+    }
+}
+
 .company-info,
 .menu-analysis,
 .sales-script {
-    min-height: 200px; /* Keep for other sections if needed */
+    min-height: 100%; /* Keep for other sections if needed */
 }
 
 .product-suggestions {
-    min-height: 0; /* Remove min-height constraint for product suggestions */
-    /* Alternatively, use a higher value like 400px if some minimum height is desired: min-height: 400px; */
+    width: 100%;
+    min-height: 0; /* Remove qualquer altura mínima que possa forçar comportamento */
 }
 
 .product-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Ajusta dinamicamente com base no espaço disponível */
+    grid-template-columns: 1fr 1fr 1fr; /* Define exatamente 3 colunas de largura igual */
     gap: 1rem;
     margin: 1rem 0;
-    max-height: none; /* Remove qualquer limite de altura */
-    overflow-y: auto; /* Adiciona rolagem vertical se necessário */
+    max-height: none; /* Garante que não haja limite de altura */
+    overflow-y: auto; /* Mantém a rolagem se necessário */
 }
 
-@media (max-width: 1200px) {
+.product-card {
+    background: rgba(255, 255, 255, 0.95);
+    color: #333;
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.results-section {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 2rem;
+}
+
+@media (max-width: 768px) {
+    .results-section {
+        grid-template-columns: 1fr; /* Mantém uma coluna em telas menores */
+    }
+    .product-grid {
+        grid-template-columns: 1fr; /* Força uma única coluna em telas menores */
+    }
+}
+
+.main-container > .card:only-child {
+    grid-column: 1 / -1; /* Ocupa toda a largura quando só há um card */
+}
+
+@media (max-width: 768px) {
     .product-grid {
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Mantém flexibilidade */
     }
@@ -275,15 +317,7 @@ body {
 }
 
 
-.product-card {
-    border: 2px solid #e0e0e0;
-    border-radius: 8px;
-    padding: 1rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    position: relative;
-}
+
 
 .product-card:hover {
     border-color: #667eea;
@@ -390,10 +424,14 @@ body {
     opacity: 1;
 }
 
-.modal-body {
-    padding: 2rem;
-    flex: 1;
-    overflow-y: auto;
+body {
+  min-height: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-repeat: no-repeat;
+  background-size: cover;
+  color: #333;
+  margin: 0;
+  padding: 0;
 }
 
 .offer-preview {
@@ -402,7 +440,7 @@ body {
     padding: 2rem;
     margin-bottom: 2rem;
     box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-    min-height: 600px;
+    min-height: 100%;
 }
 
 .modal-actions {
@@ -411,15 +449,17 @@ body {
     justify-content: center;
 }
 
-/* Offer Template */
 .offer-template {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 2rem;
-    border-radius: 15px;
-    position: relative;
-    overflow: hidden;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  
+  background-size: cover; /* Expande para cobrir o conteúdo */
+  color: white;
+  padding: 2rem;
+  border-radius: 15px;
+  position: relative;
+  overflow: visible; /* Altera de hidden para visible, permitindo expansão se o conteúdo for longo */
 }
+
 
 .offer-template::before {
     content: '';
@@ -540,10 +580,7 @@ body {
         gap: 1rem;
     }
     
-    .results-section {
-        grid-template-columns: 1fr;
-    }
-    
+   
     .modal-content {
         width: 95%;
         margin: 5% auto;

@@ -1002,7 +1002,7 @@ formatCNPJDisplay(cnpj) {
         const content = await this.readFileContent(file);
         console.log('📄 Conteúdo lido:', content.length, 'caracteres');
         
-        // Processar o conteúdo MHTML
+        // Processar o conteúdo TXT
         const menuItems = this.extractMenuItems(content);
         console.log('🍽️ Itens extraídos:', menuItems.length);
         
@@ -1034,7 +1034,7 @@ formatCNPJDisplay(cnpj) {
         return {
             items: [],
             categories: [],
-            analysis: `Erro ao processar cardápio: ${error.message}. Verifique se o arquivo MHTML foi salvo corretamente.`
+            analysis: `Erro ao processar cardápio: ${error.message}. Verifique se o arquivo TXT foi salvo corretamente.`
         };
     }
 }
@@ -1091,7 +1091,7 @@ extractMenuItems(content) {
     const items = [];
     
     try {
-        // Limpar conteúdo MHTML (remover cabeçalhos e codificação)
+        // Limpar conteúdo TXT (remover cabeçalhos e codificação)
         let cleanContent = content
             .replace(/Content-Type:.*?\n/gi, '')
             .replace(/Content-Transfer-Encoding:.*?\n/gi, '')
@@ -1204,7 +1204,7 @@ cleanItemName(name) {
 
     generateMenuAnalysis(items, categories) {
     if (!items || items.length === 0) {
-        return 'Não foi possível extrair itens do cardápio. Verifique se o arquivo MHTML foi salvo corretamente da página web.';
+        return 'Não foi possível extrair itens do cardápio. Verifique se o arquivo TXT foi salvo corretamente da página web.';
     }
 
     const totalItems = items.length;
@@ -2470,8 +2470,7 @@ convertAnalysisToHtml(analysisText) {
     }
 
     updateStats() {
-        document.getElementById('prospectCount').textContent = this.prospectCount;
-        document.getElementById('offerCount').textContent = this.offerCount;
+        
         
         // Salvar no localStorage
         localStorage.setItem('prospeccaoStats', JSON.stringify({
