@@ -1067,6 +1067,10 @@ function openTab(tab) {
                     window.catalogManager.init();
                 }
             }, 100);
+            } else if (tab === 'prospeccao') {
+    console.log('🎯 Inicializando aba prospecção...');
+    // A funcionalidade está toda contida no iframe
+
         }
 
     } catch (error) {

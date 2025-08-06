@@ -1,0 +1,324 @@
+/* Estilos para Análise de Redes Sociais */
+.social-analysis-section {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+}
+
+.social-links-input {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.social-results {
+    margin-top: 1.5rem;
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.social-results.hidden {
+    display: none;
+}
+
+.social-results.loading {
+    text-align: center;
+    padding: 2rem;
+}
+
+.loading-social {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.loading-spinner {
+    font-size: 3rem;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.loading-steps {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.step {
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 20px;
+    font-size: 0.9rem;
+    opacity: 0.5;
+    transition: all 0.3s ease;
+}
+
+.step.active {
+    opacity: 1;
+    background: rgba(102, 126, 234, 0.2);
+    border-left: 3px solid #667eea;
+}
+
+.social-analysis-content {
+    background: white;
+    border-radius: 10px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.platform-analysis {
+    margin: 1.5rem 0;
+    padding: 1.5rem;
+    border-radius: 10px;
+    border-left: 4px solid;
+}
+
+.linkedin-analysis {
+    border-left-color: #0077b5;
+    background: linear-gradient(135deg, rgba(0, 119, 181, 0.05) 0%, rgba(0, 119, 181, 0.1) 100%);
+}
+
+.facebook-analysis {
+    border-left-color: #1877f2;
+    background: linear-gradient(135deg, rgba(24, 119, 242, 0.05) 0%, rgba(24, 119, 242, 0.1) 100%);
+}
+
+.instagram-analysis {
+    border-left-color: #e4405f;
+    background: linear-gradient(135deg, rgba(228, 64, 95, 0.05) 0%, rgba(228, 64, 95, 0.1) 100%);
+}
+
+.analysis-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.metric {
+    background: rgba(255, 255, 255, 0.8);
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 3px solid #667eea;
+}
+
+.recent-activity, .decision-makers, .insights, .content-analysis {
+    margin: 1.5rem 0;
+}
+
+.recent-activity ul, .decision-makers ul, .insights ul, .content-analysis ul {
+    list-style: none;
+    padding: 0;
+}
+
+.recent-activity li, .decision-makers li, .insights li, .content-analysis li {
+    background: rgba(255, 255, 255, 0.7);
+    padding: 0.8rem;
+    margin: 0.5rem 0;
+    border-radius: 6px;
+    border-left: 3px solid #28a745;
+    position: relative;
+    padding-left: 2rem;
+}
+
+.recent-activity li::before {
+    content: "📈";
+    position: absolute;
+    left: 0.5rem;
+}
+
+.decision-makers li::before {
+    content: "👤";
+    position: absolute;
+    left: 0.5rem;
+}
+
+.insights li::before {
+    content: "💡";
+    position: absolute;
+    left: 0.5rem;
+}
+
+.hashtag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+
+.hashtag {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 0.3rem 0.8rem;
+    border-radius: 15px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.combined-insights {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    border-radius: 10px;
+    border: 2px solid rgba(102, 126, 234, 0.2);
+}
+
+.strategy-recommendations {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.insight-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    border-left: 4px solid #667eea;
+}
+
+.insight-card strong {
+    color: #2c3e50;
+    font-size: 1.1rem;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.insight-card p {
+    color: #666;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.sales-script-content {
+    background: white;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+}
+
+.script-section {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 4px solid;
+}
+
+.script-section.opening {
+    border-left-color: #28a745;
+    background: rgba(40, 167, 69, 0.05);
+}
+
+.script-section.connection {
+    border-left-color: #17a2b8;
+    background: rgba(23, 162, 184, 0.05);
+}
+
+.script-section.value-proposition {
+    border-left-color: #ffc107;
+    background: rgba(255, 193, 7, 0.05);
+}
+
+.script-section.timing {
+    border-left-color: #fd7e14;
+    background: rgba(253, 126, 20, 0.05);
+}
+
+.script-section.closing {
+    border-left-color: #6f42c1;
+    background: rgba(111, 66, 193, 0.05);
+}
+
+.social-reference {
+    background: rgba(102, 126, 234, 0.1);
+    padding: 0.8rem;
+    border-radius: 6px;
+    border-left: 3px solid #667eea;
+    margin: 0.5rem 0;
+    font-style: italic;
+}
+
+.timing-reference {
+    background: rgba(253, 126, 20, 0.1);
+    padding: 0.8rem;
+    border-radius: 6px;
+    border-left: 3px solid #fd7e14;
+    font-weight: 500;
+}
+
+.analysis-error {
+    text-align: center;
+    padding: 2rem;
+    color: #e74c3c;
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+    .analysis-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .loading-steps {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .hashtag-list {
+        justify-content: center;
+    }
+    
+    .strategy-recommendations {
+        grid-template-columns: 1fr;
+    }
+}
+.social-analysis-section {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    background: #f8f9fa;
+}
+
+.social-results.loading {
+    text-align: center;
+    padding: 2rem;
+}
+
+.loading-spinner {
+    font-size: 2rem;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.platform-analysis {
+    margin: 1rem 0;
+    padding: 1rem;
+    border-left: 4px solid #007bff;
+    background: white;
+    border-radius: 5px;
+}
+
+.analysis-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.strategy-card {
+    background: #e3f2fd;
+    padding: 1rem;
+    margin: 0.5rem 0;
+    border-radius: 5px;
+    border-left: 3px solid #2196f3;
+}

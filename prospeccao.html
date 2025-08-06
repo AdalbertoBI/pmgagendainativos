@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PMG - Prospecção Inteligente</title>
+    <link rel="stylesheet" href="prospeccao.css">
+    <link rel="stylesheet" href="social-media-styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">
+                <img src="icon-192.png" alt="PMG 30 Anos">
+                <h1>Prospecção Inteligente</h1>
+            </div>
+            <div class="header-stats">
+                <div class="stat">
+                    <span class="stat-number" id="prospectCount">0</span>
+                    <span class="stat-label">Prospecções</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number" id="offerCount">0</span>
+                    <span class="stat-label">Ofertas Criadas</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="form-section">
+            <div class="card">
+                <h2><i class="fas fa-search"></i> Dados do Cliente</h2>
+                <form id="prospectForm">
+                    <div class="form-group">
+                        <label for="cnpj">CNPJ:</label>
+                        <input type="text" id="cnpj" placeholder="00.000.000/0001-00" required>
+                        <button type="button" id="searchCnpj" class="btn btn-secondary">
+                            <i class="fas fa-search"></i> Buscar
+                        </button>
+                    </div>
+
+                    
+
+                    <div class="form-group">
+                        <label for="cardapio">Cardápio (Arquivo MHTML):</label>
+                        <input type="file" id="cardapio" accept=".mhtml,.mht">
+                        <small>Salve a página do cardápio como MHTML no navegador</small>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-magic"></i> Analisar e Criar Prospecção
+                    </button>
+                </form>
+            </div>
+
+            <div class="loading-section" id="loadingSection" style="display: none;">
+                <div class="card">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i>
+                    </div>
+                    <h3>Analisando dados do cliente... Tempo estimado de 15 minutos ...</h3>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="loading-steps">
+                        <div class="step" id="step1">
+                            <i class="fas fa-building"></i> Coletando dados da empresa
+                        </div>
+                        <div class="step" id="step2">
+                            <i class="fas fa-map-marker-alt"></i> Analisando localização
+                        </div>
+                        <div class="step" id="step3">
+                            <i class="fas fa-utensils"></i> Processando cardápio
+                        </div>
+                        <div class="step" id="step4">
+                            <i class="fas fa-chart-line"></i> Sugerindo produtos
+                        </div>
+                        <div class="step" id="step5">
+                            <i class="fas fa-palette"></i> Criando arte personalizada
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="results-section" id="resultsSection" style="display: none;">
+            <div class="company-info card">
+                <h2><i class="fas fa-building"></i> Informações da Empresa</h2>
+                <div id="companyDetails"></div>
+            </div>
+
+            <div class="menu-analysis card">
+                <h2><i class="fas fa-chart-pie"></i> Análise do Cardápio</h2>
+                <div id="menuAnalysis"></div>
+            </div>
+
+            <div class="sales-script card">
+                <h2><i class="fas fa-microphone"></i> Script de Vendas Personalizado</h2>
+                <div id="salesScript"></div>
+                <button id="copySalesScript" class="btn btn-secondary">
+                    <i class="fas fa-copy"></i> Copiar Script
+                </button>
+            </div>
+            
+
+            <div class="product-suggestions card">
+                <h2><i class="fas fa-lightbulb"></i> Produtos Sugeridos</h2>
+                <div id="productSuggestions"></div>
+                <button id="createOffer" class="btn btn-success">
+                    <i class="fas fa-palette"></i> Criar Arte da Oferta
+                </button>
+            </div>
+
+            
+        </div>
+    </div>
+
+    <!-- Modal para Arte da Oferta -->
+    <div id="offerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-palette"></i> Arte da Oferta Personalizada</h2>
+                <span class="close" id="closeModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="offer-preview" id="offerPreview">
+                    <!-- Arte será gerada aqui -->
+                </div>
+                <div class="modal-actions">
+                    <button id="downloadOffer" class="btn btn-primary">
+                        <i class="fas fa-download"></i> Baixar Arte
+                    </button>
+                    <button id="shareWhatsApp" class="btn btn-success">
+                        <i class="fab fa-whatsapp"></i> Compartilhar WhatsApp
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="prospeccao.js"></script>
+    <script src="social-media-analyzer.js"></script>
+</body>
+</html>

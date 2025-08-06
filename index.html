@@ -26,6 +26,7 @@
         <button onclick="openTab('agenda')">Agenda</button>
         <button onclick="openTab('mapa')">Mapa</button>
         <button onclick="openTab('catalogo')">Catálogo</button>
+        <button onclick="openTab('prospeccao')">Prospecção</button>
     </div>
 
     <div id="inativos-content" class="tab-content active">
@@ -34,8 +35,8 @@
             <select id="sortOption">
                 <option value="nome-az">Nome Fantasia (A-Z)</option>
                 <option value="nome-za">Nome Fantasia (Z-A)</option>
-                <option value="saldo-desc">Saldo de Crédito (Maior-Menor)</option>
-                <option value="saldo-asc">Saldo de Crédito (Menor-Maior)</option>
+                <option value="saldo-desc">Limite de Crédito (Maior-Menor)</option>
+                <option value="saldo-asc">Limite de Crédito (Menor-Maior)</option>
                 <option value="data-asc">Data Último Pedido (Antigo-Recente)</option>
                 <option value="data-desc">Data Último Pedido (Recente-Antigo)</option>
             </select>
@@ -202,7 +203,7 @@
                 <label>CEP:</label>
                 <input type="text" id="cep" maxlength="9">
                 
-                <label>Saldo de Crédito:</label>
+                <label>Limite de Crédito:</label>
                 <input type="number" id="saldo-credito" min="0" step="0.01">
                 
                 <label>Data Último Pedido:</label>
@@ -285,7 +286,9 @@
         </div>
     </div>
 
-    
+    <div id="prospeccao-content" class="tab-content">
+    <iframe src="prospeccao.html" style="width: 100%; height: calc(100vh - 100px); border: none; border-radius: 10px;"></iframe>
+</div>
 
     <button id="install-btn">📱 Instalar App</button>
 
