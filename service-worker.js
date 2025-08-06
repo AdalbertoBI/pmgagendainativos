@@ -1,4 +1,4 @@
-const CACHE_NAME = 'agenda-inativos-v2.1.0.0'; // Nova versão incrementada
+const CACHE_NAME = 'agenda-inativos-v2.2.0.0'; // Nova versão incrementada
 const isProduction = location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
 const basePath = isProduction ? '/pmgagendainativos/' : './';
 
@@ -140,4 +140,5 @@ self.addEventListener('controllerchange', () => {
 });
 
 //teste
+
 
