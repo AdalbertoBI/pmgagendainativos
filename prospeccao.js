@@ -2327,8 +2327,8 @@ convertAnalysisToHtml(analysisText) {
                 <h4>🎯 PROPOSTA DE VALOR</h4>
                 <p>Com nossos 30 anos de experiência, atendemos mais de 20.000 clientes e oferecemos:</p>
                 <ul>
-                    <li>✅ <strong>Preços competitivos</strong> - Compramos direto dos fabricantes</li>
-                    <li>✅ <strong>Entrega programada</strong> - Garantimos o abastecimento do seu negócio</li>
+                    <li>✅ <strong>Preços competitivos</strong> - Mas nosso objetivo é agregar valor ao seu negócio</li>
+                    <li>✅ <strong>Entrega programada</strong> - Somos a maior distribuidora de bebidas e alimento de SP</li>
                     <li>✅ <strong>Qualidade garantida</strong> - Produtos das melhores marcas do mercado</li>
                     <li>✅ <strong>Condições especiais</strong> - Prazo e formas de pagamento flexíveis</li>
                 </ul>
