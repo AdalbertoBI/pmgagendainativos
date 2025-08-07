@@ -293,8 +293,8 @@ body {
 
 .product-card img {
     width: 100%;
-    height: 120px;
-    object-fit: cover;
+    height: 140px;        /* ← Aumente a altura */
+    object-fit: contain;  /* ← Mude para 'contain' */
     border-radius: 4px;
     margin-bottom: 0.5rem;
 }
@@ -309,7 +309,7 @@ body {
 .product-card .price {
     font-size: 1.1rem;
     font-weight: 700;
-    color: #e74c3c;
+    color: #e91700;
 }
 
 .selection-indicator {
@@ -318,7 +318,7 @@ body {
     right: -10px;
     background: #28a745;
     color: white;
-    border-radius: 50%;
+     border-radius: 0 !important;
     width: 25px;
     height: 25px;
     display: flex;
@@ -402,32 +402,61 @@ body {
 
 /* Offer Template - CORRIGIDO PARA LARGURA TOTAL */
 .offer-template {
-    max-width: 1200px;
-    width: 98%;
+    max-width: 100%;
+    width: 100%;
     margin: 0 auto;
-    background: linear-gradient(135deg, #ffffff 0%, #128C7E 100%);
+    background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%);
     border-radius: 15px;
     overflow: hidden;
     box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-    color: white;
+    color: rgb(17, 0, 0);
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     min-height: auto;
+    padding: 0;
 }
 
+/* CORREÇÃO: Container do header para evitar sobreposição */
 .offer-header {
     text-align: center;
-    padding: 30px 25px;
+    padding: 40px 35px;
     background: rgba(255,255,255,0.1);
     position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Centralize tudo */
+    gap: 15px; /* Espaçamento consistente */
+    min-height: 300px; /* NOVO: altura mínima garantida */
+     padding: 0; 
+}
+/* CORREÇÃO: Garantir que o logo não cause overflow */
+.offer-header * {
+    position: relative;
+    z-index: auto;
 }
 
+/* CORREÇÃO DEFINITIVA: Logo da empresa - base fixa */
 .company-logo {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    margin-bottom: 20px;
+    width: 150px !important;
+    height: 150px !important;
+     border-radius: 0 !important;
+    margin: 0 auto 20px auto;
     border: 4px solid white;
-    object-fit: contain;
+    object-fit: cover !important; /* MUDANÇA: cover para logo */
+    object-position: center;
+    background: white;
+    display: block;
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    /* NOVO: Garantir aspect ratio */
+    aspect-ratio: 1/1;
+    /* NOVO: Evitar compressão/esticamento */
+    max-width: 150px;
+    max-height: 150px;
+    min-width: 150px;
+    min-height: 150px;
+     padding: 0;
 }
 
 .offer-header h1 {
@@ -447,9 +476,9 @@ body {
 /* Offer Products - CORRIGIDO PARA MÚLTIPLAS COLUNAS */
 .offer-products {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 20px;
-    padding: 25px 20px;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 25px;
+    padding: 30px 25px;
     justify-items: stretch;
 }
 
@@ -461,7 +490,7 @@ body {
     backdrop-filter: blur(15px);
     border: 2px solid rgba(255,255,255,0.2);
     width: 100%;
-    max-width: 280px;
+    max-width: 350px;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
@@ -471,12 +500,13 @@ body {
 }
 
 .offer-product img {
-    width: 120px;
-    height: 120px;
-    object-fit: cover;
+    width: 100%;         /* ← Mude para 100% */
+    height: 150px;       /* ← Aumente a altura */
+    object-fit: contain; /* ← Mude de 'cover' para 'contain' */
     border-radius: 12px;
     margin-bottom: 15px;
     border: 2px solid rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.9);
 }
 
 .offer-product h3 {
@@ -498,14 +528,14 @@ body {
 
 .offer-product .unit {
     font-size: 16px;
-    color: #555;
+    color: #000000;
     margin: 8px 0;
     font-weight: 500;
 }
 
 /* Offer Footer */
 .offer-footer {
-    background: rgba(0,0,0,0.3);
+    background: rgba(53, 167, 77, 0.3);
     padding: 30px 25px;
     text-align: center;
 }
@@ -513,7 +543,7 @@ body {
 .offer-footer h2 {
     font-size: 26px;
     margin: 0 0 20px 0;
-    color: #FFD700;
+    color: #137547;
     font-weight: 700;
 }
 
@@ -661,8 +691,8 @@ body {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
     z-index: 1000;
-    max-width: 90%;
-    max-height: 90vh;
+    max-width: 95%;
+    max-height: 95vh;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -675,7 +705,7 @@ body {
     right: 1rem;
     font-size: 1.5rem;
     cursor: pointer;
-    color: #666;
+    color: #000000;
 }
 
 .offer-customized-content {
@@ -882,12 +912,12 @@ body {
 
 .modal-content {
     background: white;
-    margin: 1% auto;
-    width: 95%;
+    margin: 0.5% auto;
+    width: 98%;
     max-width: 1400px;
     border-radius: 15px;
     overflow: hidden;
-    max-height: 95vh;
+    max-height: 98vh;
     display: flex;
     flex-direction: column;
     animation: slideIn 0.3s ease-out;
@@ -919,4 +949,96 @@ body {
 
 .modal-content {
     cursor: default;
+}
+/* Animação para feedback */
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Estilos fixos para captura de imagem */
+.offer-template.capturing {
+    width: 1200px !important;
+    max-width: 1200px !important;
+    transform: none !important;
+}
+
+.offer-template.capturing .offer-products {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 25px !important;
+}
+
+.offer-template.capturing .offer-product img {
+    width: 150px !important;
+    height: 150px !important;
+    object-fit: contain !important;
+}
+/* CORREÇÃO ESPECÍFICA: Estilos fixos para captura de imagens */
+.offer-template.capturing .offer-product img,
+.offer-template.capturing .company-logo,
+.offer-template.capturing .product-card img {
+    /* Forçar dimensões fixas */
+    width: 120px !important;
+    height: 120px !important;
+    /* Manter proporção sem distorção */
+    object-fit: contain !important;
+    /* Centralizar imagem */
+    object-position: center !important;
+    /* Garantir fundo branco */
+    background-color: #ffffff !important;
+    /* Remover flexbox/grid conflicts */
+    flex-shrink: 0 !important;
+    /* Forçar display block */
+    display: block !important;
+    /* Centralizar horizontalmente */
+    margin: 0 auto !important;
+    /* Bordas consistentes */
+    border-radius: 0 !important;
+    /* Evitar overflow */
+    overflow: hidden !important;
+}
+
+/* CORREÇÃO CRÍTICA: Logo durante captura - MESMAS dimensões */
+.offer-template.capturing .company-logo {
+    width: 150px !important;
+    height: 150px !important;
+    border-radius: 0 !important;
+    border: 4px solid white !important;
+    object-fit: cover !important; /* MANTÉM cover para logo */
+    object-position: center !important;
+    background: white !important;
+    display: block !important;
+    margin: 0 auto 20px auto !important;
+    position: relative !important;
+    z-index: 2 !important;
+    flex-shrink: 0 !important;
+    transform: none !important;
+    /* NOVO: Garantias de dimensão fixa */
+    aspect-ratio: 1/1 !important;
+    max-width: 150px !important;
+    max-height: 150px !important;
+    min-width: 150px !important;
+    min-height: 150px !important;
+    /* NOVO: Evitar herança problemática */
+    box-sizing: border-box !important;
+    padding: 0;
+}
+
+/* CORREÇÃO: Separar estilos das imagens de produtos */
+.offer-template.capturing .offer-product img {
+    /* Manter as configurações originais para produtos */
+    width: 120px !important;
+    height: 120px !important;
+    object-fit: contain !important;
+    /* Garantir que o container não force dimensões nas imagens */
+    min-height: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
 }

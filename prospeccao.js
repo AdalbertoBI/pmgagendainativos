@@ -512,11 +512,12 @@ transformCachedProducts(cachedData) {
             this.createOfferArt();
         });
 
-        // Evento para baixar oferta
-    document.getElementById('downloadOffer')?.addEventListener('click', () => this.downloadOffer());
+       // Evento para copiar imagem da oferta
+document.getElementById('copyOfferImage')?.addEventListener('click', () => this.copyOfferImage());
 
-    // Evento para copiar para a área de transferência
-    document.getElementById('copyToClipboard')?.addEventListener('click', () => this.copyToClipboard());
+// Evento para copiar texto da oferta
+document.getElementById('copyOfferText')?.addEventListener('click', () => this.copyOfferText());
+
 
     // NOVO: Event listeners para outros modais se existirem
         this.setupAdditionalModalListeners();
@@ -2450,7 +2451,7 @@ generateOfferTemplate(clientName, products) {
     return `
         <div class="offer-template">
             <div class="offer-header">
-                <img src="icon-192.png" alt="PMG 30 Anos" class="company-logo">
+                <img src="logo.png" alt="Logo da Empresa" class="company-logo" crossorigin="anonymous">
                 <h1>🎯 OFERTA EXCLUSIVA</h1>
                 <p>Especialmente para <strong>${clientName}</strong> 💼</p>
             </div>
@@ -2484,83 +2485,834 @@ generateOfferTemplate(clientName, products) {
 }
 
 
-    async downloadOffer() {
+    downloadOffer() {
     try {
-        const element = document.getElementById('offerPreview');
-        const canvas = await html2canvas(element, {
-            backgroundColor: '#ffffff',
-            scale: 2,
-            useCORS: true,
-            allowTaint: true,
-            logging: true // Para depuração
-        });
+        const offerContent = document.querySelector('.offer-template');
+        if (!offerContent) {
+            alert('❌ Conteúdo da oferta não encontrado');
+            return;
+        }
 
-        return new Promise((resolve) => {
-            canvas.toBlob((blob) => {
-                this.offerImageUrl = URL.createObjectURL(blob);
-                this.isOfferImageGenerated = true; // Marca como gerada
-                const a = document.createElement('a');
-                a.href = this.offerImageUrl;
-                a.download = `oferta-${this.currentProspect.company.fantasia || 'cliente'}-${Date.now()}.png`;
-                a.click();
-                // Não revoga imediatamente - será revogado em copyToClipboard ou ao fechar o modal
-                resolve(this.offerImageUrl);
-            });
-        });
+        // Incluir estilos inline no HTML para download
+        const htmlWithStyles = this.addInlineStylesToImages(offerContent.outerHTML);
+        
+        const completeHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Oferta PMG Atacadista</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; }
+        .offer-template { max-width: 100%; margin: 0 auto; }
+        /* Estilos críticos para garantir formatação */
+        .offer-product img {
+            width: 100% !important;
+            height: 150px !important;
+            object-fit: contain !important;
+            background: rgba(255,255,255,0.9) !important;
+        }
+        .company-logo {
+            width: 150px !important;
+            height: 150px !important;
+            object-fit: contain !important;
+            background: white !important;
+        }
+    </style>
+</head>
+<body>
+    ${htmlWithStyles}
+</body>
+</html>`;
+
+        // Criar e baixar arquivo
+        const blob = new Blob([completeHtml], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `oferta_${Date.now()}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        console.log('📥 Download realizado com estilos preservados');
     } catch (error) {
-        console.error('❌ Erro ao baixar oferta:', error);
-        alert('❌ Erro ao baixar oferta: ' + error.message);
-        this.isOfferImageGenerated = false;
+        console.error('❌ Erro no download:', error);
+        alert('❌ Erro ao fazer download da oferta');
+    }
+}
+
+    async copyOfferText() {
+    try {
+        if (!this.currentProspect) {
+            alert('❌ Nenhuma prospecção ativa para copiar');
+            return;
+        }
+
+        const company = this.currentProspect.company;
+        const nomeEmpresa = company.fantasia || company.razao_social || 'Empresa';
+        const cidade = company.municipio || 'sua cidade';
+        
+        // Gerar texto formatado da oferta (mesmo conteúdo do modal)
+        const offerText = this.generateOfferText(nomeEmpresa, cidade, company);
+        
+        await navigator.clipboard.writeText(offerText);
+        
+        // Feedback visual
+        const button = document.getElementById('copyOfferText');
+        const originalText = button.innerHTML;
+        button.innerHTML = '✅ Texto Copiado!';
+        button.style.backgroundColor = '#28a745';
+        
+        setTimeout(() => {
+            button.innerHTML = originalText;
+            button.style.backgroundColor = '';
+        }, 2000);
+        
+        console.log('✅ Texto da oferta copiado para área de transferência');
+        
+    } catch (error) {
+        console.error('❌ Erro ao copiar texto da oferta:', error);
+        alert('❌ Erro ao copiar texto da oferta');
+    }
+}
+
+generateOfferText(nomeEmpresa, cidade, company) {
+    const selectedProductsText = this.selectedProducts.length > 0 
+        ? this.selectedProducts.map(product => 
+            `• ${product.name} - R$ ${product.price.toFixed(2)}/${product.unit}`
+          ).join('\n')
+        : 'Produtos selecionados conforme análise do seu negócio';
+
+    return `🎯 PROPOSTA COMERCIAL PERSONALIZADA
+═══════════════════════════════════════
+
+Empresa: ${nomeEmpresa}
+Cidade: ${cidade}
+CNPJ: ${company.cnpj || 'Não informado'}
+
+═══════════════════════════════════════
+
+Olá! Falo com o responsável pelas compras do(a) ${nomeEmpresa}?
+
+Meu nome é [SEU NOME], sou consultor comercial da PMG Atacadista, uma empresa com 30 anos no mercado de distribuição de alimentos e bebidas.
+
+Estive analisando o perfil da sua empresa aqui em ${cidade} e vi que vocês trabalham com ${company.atividade_principal?.toLowerCase() || 'alimentação'}.
+
+🏆 PRODUTOS RECOMENDADOS:
+${selectedProductsText}
+
+💼 NOSSOS DIFERENCIAIS:
+✅ 30 anos de experiência no mercado
+✅ Mais de 20.000 clientes atendidos
+✅ Entrega rápida e pontual
+✅ Condições especiais de pagamento
+✅ Suporte técnico especializado
+
+📞 VAMOS CONVERSAR?
+Gostaria de agendar uma visita para apresentar nossos produtos pessoalmente?
+
+Quando seria um bom horário para conversarmos com mais detalhes?
+
+═══════════════════════════════════════
+🌐 PMG Atacadista - 30 anos de tradição
+Site: www.pmg.com.br
+═══════════════════════════════════════`;
+}
+
+async copyOfferImage() {
+    try {
+        console.log('📸 Iniciando cópia da imagem da oferta...');
+        
+        // CORREÇÃO CRÍTICA: Verificar se o modal está aberto
+        const modal = document.getElementById('offerModal');
+        if (!modal || modal.style.display !== 'block') {
+            this.showCopyFeedback('❌ Modal de oferta não está aberto', 'error');
+            return;
+        }
+        
+        // CORREÇÃO: Usar seletor mais específico dentro do modal
+        const offerElement = modal.querySelector('.offer-template');
+        if (!offerElement) {
+            console.error('❌ Elemento .offer-template não encontrado no modal');
+            this.showCopyFeedback('❌ Template da oferta não encontrado', 'error');
+            return;
+        }
+        
+        // CORREÇÃO CRÍTICA: Verificar se há produtos na oferta
+        const products = offerElement.querySelectorAll('.offer-product');
+        if (products.length === 0) {
+            console.error('❌ Nenhum produto encontrado na oferta');
+            this.showCopyFeedback('❌ Oferta sem produtos para capturar', 'error');
+            return;
+        }
+        
+        console.log(`✅ Encontrados ${products.length} produtos para capturar`);
+        
+        // CORREÇÃO: Aguardar carregamento completo das imagens
+        await this.waitForImagesToLoad(offerElement);
+        
+        // CORREÇÃO: Aplicar estilos de captura melhorados
+        const originalStyles = await this.applyEnhancedCaptureStyles(offerElement);
+        
+        // CORREÇÃO: Aguardar renderização dos estilos
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        const canvas = await html2canvas(offerElement, {
+    scale: 2,
+    useCORS: true,
+    allowTaint: false,
+    backgroundColor: '#ffffff',
+    width: 1200,
+    height: null,
+    scrollX: 0,
+    scrollY: 0,
+    foreignObjectRendering: false,
+    removeContainer: false,
+    imageTimeout: 30000,
+    logging: false,
+    // CORREÇÃO ESPECÍFICA PARA IMAGENS
+    ignoreElements: function(element) {
+        // Ignorar elementos problemáticos, mas manter imagens
+        return false;
+    },
+    onclone: (clonedDoc) => {
+        const clonedElement = clonedDoc.querySelector('.offer-template');
+        if (clonedElement) {
+            // Aplicar classe de captura no clone
+        clonedElement.classList.add('capturing');
+        
+        // CORREÇÃO ESPECÍFICA: Logo no clone
+        const clonedLogo = clonedElement.querySelector('.company-logo');
+        if (clonedLogo) {
+            // Forçar estilos específicos da logo
+            clonedLogo.style.cssText = `
+                width: 150px !important;
+                height: 150px !important;
+                object-fit: cover !important;
+                object-position: center !important;
+                background-color: white !important;
+                display: block !important;
+                margin: 0 auto 20px auto !important;
+                border-radius: 0 !important;
+                border: 4px solid white !important;
+                transform: none !important;
+                position: relative !important;
+                z-index: 2 !important;
+                aspect-ratio: 1/1 !important;
+                box-sizing: border-box !important;
+                max-width: 150px !important;
+                max-height: 150px !important;
+                min-width: 150px !important;
+                min-height: 150px !important;
+                flex-shrink: 0 !important;
+            `;
+            console.log('✅ Logo configurada no clone');
+        }
+        
+        // Imagens de produtos separadamente
+        const productImages = clonedElement.querySelectorAll('.offer-product img:not(.company-logo)');
+        productImages.forEach(img => {
+            img.style.cssText += `
+                width: 120px !important;
+                height: 120px !important;
+                object-fit: contain !important;
+            `;
+        });
+            // Aplicar classe de captura no clone
+            clonedElement.classList.add('capturing');
+            
+            // CORREÇÃO CRÍTICA: Forçar estilos nas imagens do clone
+            const clonedImages = clonedElement.querySelectorAll('img');
+            clonedImages.forEach(img => {
+                img.style.cssText += `
+                    width: 120px !important;
+                    height: 120px !important;
+                    object-fit: contain !important;
+                    object-position: center !important;
+                    background-color: #ffffff !important;
+                    display: block !important;
+                    margin: 0 auto !important;
+                `;
+                
+                // Logo específico
+                if (img.classList.contains('company-logo') || 
+                    img.parentElement.classList.contains('offer-header')) {
+                    img.style.cssText += `
+                        width: 100px !important;
+                        height: 100px !important;
+                        border-radius: 0 !important;
+                        border: 3px solid white !important;
+                    `;
+                }
+            });
+        }
+    }
+});
+
+        
+        // Restaurar estilos originais
+        this.restoreOriginalStyles(offerElement, originalStyles);
+        
+        // CORREÇÃO: Verificar se o canvas foi criado corretamente
+        if (!canvas || canvas.width === 0 || canvas.height === 0) {
+            throw new Error('Canvas vazio ou inválido gerado');
+        }
+        
+        console.log(`✅ Canvas gerado: ${canvas.width}x${canvas.height}`);
+        
+        // Converter para blob e copiar
+        canvas.toBlob(async (blob) => {
+            if (!blob) {
+                this.showCopyFeedback('❌ Erro ao gerar imagem', 'error');
+                return;
+            }
+            
+            try {
+                await navigator.clipboard.write([
+                    new ClipboardItem({ 'image/png': blob })
+                ]);
+                
+                this.showCopyFeedback('✅ Imagem copiada com sucesso!', 'success');
+                console.log('✅ Imagem da oferta copiada para área de transferência');
+                
+            } catch (clipboardError) {
+                console.error('❌ Erro ao copiar para área de transferência:', clipboardError);
+                // Fallback: download da imagem
+                this.downloadImageFallback(canvas);
+            }
+        }, 'image/png', 1.0); // CORREÇÃO: qualidade máxima
+        
+    } catch (error) {
+        console.error('❌ Erro detalhado ao copiar imagem:', error);
+        this.showCopyFeedback(`❌ Erro: ${error.message}`, 'error');
+    }
+}
+
+// NOVO MÉTODO: Aguardar carregamento das imagens
+async waitForImagesToLoad(element) {
+    const images = element.querySelectorAll('img');
+    const imagePromises = Array.from(images).map(img => {
+        return new Promise((resolve) => {
+            if (img.complete && img.naturalWidth > 0) {
+                resolve();
+            } else {
+                img.onload = () => resolve();
+                img.onerror = () => resolve(); // Resolve mesmo com erro para não travar
+                // Timeout de segurança
+                setTimeout(() => resolve(), 5000);
+            }
+        });
+    });
+    
+    console.log(`⏳ Aguardando ${images.length} imagens carregarem...`);
+    await Promise.all(imagePromises);
+    console.log('✅ Todas as imagens processadas');
+}
+
+async applyEnhancedCaptureStyles(element) {
+    const originalStyles = {};
+    
+    // Adicionar classe de captura
+    element.classList.add('capturing');
+    
+    // Adicionar classe de captura
+    element.classList.add('capturing');
+    
+    // CORREÇÃO ESPECÍFICA PARA LOGO - tratamento separado
+    const logo = element.querySelector('.company-logo');
+    if (logo) {
+        console.log('🖼️ Processando logo da empresa...');
+        
+        // Salvar TODOS os estilos originais
+        originalStyles.logo = {
+            width: logo.style.width,
+            height: logo.style.height,
+            objectFit: logo.style.objectFit,
+            objectPosition: logo.style.objectPosition,
+            backgroundColor: logo.style.backgroundColor,
+            display: logo.style.display,
+            margin: logo.style.margin,
+            borderRadius: logo.style.borderRadius,
+            border: logo.style.border,
+            transform: logo.style.transform,
+            position: logo.style.position,
+            zIndex: logo.style.zIndex,
+            aspectRatio: logo.style.aspectRatio,
+            boxSizing: logo.style.boxSizing,
+            crossOrigin: logo.crossOrigin,
+            // Salvar computedStyles também
+            computedWidth: window.getComputedStyle(logo).width,
+            computedHeight: window.getComputedStyle(logo).height
+        };
+        
+        // CORREÇÃO CRÍTICA: Aguardar logo carregar ANTES de aplicar estilos
+        await this.ensureLogoLoaded(logo);
+        
+        // APLICAR estilos específicos da logo
+        logo.crossOrigin = 'anonymous';
+        logo.style.width = '150px';
+        logo.style.height = '150px';
+        logo.style.objectFit = 'cover'; // Cover para logo
+        logo.style.objectPosition = 'center';
+        logo.style.backgroundColor = 'white';
+        logo.style.display = 'block';
+        logo.style.margin = '0 auto 20px auto';
+        logo.style.borderRadius = '50%';
+        logo.style.border = '4px solid white';
+        logo.style.transform = 'none';
+        logo.style.position = 'relative';
+        logo.style.zIndex = '2';
+        logo.style.aspectRatio = '1/1';
+        logo.style.boxSizing = 'border-box';
+        logo.style.maxWidth = '150px';
+        logo.style.maxHeight = '150px';
+        logo.style.minWidth = '150px';
+        logo.style.minHeight = '150px';
+        logo.style.flexShrink = '0';
+        
+        console.log('✅ Logo configurada para captura');
+    }
+    
+    // Tratamento das OUTRAS imagens (produtos)
+    const productImages = element.querySelectorAll('.offer-product img:not(.company-logo)');
+    originalStyles.productImages = [];
+    
+    productImages.forEach((img, index) => {
+        originalStyles.productImages[index] = {
+            width: img.style.width,
+            height: img.style.height,
+            objectFit: img.style.objectFit
+        };
+        
+        // Configurações específicas para imagens de produtos
+        img.style.width = '120px';
+        img.style.height = '120px';
+        img.style.objectFit = 'contain'; // Contain para produtos
+    });
+    // CORREÇÃO CRÍTICA: Aguardar imagens carregarem e aplicar estilos específicos
+    const images = element.querySelectorAll('img');
+    originalStyles.images = [];
+    
+    for (let i = 0; i < images.length; i++) {
+        const img = images[i];
+        
+        // Salvar estilos originais
+        originalStyles.images[i] = {
+            width: img.style.width,
+            height: img.style.height,
+            objectFit: img.style.objectFit,
+            objectPosition: img.style.objectPosition,
+            backgroundColor: img.style.backgroundColor,
+            display: img.style.display,
+            margin: img.style.margin,
+            borderRadius: img.style.borderRadius,
+            border: img.style.border,
+            crossOrigin: img.crossOrigin
+        };
+        
+        // CORREÇÃO PRINCIPAL: Aplicar estilos fixos para cada imagem
+        img.crossOrigin = 'anonymous'; // Para evitar problemas de CORS
+        img.style.width = '120px';
+        img.style.height = '120px';
+        img.style.objectFit = 'contain';
+        img.style.objectPosition = 'center';
+        img.style.backgroundColor = '#ffffff';
+        img.style.display = 'block';
+        img.style.margin = '0 auto';
+        img.style.borderRadius = '8px';
+        img.style.overflow = 'hidden';
+        
+        
+        // CORREÇÃO CRÍTICA: Aguardar cada imagem carregar
+        if (!img.complete || img.naturalWidth === 0) {
+            await new Promise((resolve) => {
+                const timeout = setTimeout(resolve, 2000); // Timeout de segurança
+                img.onload = () => {
+                    clearTimeout(timeout);
+                    resolve();
+                };
+                img.onerror = () => {
+                    clearTimeout(timeout);
+                    console.warn(`Imagem falhou ao carregar: ${img.src}`);
+                    resolve();
+                };
+            });
+        }
+    }
+    
+    // Aplicar outros estilos gerais
+    element.style.width = '1200px';
+    element.style.maxWidth = '1200px';
+    element.style.height = 'auto';
+    element.style.transform = 'none';
+    element.style.backgroundColor = '#ffffff';
+    element.style.visibility = 'visible';
+    element.style.opacity = '1';
+    
+    return originalStyles;
+}
+// NOVO: Método específico para garantir carregamento da logo
+async ensureLogoLoaded(logoElement) {
+    return new Promise((resolve) => {
+        if (logoElement.complete && logoElement.naturalWidth > 0) {
+            console.log('✅ Logo já carregada');
+            resolve();
+            return;
+        }
+        
+        console.log('⏳ Aguardando carregamento da logo...');
+        
+        const timeout = setTimeout(() => {
+            console.warn('⚠️ Timeout no carregamento da logo, continuando...');
+            resolve();
+        }, 5000);
+        
+        logoElement.onload = () => {
+            clearTimeout(timeout);
+            console.log('✅ Logo carregada com sucesso');
+            resolve();
+        };
+        
+        logoElement.onerror = () => {
+            clearTimeout(timeout);
+            console.error('❌ Erro ao carregar logo, continuando...');
+            resolve();
+        };
+        
+        // Forçar recarregamento se necessário
+        if (logoElement.src) {
+            const currentSrc = logoElement.src;
+            logoElement.src = '';
+            logoElement.src = currentSrc + '?' + Date.now(); // Cache bust
+        }
+    });
+}
+
+// NOVO MÉTODO: Forçar visibilidade no clone
+forceVisibilityInClone(clonedElement) {
+    // Aplicar estilos diretamente via CSS inline
+    clonedElement.style.cssText += `
+        position: relative !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        display: block !important;
+        width: 1200px !important;
+        max-width: 1200px !important;
+        background-color: #ffffff !important;
+    `;
+    
+    // Forçar visibilidade dos produtos
+    const products = clonedElement.querySelectorAll('.offer-product');
+    products.forEach(product => {
+        product.style.cssText += `
+            visibility: visible !important;
+            opacity: 1 !important;
+            display: block !important;
+            background-color: rgba(255,255,255,0.95) !important;
+        `;
+        
+        const img = product.querySelector('img');
+        if (img) {
+            img.style.cssText += `
+                visibility: visible !important;
+                opacity: 1 !important;
+                display: block !important;
+                width: 120px !important;
+                height: 120px !important;
+            `;
+        }
+    });
+    
+    // Forçar visibilidade do grid
+    const grid = clonedElement.querySelector('.offer-products');
+    if (grid) {
+        grid.style.cssText += `
+            display: grid !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        `;
+    }
+}
+
+restoreOriginalStyles(element, originalStyles) {
+    // Remover classe de captura
+    element.classList.remove('capturing');
+     // CORREÇÃO: Restaurar estilos do logo especificamente
+    if (originalStyles.logo) {
+        const logo = element.querySelector('.company-logo');
+        if (logo) {
+            Object.assign(logo.style, originalStyles.logo);
+        }
+    }
+    // CORREÇÃO: Restaurar estilos das imagens especificamente
+    if (originalStyles.images) {
+        const images = element.querySelectorAll('img');
+        images.forEach((img, index) => {
+            if (originalStyles.images[index]) {
+                const original = originalStyles.images[index];
+                img.style.width = original.width || '';
+                img.style.height = original.height || '';
+                img.style.objectFit = original.objectFit || '';
+                img.style.objectPosition = original.objectPosition || '';
+                img.style.backgroundColor = original.backgroundColor || '';
+                img.style.display = original.display || '';
+                img.style.margin = original.margin || '';
+                img.style.borderRadius = original.borderRadius || '';
+                img.style.border = original.border || '';
+                img.crossOrigin = original.crossOrigin || null;
+            }
+        });
+    }
+    
+    // Restaurar estilos gerais do elemento
+    element.style.width = '';
+    element.style.maxWidth = '';
+    element.style.height = '';
+    element.style.transform = '';
+    element.style.backgroundColor = '';
+    element.style.visibility = '';
+    element.style.opacity = '';
+}
+
+
+// MÉTODO MELHORADO: Fallback para download
+downloadImageFallback(canvas) {
+    try {
+        const link = document.createElement('a');
+        link.download = `oferta-personalizada-${new Date().getTime()}.png`;
+        link.href = canvas.toDataURL('image/png', 1.0);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        this.showCopyFeedback('📥 Imagem baixada como arquivo', 'info');
+    } catch (error) {
+        console.error('❌ Erro no fallback de download:', error);
+        this.showCopyFeedback('❌ Erro ao baixar imagem', 'error');
+    }
+}
+
+// MÉTODO MELHORADO: Feedback visual
+showCopyFeedback(message, type = 'success') {
+    // Remove feedback anterior se existir
+    const existing = document.querySelector('.copy-feedback');
+    if (existing) existing.remove();
+    
+    const feedback = document.createElement('div');
+    feedback.className = `copy-feedback ${type}`;
+    feedback.textContent = message;
+    
+    const colors = {
+        success: '#28a745',
+        error: '#dc3545',
+        info: '#17a2b8'
+    };
+    
+    feedback.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${colors[type]};
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        z-index: 10001;
+        font-weight: 600;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        animation: slideInRight 0.3s ease-out;
+    `;
+    
+    document.body.appendChild(feedback);
+    
+    setTimeout(() => {
+        feedback.style.animation = 'slideOutRight 0.3s ease-in forwards';
+        setTimeout(() => feedback.remove(), 300);
+    }, 4000);
+}
+debugOfferCapture() {
+    const modal = document.getElementById('offerModal');
+    const offer = modal?.querySelector('.offer-template');
+    const products = offer?.querySelectorAll('.offer-product');
+    
+    console.log('🔍 DEBUG - Estado do modal:', {
+        modalExists: !!modal,
+        modalVisible: modal?.style.display === 'block',
+        offerExists: !!offer,
+        productsCount: products?.length || 0,
+        offerDimensions: offer ? {
+            width: offer.offsetWidth,
+            height: offer.offsetHeight
+        } : null
+    });
+    
+    products?.forEach((product, i) => {
+        const img = product.querySelector('img');
+        console.log(`Produto ${i}:`, {
+            visible: window.getComputedStyle(product).visibility,
+            display: window.getComputedStyle(product).display,
+            hasImage: !!img,
+            imageLoaded: img?.complete && img?.naturalWidth > 0
+        });
+    });
+}
+
+debugOfferModal() {
+    const modal = document.getElementById('offerModal');
+    console.log('🔍 DEBUG COMPLETO DO MODAL:');
+    console.log('Modal encontrado:', !!modal);
+    
+    if (modal) {
+        const computedStyle = window.getComputedStyle(modal);
+        
+        console.log('📊 Estilos computados:', {
+            display: computedStyle.display,
+            visibility: computedStyle.visibility,
+            opacity: computedStyle.opacity,
+            position: computedStyle.position,
+            zIndex: computedStyle.zIndex
+        });
+        
+        console.log('📐 Dimensões:', {
+            offsetWidth: modal.offsetWidth,
+            offsetHeight: modal.offsetHeight,
+            scrollWidth: modal.scrollWidth,
+            scrollHeight: modal.scrollHeight,
+            clientWidth: modal.clientWidth,
+            clientHeight: modal.clientHeight
+        });
+        
+        console.log('🎨 Classes:', modal.className);
+        console.log('🔧 Estilos inline:', modal.style.cssText);
+        
+        // Verificar elementos filhos
+        const modalContent = modal.querySelector('.modal-content');
+        const offerTemplate = modal.querySelector('.offer-template');
+        const offerPreview = modal.querySelector('.offer-preview');
+        
+        console.log('🔍 Elementos encontrados:');
+        console.log('  .modal-content:', !!modalContent, modalContent?.offsetWidth + 'x' + modalContent?.offsetHeight);
+        console.log('  .offer-template:', !!offerTemplate, offerTemplate?.offsetWidth + 'x' + offerTemplate?.offsetHeight);
+        console.log('  .offer-preview:', !!offerPreview, offerPreview?.offsetWidth + 'x' + offerPreview?.offsetHeight);
+        
+        // Verificar se é visível
+        const isVisible = modal.offsetWidth > 0 && modal.offsetHeight > 0 && 
+                         computedStyle.display !== 'none' && 
+                         computedStyle.visibility !== 'hidden' && 
+                         parseFloat(computedStyle.opacity) > 0;
+                         
+        console.log('👁️ Modal visível:', isVisible);
+        
+        return {
+            modal,
+            modalContent,
+            offerTemplate,
+            offerPreview,
+            isVisible,
+            computedStyle
+        };
+    } else {
+        console.log('❌ Modal não encontrado!');
         return null;
     }
 }
-    copyToClipboard() {
-    const company = this.currentProspect.company;
-    const nomeEmpresa = company.fantasia || company.nome;
 
-    const choice = prompt('Escolha o que copiar:\n1 - Texto\n2 - Imagem', '1');
 
-    if (choice === '1' || choice === null) {
-        let message = `🎯 *Oferta Especial PMG Atacadista*\n\n`;
-        message += `Olá ${nomeEmpresa}! 👋\n\n`;
-        message += `Preparamos uma oferta especial para vocês com ${this.selectedProducts.length} produtos selecionados:\n\n`;
-
-        this.selectedProducts.forEach((product, index) => {
-            message += `${index + 1}. *${product.name}*\n`;
-            message += `   💰 R$ ${product.price.toFixed(2)} por ${product.unit}\n`;
-            message += `   📦 ${product.reason}\n\n`;
-        });
-
-        message += `🏆 *PMG Atacadista - 30 Anos de Tradição*\n`;
-        message += `✅ Preços competitivos\n`;
-        message += `✅ Entrega programada\n`;
-        message += `✅ Qualidade garantida\n`;
-        message += `✅ Condições especiais de pagamento\n\n`;
-        message += `🌐 www.pmg.com.br`;
-
-        navigator.clipboard.writeText(message).then(() => {
-            alert('✅ Texto copiado para a área de transferência!');
-        }).catch(err => {
-            console.error('❌ Erro ao copiar texto:', err);
-            alert('❌ Erro ao copiar texto: ' + err.message);
-        });
-    } else if (choice === '2') {
-        if (!this.isOfferImageGenerated || !this.offerImageUrl) {
-            alert('⚠️ A imagem da oferta ainda não foi gerada. Gerando agora...');
-            this.downloadOffer().then((url) => {
-                if (url) {
-                    this.offerImageUrl = url;
-                    this.copyImageToClipboard();
-                } else {
-                    alert('❌ Falha ao gerar a imagem da oferta. Verifique se as imagens no "offerPreview" são locais ou se o CORS está bloqueando (ex.: https://pmg.com.br). Considere usar imagens hospedadas localmente.');
-                }
-            });
-        } else {
-            this.copyImageToClipboard();
-        }
-    } else {
-        alert('⚠️ Opção inválida selecionada.');
+// Método fallback caso o navigator.clipboard não funcione
+fallbackCopyMethod() {
+    try {
+        const offerContent = document.querySelector('.offer-template');
+        const htmlWithStyles = this.addInlineStylesToImages(offerContent.outerHTML);
+        
+        // Criar elemento temporário para seleção
+        const textArea = document.createElement('textarea');
+        textArea.value = htmlWithStyles;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        alert('✅ Oferta copiada (método compatibilidade)!');
+    } catch (error) {
+        console.error('❌ Erro no método fallback:', error);
+        alert('❌ Erro ao copiar. Tente novamente.');
     }
+}
+
+// Adicionar este método na classe ProspeccaoManager
+addInlineStylesToImages(htmlString) {
+    // Criar um elemento temporário para manipular o HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlString;
+    
+    // Aplicar estilos inline às imagens dos produtos
+    const productImages = tempDiv.querySelectorAll('.offer-product img');
+    productImages.forEach(img => {
+        img.style.cssText = `
+            width: 100% !important;
+            height: 150px !important;
+            object-fit: contain !important;
+            border-radius: 12px !important;
+            margin-bottom: 15px !important;
+            border: 2px solid rgba(255,255,255,0.3) !important;
+            background: rgba(255,255,255,0.9) !important;
+            box-sizing: border-box !important;
+        `;
+    });
+    
+    // Aplicar estilos inline ao logo da empresa
+    const companyLogo = tempDiv.querySelector('.company-logo');
+    if (companyLogo) {
+        companyLogo.style.cssText = `
+            width: 150px !important;
+            height: 150px !important;
+            border-radius: 0 !important;
+            margin-bottom: 20px !important;
+            border: 4px solid white !important;
+            object-fit: contain !important;
+            background: white !important;
+            box-sizing: border-box !important;
+        `;
+    }
+    
+    // Aplicar estilos aos containers dos produtos
+    const offerProducts = tempDiv.querySelectorAll('.offer-product');
+    offerProducts.forEach(product => {
+        product.style.cssText += `
+            max-width: 350px !important;
+            box-sizing: border-box !important;
+        `;
+    });
+    
+    return tempDiv.innerHTML;
+}
+// Adicionar este método também
+cloneWithInlineStyles(element) {
+    const clone = element.cloneNode(true);
+    
+    // Aplicar estilos computados aos elementos principais
+    const originalImages = element.querySelectorAll('img');
+    const clonedImages = clone.querySelectorAll('img');
+    
+    originalImages.forEach((originalImg, index) => {
+        if (clonedImages[index]) {
+            const computedStyle = window.getComputedStyle(originalImg);
+            clonedImages[index].style.cssText = `
+                width: ${computedStyle.width} !important;
+                height: ${computedStyle.height} !important;
+                object-fit: ${computedStyle.objectFit} !important;
+                border-radius: ${computedStyle.borderRadius} !important;
+                margin-bottom: ${computedStyle.marginBottom} !important;
+                border: ${computedStyle.border} !important;
+                background: ${computedStyle.background} !important;
+            `;
+        }
+    });
+    
+    return clone;
 }
 
 copyImageToClipboard() {
