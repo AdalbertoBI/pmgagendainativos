@@ -450,28 +450,140 @@ body {
 }
 
 .offer-template {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  
-  background-size: cover; /* Expande para cobrir o conteúdo */
-  color: white;
-  padding: 2rem;
-  border-radius: 15px;
-  position: relative;
-  overflow: visible; /* Altera de hidden para visible, permitindo expansão se o conteúdo for longo */
-}
-
-
-.offer-template::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    right: -50%;
+    max-width: 600px; /* Aumentado de ~400px para 600px */
     width: 100%;
-    height: 100%;
-    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="2" fill="rgba(255,255,255,0.1)"/></svg>') repeat;
-    opacity: 0.1;
+    margin: 0 auto;
+    background: linear-gradient(135deg, #25D366 0%, #128C7E 100%); /* Cores do WhatsApp */
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    color: white;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
+.offer-header {
+    text-align: center;
+    padding: 25px 20px;
+    background: rgba(255,255,255,0.1);
+}
+
+.company-logo {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    margin-bottom: 15px;
+    border: 3px solid white;
+}
+
+.offer-header h1 {
+    font-size: 28px;
+    margin: 10px 0;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.offer-header p {
+    font-size: 16px;
+    margin: 0;
+    opacity: 0.9;
+}
+
+.offer-products {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); /* Produtos mais largos */
+    gap: 20px;
+    padding: 25px 20px;
+}
+
+.offer-product {
+    background: rgba(255,255,255,0.15);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.offer-product img {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 10px;
+    margin-bottom: 12px;
+}
+
+.offer-product h3 {
+    font-size: 18px;
+    margin: 10px 0;
+    font-weight: 600;
+}
+
+.offer-product .price {
+    font-size: 24px;
+    font-weight: bold;
+    color: #FFD700;
+    margin: 8px 0;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+
+.offer-product .unit {
+    font-size: 14px;
+    opacity: 0.8;
+    margin: 5px 0;
+}
+
+.offer-footer {
+    background: rgba(0,0,0,0.2);
+    padding: 25px 20px;
+    text-align: center;
+}
+
+.offer-footer h2 {
+    font-size: 22px;
+    margin: 0 0 15px 0;
+    color: #FFD700;
+}
+
+.benefits {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 15px 0;
+}
+
+.benefits p {
+    font-size: 14px;
+    margin: 5px 0;
+    padding: 8px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 8px;
+}
+
+.contact {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255,255,255,0.2);
+}
+
+.contact p {
+    margin: 8px 0;
+    font-size: 16px;
+}
+
+/* Responsivo para WhatsApp Web */
+@media (max-width: 768px) {
+    .offer-template {
+        max-width: 95%;
+        margin: 10px auto;
+    }
+    
+    .offer-products {
+        grid-template-columns: 1fr;
+    }
+    
+    .benefits {
+        grid-template-columns: 1fr;
+    }
+}
 .offer-header {
     text-align: center;
     margin-bottom: 2rem;

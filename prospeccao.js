@@ -6,6 +6,8 @@ class ProspeccaoManager {
         this.selectedProducts = [];
         this.prospectCount = 0;
         this.offerCount = 0;
+        this.offerImageUrl = null; // Armazena a URL da imagem gerada
+        this.isOfferImageGenerated = false; // Flag para verificar se a imagem foi gerada
         
         this.init();
     }
@@ -483,17 +485,12 @@ transformCachedProducts(cachedData) {
             this.createOfferArt();
         });
 
-        document.getElementById('copySalesScript').addEventListener('click', () => {
-            this.copySalesScript();
-        });
+        // Evento para baixar oferta
+    document.getElementById('downloadOffer')?.addEventListener('click', () => this.downloadOffer());
 
-        document.getElementById('downloadOffer').addEventListener('click', () => {
-            this.downloadOffer();
-        });
-
-        document.getElementById('shareWhatsApp').addEventListener('click', () => {
-            this.shareWhatsApp();
-        });
+    // Evento para copiar para a área de transferência
+    document.getElementById('copyToClipboard')?.addEventListener('click', () => this.copyToClipboard());
+        
     }
 
     formatCNPJ(input) {
@@ -2359,88 +2356,100 @@ convertAnalysisToHtml(analysisText) {
     }
 
     createOfferArt() {
-        if (this.selectedProducts.length === 0) {
-            alert('❌ Selecione pelo menos um produto para criar a arte da oferta');
-            return;
-        }
-
-        const company = this.currentProspect.company;
-        const nomeEmpresa = company.fantasia || company.nome;
-
-        // Gerar arte da oferta
-        const offerHtml = this.generateOfferTemplate(nomeEmpresa, this.selectedProducts);
-        
-        // Mostrar no modal
-        document.getElementById('offerPreview').innerHTML = offerHtml;
-        document.getElementById('offerModal').style.display = 'block';
-        
-        this.offerCount++;
-        this.updateStats();
+    if (this.selectedProducts.length === 0) {
+        alert('❌ Selecione pelo menos um produto para criar a arte da oferta');
+        return;
     }
 
-    generateOfferTemplate(clientName, products) {
-        return `
-            <div class="offer-template">
-                <div class="offer-header">
-                    <img src="https://pmg.com.br/wp-content/uploads/2024/05/PMG-30-ANOS-ATACADISTA-PNG-3.png" alt="PMG 30 Anos">
-                    <h1>Oferta Especial</h1>
-                    <p>Personalizada para <strong>${clientName}</strong></p>
-                </div>
+    const company = this.currentProspect.company;
+    const nomeEmpresa = company.fantasia || company.nome;
 
-                <div class="offer-products">
-                    ${products.map(product => `
-                        <div class="offer-product">
-                            <img src="${product.image}" alt="${product.name}" onerror="this.src='${this.getProductImage(product.code)}'">
-                            <h3>${product.name}</h3>
-                            <div class="price">R$ ${product.price.toFixed(2)}</div>
-                            <div class="unit">Por ${product.unit}</div>
-                        </div>
-                    `).join('')}
-                </div>
+    // Gerar arte da oferta
+    const offerHtml = this.generateOfferTemplate(nomeEmpresa, this.selectedProducts);
+    
+    // Mostrar no modal
+    document.getElementById('offerPreview').innerHTML = offerHtml;
+    document.getElementById('offerModal').style.display = 'block';
+    
+    this.offerCount++;
+    this.updateStats();
+}
 
-                <div class="offer-footer">
-                    <h2>PMG Atacadista - 30 Anos de Tradição</h2>
-                    <p>Qualidade, Pontualidade e o Melhor Atendimento</p>
-                    <p>Condições especiais de pagamento</p>
-                    <p>Entrega programada na sua região</p>
-                    <p>www.pmg.com.br</p>
+generateOfferTemplate(clientName, products) {
+    return `
+        <div class="offer-template">
+            <div class="offer-header">
+                <img src="icon-192.png" alt="PMG 30 Anos" class="company-logo">
+                <h1>🎯 OFERTA EXCLUSIVA</h1>
+                <p>Especialmente para <strong>${clientName}</strong> 💼</p>
+            </div>
+
+            <div class="offer-products">
+                ${products.map(product => `
+                    <div class="offer-product">
+                        <img src="${product.image}" alt="${product.name}" onerror="this.src='${this.getProductImage(product.code)}'">
+                        <h3>${product.name}</h3>
+                        <div class="price">💰 R$ ${product.price.toFixed(2)}</div>
+                        <div class="unit">📦 Por ${product.unit}</div>
+                    </div>
+                `).join('')}
+            </div>
+
+            <div class="offer-footer">
+                <h2>🏆 PMG Atacadista - 30 Anos</h2>
+                <div class="benefits">
+                    <p>✅ Qualidade Garantida</p>
+                    <p>🚛 Entrega Programada</p>
+                    <p>💳 Condições Especiais</p>
+                    <p>📞 Melhor Atendimento</p>
+                </div>
+                <div class="contact">
+                    <p>🌐 www.pmg.com.br</p>
+                    <p><strong>Entre em contato e garante já!</strong> 📱</p>
                 </div>
             </div>
-        `;
-    }
+        </div>
+    `;
+}
+
 
     async downloadOffer() {
-        try {
-            const element = document.getElementById('offerPreview');
-            const canvas = await html2canvas(element, {
-                backgroundColor: '#ffffff',
-                scale: 2,
-                useCORS: true,
-                allowTaint: true
-            });
+    try {
+        const element = document.getElementById('offerPreview');
+        const canvas = await html2canvas(element, {
+            backgroundColor: '#ffffff',
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            logging: true // Para depuração
+        });
 
-            // Converter para blob e baixar
+        return new Promise((resolve) => {
             canvas.toBlob((blob) => {
-                const url = URL.createObjectURL(blob);
+                this.offerImageUrl = URL.createObjectURL(blob);
+                this.isOfferImageGenerated = true; // Marca como gerada
                 const a = document.createElement('a');
-                a.href = url;
+                a.href = this.offerImageUrl;
                 a.download = `oferta-${this.currentProspect.company.fantasia || 'cliente'}-${Date.now()}.png`;
                 a.click();
-                URL.revokeObjectURL(url);
+                // Não revoga imediatamente - será revogado em copyToClipboard ou ao fechar o modal
+                resolve(this.offerImageUrl);
             });
-
-            alert('✅ Arte da oferta baixada com sucesso!');
-        } catch (error) {
-            console.error('❌ Erro ao baixar oferta:', error);
-            alert('❌ Erro ao baixar oferta: ' + error.message);
-        }
+        });
+    } catch (error) {
+        console.error('❌ Erro ao baixar oferta:', error);
+        alert('❌ Erro ao baixar oferta: ' + error.message);
+        this.isOfferImageGenerated = false;
+        return null;
     }
+}
+    copyToClipboard() {
+    const company = this.currentProspect.company;
+    const nomeEmpresa = company.fantasia || company.nome;
 
-    shareWhatsApp() {
-        const company = this.currentProspect.company;
-        const nomeEmpresa = company.fantasia || company.nome;
-        const telefone = company.telefone ? company.telefone.replace(/\D/g, '') : '';
+    const choice = prompt('Escolha o que copiar:\n1 - Texto\n2 - Imagem', '1');
 
+    if (choice === '1' || choice === null) {
         let message = `🎯 *Oferta Especial PMG Atacadista*\n\n`;
         message += `Olá ${nomeEmpresa}! 👋\n\n`;
         message += `Preparamos uma oferta especial para vocês com ${this.selectedProducts.length} produtos selecionados:\n\n`;
@@ -2458,15 +2467,57 @@ convertAnalysisToHtml(analysisText) {
         message += `✅ Condições especiais de pagamento\n\n`;
         message += `🌐 www.pmg.com.br`;
 
-        const encodedMessage = encodeURIComponent(message);
-        let whatsappUrl = `https://wa.me/${telefone}?text=${encodedMessage}`;
-
-        if (!telefone) {
-            whatsappUrl = `https://wa.me/?text=${encodedMessage}`;
+        navigator.clipboard.writeText(message).then(() => {
+            alert('✅ Texto copiado para a área de transferência!');
+        }).catch(err => {
+            console.error('❌ Erro ao copiar texto:', err);
+            alert('❌ Erro ao copiar texto: ' + err.message);
+        });
+    } else if (choice === '2') {
+        if (!this.isOfferImageGenerated || !this.offerImageUrl) {
+            alert('⚠️ A imagem da oferta ainda não foi gerada. Gerando agora...');
+            this.downloadOffer().then((url) => {
+                if (url) {
+                    this.offerImageUrl = url;
+                    this.copyImageToClipboard();
+                } else {
+                    alert('❌ Falha ao gerar a imagem da oferta. Verifique se as imagens no "offerPreview" são locais ou se o CORS está bloqueando (ex.: https://pmg.com.br). Considere usar imagens hospedadas localmente.');
+                }
+            });
+        } else {
+            this.copyImageToClipboard();
         }
-
-        window.open(whatsappUrl, '_blank');
+    } else {
+        alert('⚠️ Opção inválida selecionada.');
     }
+}
+
+copyImageToClipboard() {
+    if (this.offerImageUrl) {
+        fetch(this.offerImageUrl)
+            .then(res => res.blob())
+            .then(blob => {
+                const item = new ClipboardItem({ 'image/png': blob });
+                navigator.clipboard.write([item]).then(() => {
+                    alert('✅ Imagem copiada para a área de transferência!');
+                    // Revoga a URL após a cópia bem-sucedida
+                    URL.revokeObjectURL(this.offerImageUrl);
+                    this.offerImageUrl = null;
+                    this.isOfferImageGenerated = false;
+                }).catch(err => {
+                    console.error('❌ Erro ao copiar imagem:', err);
+                    alert('❌ Erro ao copiar imagem: ' + err.message + '. Tente gerar a oferta novamente.');
+                });
+            }).catch(err => {
+                console.error('❌ Erro ao buscar blob:', err);
+                alert('❌ Falha ao acessar a imagem. Verifique o console para mais detalhes.');
+            });
+    } else {
+        alert('❌ Imagem não disponível. Gere a oferta primeiro.');
+    }
+}
+
+    
 
     updateStats() {
         
