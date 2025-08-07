@@ -828,15 +828,114 @@ handleImageError(imgElement, codigo) {
 
     categorizeProduct(name) {
         const categories = {
-            'Temperos e Condimentos': ['aceto', 'vinagre', 'azeite', 'oleo', 'sal', 'pimenta', 'tempero', 'molho'],
-            'Conservas': ['conserva', 'picles', 'azeitona', 'palmito'],
-            'Doces e Sobremesas': ['doce', 'geleia', 'compota', 'mel', 'chocolate', 'açúcar'],
-            'Bebidas': ['suco', 'refrigerante', 'agua', 'cerveja', 'vinho'],
-            'Limpeza': ['detergente', 'sabao', 'desinfetante', 'amaciante'],
-            'Carnes': ['carne', 'frango', 'boi', 'suino', 'bovino', 'aves', 'acém', 'matoso'],
-            'Laticínios': ['leite', 'queijo', 'iogurte', 'manteiga', 'requeijao'],
-            'Outros': []
-        };
+    'Temperos e Condimentos': [
+        'aceto', 'vinagre', 'azeite', 'oleo', 'sal', 'pimenta', 'tempero', 'molho',
+        'colorífico', 'cominho', 'orégano', 'manjericão', 'páprica', 'chimichurri',
+        'mostarda', 'catchup', 'ketchup', 'maionese', 'shoyu', 'barbecue', 'tahine',
+        'wasabi', 'curry', 'alho', 'cebola', 'salsa', 'cebolinha', 'louro',
+        'canela', 'noz moscada', 'gergelim', 'lemon pepper', 'baiano', 'sazón',
+        'ajinomoto', 'glutamato', 'fumaça', 'defumado', 'balsâmico', 'tártaro',
+        'inglês', 'picante', 'agridoce', 'temperos', 'condimentos', 'especiarias'
+    ],
+    
+    'Conservas': [
+        'conserva', 'picles', 'azeitona', 'palmito', 'champignon', 'alcachofra',
+        'aspargos', 'pepininho', 'biquinho', 'jalapeño', 'tomate pelado', 'seco',
+        'pickles', 'cebolinha', 'cogumelo', 'funghi', 'aliche', 'sardinha',
+        'atum', 'bacalhau', 'camarão', 'polvo', 'lulas', 'frutos do mar',
+        'enlatados', 'vidros', 'conservados', 'marinados'
+    ],
+    
+    'Doces e Sobremesas': [
+        'doce', 'geleia', 'compota', 'mel', 'chocolate', 'açúcar', 'doce de leite',
+        'brigadeiro', 'goiabada', 'melado', 'gelatina', 'pudim', 'mousse',
+        'calda', 'abacaxi em calda', 'pêssego em calda', 'figo em calda',
+        'ameixa em calda', 'frutas cristalizadas', 'bombom', 'trufa', 'paçoca',
+        'cocada', 'rapadura', 'bala', 'pirulito', 'chiclete', 'goma', 'pastilha',
+        'sobremesa', 'sobremesas', 'adoçante', 'xarope', 'cobertura', 'recheio'
+    ],
+    
+    'Bebidas': [
+        'suco', 'refrigerante', 'agua', 'cerveja', 'vinho', 'cachaça', 'whisky',
+        'vodka', 'gin', 'rum', 'licor', 'conhaque', 'aperitivo', 'espumante',
+        'champagne', 'tequila', 'saquê', 'coca cola', 'fanta', 'sprite', 'guaraná',
+        'pepsi', 'dolly', 'sukita', 'antarctica', 'brahma', 'skol', 'heineken',
+        'stella', 'corona', 'budweiser', 'energético', 'isotônico', 'gatorade',
+        'red bull', 'monster', 'água tônica', 'schweppes', 'groselha', 'xarope',
+        'concentrado', 'bebida', 'bebidas', 'alcoólico', 'alcoolica'
+    ],
+    
+    'Limpeza': [
+        'detergente', 'sabao', 'sabão', 'desinfetante', 'amaciante', 'água sanitária',
+        'alvejante', 'multiuso', 'limpador', 'limpa vidros', 'cera', 'lustrador',
+        'desengraxante', 'removedor', 'cloro', 'bactericida', 'higiene', 'limpeza',
+        'sanitário', 'antibacteriano', 'antisséptico', 'esponja', 'pano', 'flanela'
+    ],
+    
+    'Carnes': [
+        'carne', 'frango', 'boi', 'suino', 'suína', 'bovino', 'bovina', 'aves',
+        'acém', 'alcatra', 'contrafilé', 'picanha', 'fraldinha', 'maminha',
+        'patinho', 'coxão', 'lagarto', 'músculo', 'costela', 'cupim', 'rabo',
+        'filé mignon', 'chorizo', 'bife', 'peito', 'coxa', 'sobrecoxa', 'asa',
+        'sassami', 'tulipa', 'presunto', 'mortadela', 'salame', 'linguiça',
+        'calabresa', 'pepperoni', 'bacon', 'lombo', 'pernil', 'panceta',
+        'toucinho', 'paio', 'apresuntado', 'blanquet', 'copa', 'hambúrguer',
+        'almôndega', 'steak', 'nuggets', 'empanado', 'congelado', 'resfriado',
+        'defumado', 'salgado', 'temperado', 'marinado', 'matoso', 'friboi'
+    ],
+    
+    'Laticínios': [
+        'leite', 'queijo', 'iogurte', 'manteiga', 'requeijão', 'cream cheese',
+        'muçarela', 'mozzarela', 'parmesão', 'provolone', 'gorgonzola', 'brie',
+        'camembert', 'gouda', 'estepe', 'coalho', 'minas', 'prato', 'colonial',
+        'frescal', 'canastra', 'ricota', 'mascarpone', 'cottage', 'cheddar',
+        'processado', 'fatiado', 'ralado', 'creme de leite', 'leite condensado',
+        'nata', 'chantilly', 'margarina', 'doce de leite', 'bebida láctea',
+        'coalhada', 'kefir', 'zero lactose', 'desnatado', 'integral', 'UHT',
+        'pasteurizado', 'orgânico', 'lácteo', 'laticínio', 'laticínios'
+    ],
+    
+    'Grãos e Cereais': [
+        'arroz', 'feijão', 'lentilha', 'grão de bico', 'soja', 'milho', 'aveia',
+        'quinoa', 'trigo', 'farinha', 'fubá', 'polenta', 'canjica', 'xerém',
+        'tapioca', 'polvilho', 'macarrão', 'massa', 'espaguete', 'penne',
+        'talharim', 'lasanha', 'nhoque', 'cereais', 'grãos', 'integral'
+    ],
+    
+    'Panificação e Confeitaria': [
+        'farinha', 'fermento', 'chocolate', 'açúcar', 'mel', 'essência', 'aroma',
+        'corante', 'bicarbonato', 'melhorador', 'glicose', 'glucose', 'frutose',
+        'emulsificante', 'estabilizante', 'cobertura', 'recheio', 'granulado',
+        'confeitos', 'sprinkles', 'pasta', 'creme', 'chantilly', 'panificação'
+    ],
+    
+    'Frios e Embutidos': [
+        'presunto', 'mortadela', 'salame', 'copa', 'lombo canadense', 'peito de peru',
+        'blanquet', 'apresuntado', 'pastrami', 'rosbeef', 'parma', 'prosciutto',
+        'linguiça', 'calabresa', 'pepperoni', 'bacon', 'panceta', 'toucinho',
+        'frios', 'embutidos', 'defumados', 'curados', 'fatiados'
+    ],
+    
+    'Congelados': [
+        'congelado', 'congelados', 'frozen', 'hambúrguer', 'nuggets', 'empanado',
+        'batata', 'vegetais', 'legumes', 'frutas', 'polpa', 'sorvete', 'picolé',
+        'açaí', 'pizza', 'lasanha', 'pão de açúcar', 'salgados', 'tortas'
+    ],
+    
+    'Higiene e Beleza': [
+        'shampoo', 'condicionador', 'sabonete', 'creme dental', 'escova',
+        'desodorante', 'perfume', 'loção', 'hidratante', 'protetor solar',
+        'papel higiênico', 'absorvente', 'fralda', 'lenço', 'algodão',
+        'higiene', 'beleza', 'cosméticos', 'perfumaria'
+    ],
+    
+    'Outros': [
+        'pet', 'ração', 'brinquedo', 'casa', 'jardim', 'auto', 'eletrônicos',
+        'pilha', 'bateria', 'carregador', 'cabo', 'diversos', 'variados',
+        'utensílios', 'descartáveis', 'embalagens', 'sacolas'
+    ]
+};
+
 
         const nameLower = name.toLowerCase();
         for (const [category, keywords] of Object.entries(categories)) {
