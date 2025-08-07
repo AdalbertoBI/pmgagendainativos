@@ -474,10 +474,37 @@ transformCachedProducts(cachedData) {
         document.getElementById('cnpj').addEventListener('input', (e) => {
             this.formatCNPJ(e.target);
         });
+        
 
-        // Modal
-        document.getElementById('closeModal').addEventListener('click', () => {
-            document.getElementById('offerModal').style.display = 'none';
+       // Modal - CÓDIGO CORRIGIDO PARA FECHAR AO CLICAR FORA
+        const modal = document.getElementById('offerModal');
+        const closeBtn = document.getElementById('closeModal');
+        
+        // Fechar modal com botão X
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                this.closeOfferModal();
+            });
+        }
+
+        // NOVO: Fechar modal ao clicar fora do conteúdo
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                // Verifica se o clique foi no overlay (fundo do modal) e não no conteúdo
+                if (e.target === modal) {
+                    this.closeOfferModal();
+                }
+            });
+        }
+
+        // NOVO: Fechar modal com tecla ESC
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('offerModal');
+                if (modal && modal.style.display === 'block') {
+                    this.closeOfferModal();
+                }
+            }
         });
 
         // Botões de ação
@@ -490,6 +517,50 @@ transformCachedProducts(cachedData) {
 
     // Evento para copiar para a área de transferência
     document.getElementById('copyToClipboard')?.addEventListener('click', () => this.copyToClipboard());
+
+    // NOVO: Event listeners para outros modais se existirem
+        this.setupAdditionalModalListeners();
+    }
+
+    // NOVO: Método específico para fechar o modal de oferta
+    closeOfferModal() {
+        const modal = document.getElementById('offerModal');
+        if (modal) {
+            modal.style.display = 'none';
+            console.log('🔐 Modal de oferta fechado');
+        }
+    }
+
+    // NOVO: Método para configurar outros modais
+    setupAdditionalModalListeners() {
+        // Modal de oferta customizada (se existir)
+        const customModal = document.querySelector('.offer-customized');
+        if (customModal) {
+            customModal.addEventListener('click', (e) => {
+                if (e.target === customModal) {
+                    customModal.style.display = 'none';
+                }
+            });
+
+            // Botão de fechar da oferta customizada
+            const customCloseBtn = customModal.querySelector('.close-btn');
+            if (customCloseBtn) {
+                customCloseBtn.addEventListener('click', () => {
+                    customModal.style.display = 'none';
+                });
+            }
+        }
+    }
+
+    // NOVO: Método melhorado para abrir modal
+    openOfferModal() {
+        const modal = document.getElementById('offerModal');
+        if (modal) {
+            modal.style.display = 'block';
+            // Focar no modal para acessibilidade
+            modal.focus();
+            console.log('🔓 Modal de oferta aberto');
+        }
         
     }
 
