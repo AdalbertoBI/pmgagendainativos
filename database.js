@@ -3,7 +3,7 @@
 class DatabaseManager {
     constructor() {
         this.dbName = 'ClientDatabase';
-        this.dbVersion = 4; // Incrementado para forçar upgrade
+        this.dbVersion = 5; // Incrementado para forçar upgrade
         this.db = null;
     }
 
@@ -180,3 +180,4 @@ class DatabaseManager {
 
 
 window.dbManager = new DatabaseManager();
+
