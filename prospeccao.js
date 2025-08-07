@@ -2115,7 +2115,7 @@ getProductImage(productCode) {
                 <h4><i class="fas fa-map-marker-alt"></i> Análise de Localização</h4>
                 <p><strong>Região:</strong> ${this.currentProspect.location.regiao}</p>
                 <p><strong>Perfil Econômico:</strong> ${this.currentProspect.location.perfil_economico}</p>
-                <p><strong>População Estimada:</strong> ${this.currentProspect.location.populacao_estimada.toLocaleString()}</p>
+                <p><strong>Alcance Estimado:</strong> ${this.currentProspect.location.populacao_estimada.toLocaleString()}</p>
                 <div class="concurrence-info">
                     <strong>Concorrência:</strong> ${this.currentProspect.location.concorrencia.nivel}
                     <br><small>${this.currentProspect.location.concorrencia.observacao}</small>
