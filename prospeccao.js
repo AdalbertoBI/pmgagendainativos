@@ -2325,7 +2325,7 @@ convertAnalysisToHtml(analysisText) {
 
             <div class="script-section">
                 <h4>🎯 PROPOSTA DE VALOR</h4>
-                <p>Com nossos 30 anos de experiência, atendemos mais de 5.000 clientes e oferecemos:</p>
+                <p>Com nossos 30 anos de experiência, atendemos mais de 20.000 clientes e oferecemos:</p>
                 <ul>
                     <li>✅ <strong>Preços competitivos</strong> - Compramos direto dos fabricantes</li>
                     <li>✅ <strong>Entrega programada</strong> - Garantimos o abastecimento do seu negócio</li>
