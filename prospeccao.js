@@ -47,9 +47,9 @@ class ProspeccaoManager {
         const catalogIntegrated = await this.integrateCatalogManager();
         if (catalogIntegrated) {
             console.log('✅ Catálogo carregado via CatalogManager');
-            // Garantir pelo menos 50 produtos, se possível
-            if (this.catalog.length < 50) {
-                const additionalProducts = this.createBasicCatalog().slice(0, 50 - this.catalog.length);
+            // Garantir pelo menos 150 produtos, se possível
+            if (this.catalog.length < 150) {
+                const additionalProducts = this.createBasicCatalog().slice(0, 150 - this.catalog.length);
                 this.catalog = [...this.catalog, ...additionalProducts];
             }
             return;
@@ -2342,11 +2342,11 @@ convertAnalysisToHtml(analysisText) {
                     <h4>🍕 ESPECIALIZADO PARA PIZZARIAS</h4>
                     <p>Trabalhamos com produtos específicos para pizzarias:</p>
                     <ul>
-                        <li>🥩 Calabresa Aurora de primeira qualidade</li>
+                        <li>🥩 Calabresa, frango eoutras proteinas de primeira qualidade</li>
                         <li>🧀 Queijos especiais para pizza</li>
                         <li>🍅 Molhos de tomate sem acidez</li>
                         <li>🫒 Azeitonas importadas e nacionais</li>
-                        <li>🥓 Bacon em cubos para pizzas gourmet</li>
+                        <li>🥓 Bacon em cubos e muito mais</li>
                     </ul>
                 </div>
             `;
@@ -2383,7 +2383,7 @@ convertAnalysisToHtml(analysisText) {
         script += `
             <div class="script-section">
                 <h4>🤝 PRÓXIMOS PASSOS</h4>
-                <p>Gostaria de agendar uma visita para apresentar nossos produtos pessoalmente?</p>
+                <p>Gostaria de apresentar nossos produtos?</p>
                 <p>Posso enviar um catálogo personalizado com sugestões específicas para o seu negócio.</p>
                 <p><strong>Quando seria um bom horário para conversarmos com mais detalhes?</strong></p>
             </div>
@@ -2611,7 +2611,7 @@ ${selectedProductsText}
 ✅ Suporte técnico especializado
 
 📞 VAMOS CONVERSAR?
-Gostaria de agendar uma visita para apresentar nossos produtos pessoalmente?
+Gostaria de apresentar nossos produtos?
 
 Quando seria um bom horário para conversarmos com mais detalhes?
 
