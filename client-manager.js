@@ -262,6 +262,69 @@ class ClientManager {
             return [];
         }
     }
+// Excluir cliente inativo - NOVA FUNÇÃO
+async excluirCliente(cliente) {
+    try {
+        const clienteNome = cliente['Nome Fantasia'] || 'Cliente sem nome';
+        console.log('🗑️ Excluindo cliente:', clienteNome);
+        
+        // Verificar se está na lista de inativos
+        const indexInativo = this.data.findIndex(c => c.id === cliente.id);
+        if (indexInativo !== -1) {
+            // Remover da lista de inativos
+            this.data.splice(indexInativo, 1);
+            console.log(`✅ Cliente removido da lista de inativos (posição ${indexInativo})`);
+            
+            // Salvar mudanças
+            await window.dbManager.saveArrayData('clients', this.data);
+            window.data = this.data;
+            
+            console.log('✅ Cliente excluído com sucesso dos inativos');
+            return { success: true, tipo: 'inativo' };
+        }
+        
+        // Verificar se está na lista de ativos
+        const indexAtivo = this.ativos.findIndex(c => c.id === cliente.id);
+        if (indexAtivo !== -1) {
+            // Usar função existente para excluir ativo
+            await this.excluirAtivo(cliente);
+            console.log('✅ Cliente excluído com sucesso dos ativos');
+            return { success: true, tipo: 'ativo' };
+        }
+        
+        console.warn('⚠️ Cliente não encontrado em nenhuma lista');
+        return { success: false, message: 'Cliente não encontrado' };
+        
+    } catch (error) {
+        console.error('❌ Erro ao excluir cliente:', error);
+        throw error;
+    }
+}
+
+// Excluir cliente por ID - NOVA FUNÇÃO
+async excluirClientePorId(clienteId) {
+    try {
+        console.log('🗑️ Excluindo cliente por ID:', clienteId);
+        
+        // Procurar primeiro nos inativos
+        const clienteInativo = this.data.find(c => c.id === clienteId);
+        if (clienteInativo) {
+            return await this.excluirCliente(clienteInativo);
+        }
+        
+        // Procurar nos ativos
+        const clienteAtivo = this.ativos.find(c => c.id === clienteId);
+        if (clienteAtivo) {
+            return await this.excluirCliente(clienteAtivo);
+        }
+        
+        return { success: false, message: 'Cliente não encontrado' };
+        
+    } catch (error) {
+        console.error('❌ Erro ao excluir cliente por ID:', error);
+        throw error;
+    }
+}
 
     // Aplicar filtros e ordenação
     applyFiltersAndSort() {
@@ -520,11 +583,13 @@ class ClientManager {
                 </div>
                 
                 <!-- Botões de ação -->
-                <div class="action-buttons" style="margin-top: 20px;">
-                    <button id="editarCliente" class="action-btn edit-btn">✏️ Editar Cliente</button>
-                    <button id="salvarEdicao" class="action-btn save-btn" style="display: none;">💾 Salvar</button>
-                    <button id="cancelarEdicao" class="action-btn cancel-btn" style="display: none;">❌ Cancelar</button>
-                </div>
+<div class="action-buttons" style="margin-top: 20px;">
+    <button id="editarCliente" class="action-btn edit-btn">✏️ Editar Cliente</button>
+    <button id="excluirCliente" class="action-btn delete-btn" onclick="excluirClienteAtual()" style="background-color: #dc3545; color: white; border: 1px solid #dc3545;">🗑️ Excluir Cliente</button>
+    <button id="salvarEdicao" class="action-btn save-btn" style="display: none;">💾 Salvar</button>
+    <button id="cancelarEdicao" class="action-btn cancel-btn" style="display: none;">❌ Cancelar</button>
+</div>
+
             `;
 
             // Configurar event listeners para os botões de edição
@@ -728,7 +793,10 @@ async createBackup(dataType, data) {
         // O object store 'backups' será criado automaticamente no init, então não precisamos de initBackupStore
     }
 
+    
+
 }
+
 }
 
 // Função global para exclusão robusta de ativos - NOVA

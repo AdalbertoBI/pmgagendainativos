@@ -400,6 +400,7 @@ async function handleConfirmarAtivo() {
     }
 }
 
+
 async function handleExcluirAtivo() {
     try {
         const cliente = window.clientManager.currentItem;
@@ -419,6 +420,63 @@ async function handleExcluirAtivo() {
     } catch (error) {
         console.error('❌ Erro ao excluir cliente ativo:', error);
         alert('❌ Erro ao excluir cliente ativo: ' + error.message);
+    }
+}
+async function excluirClienteAtual() {
+    if (!window.clientManager.currentItem) {
+        alert('❌ Nenhum cliente selecionado');
+        return;
+    }
+    
+    const cliente = window.clientManager.currentItem;
+    const nomeCliente = cliente['Nome Fantasia'] || 'Cliente sem nome';
+    
+    // Confirmar exclusão
+    const confirmar = confirm(`⚠️ Tem certeza que deseja excluir permanentemente o cliente "${nomeCliente}"?\n\nEsta ação não pode ser desfeita!`);
+    
+    if (!confirmar) {
+        return;
+    }
+    
+    try {
+        // Mostrar loading
+        const loadingMessage = document.createElement('div');
+        loadingMessage.innerHTML = '🔄 Excluindo cliente...';
+        loadingMessage.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); z-index: 10001;';
+        document.body.appendChild(loadingMessage);
+        
+        // Executar exclusão
+        const resultado = await window.clientManager.excluirCliente(cliente);
+        
+        // Remover loading
+        document.body.removeChild(loadingMessage);
+        
+        if (resultado.success) {
+            // Fechar modal
+            document.getElementById('modal').style.display = 'none';
+            
+            // Atualizar lista
+            window.clientManager.applyFiltersAndSort();
+            renderAtivos();
+            
+            // Mostrar mensagem de sucesso
+            alert(`✅ Cliente "${nomeCliente}" foi excluído com sucesso da lista de ${resultado.tipo}s!`);
+            
+            console.log('✅ Cliente excluído com sucesso:', nomeCliente);
+        } else {
+            alert(`❌ Erro ao excluir cliente: ${resultado.message}`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Erro ao excluir cliente:', error);
+        
+        // Remover loading se ainda existir
+        const existingLoading = document.querySelector('div[style*="position: fixed"]');
+        if (existingLoading) {
+            document.body.removeChild(existingLoading);
+        }
+        
+        alert(`❌ Erro ao excluir cliente: ${error.message}`);
     }
 }
 
@@ -1297,6 +1355,8 @@ function limparTudoERecarregar() {
         alert('✅ Limpeza concluída! A página será recarregada.');
         window.location.reload(true);
     }
+
+    
 }
 
 // Disponibilizar no console para emergências
