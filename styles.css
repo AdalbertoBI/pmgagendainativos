@@ -2213,14 +2213,3 @@ button:active {
         gap: 0.5rem;
     }
 }
-.action-btn.delete-btn {
-    background-color: #dc3545;
-    color: white;
-    border: 1px solid #dc3545;
-    transition: background-color 0.3s ease;
-}
-
-.action-btn.delete-btn:hover {
-    background-color: #c82333;
-    border-color: #bd2130;
-}

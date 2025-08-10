@@ -10,6 +10,10 @@ class CatalogManager {
         this.pdfText = '';
         this.extractedProducts = [];
          this.imagesMap = {}; // <- Aqui você guarda o mapping
+        // Faixa de preço selecionada (persistida)
+        this.priceBand = localStorage.getItem('priceBand') || 'retira';
+        // Preferência de fundo dinâmico
+        this.dynamicBackground = localStorage.getItem('dynamicBg') === 'true';
     }
     // === MÉTODOS DE PERSISTÊNCIA ===
 
@@ -110,6 +114,8 @@ async init() {
             this.extractedProducts = cachedCatalog.extractedProducts || [];
             this.pdfText = cachedCatalog.pdfText || '';
             this.filteredProducts = [...this.products];
+            // Aplicar faixa de preço aos produtos (caso tenham prices)
+            this.applyPriceBandToProducts();
             
             this.updateCatalogStatus(`Catálogo carregado do cache: ${cachedCatalog.fileName} (${cachedCatalog.products.length} produtos)`);
             this.renderProductsGrid();
@@ -121,6 +127,11 @@ async init() {
         }
         
         this.setupEventListeners();
+        // Inicializar valor do seletor de faixa, se existir
+        const priceBandSelect = document.getElementById('price-band-select');
+        if (priceBandSelect) {
+            priceBandSelect.value = this.priceBand;
+        }
         
     } catch (error) {
         console.error('❌ Erro na inicialização:', error);
@@ -150,10 +161,15 @@ const catalogFileInput = document.getElementById('catalog-file-input');
 if (catalogFileInput) {
     catalogFileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
-        if (file && file.type === 'application/pdf') {
+        if (!file) return;
+        const name = (file.name || '').toLowerCase();
+        const type = file.type || '';
+        if (name.endsWith('.pdf') || type === 'application/pdf') {
             this.loadNewCatalog(file);
-        } else if (file) {
-            alert('Por favor, selecione um arquivo PDF válido.');
+        } else if (name.endsWith('.xlsx') || type.includes('sheet') || type.includes('excel')) {
+            this.loadExcelCatalog(file);
+        } else {
+            alert('Selecione .pdf ou .xlsx');
         }
     });
 }
@@ -181,6 +197,24 @@ if (refreshBtn) {
         if (selectMultipleBtn) {
             selectMultipleBtn.addEventListener('click', () => {
                 this.openProductSelectionModal();
+            });
+        }
+
+        // Seletor de faixa de preço
+        const priceBandSelect = document.getElementById('price-band-select');
+        if (priceBandSelect) {
+            priceBandSelect.addEventListener('change', (e) => {
+                this.setPriceBand(e.target.value);
+            });
+        }
+
+        // Toggle de fundo dinâmico
+        const toggleBg = document.getElementById('toggle-dynamic-bg');
+        if (toggleBg) {
+            toggleBg.checked = this.dynamicBackground;
+            toggleBg.addEventListener('change', (e) => {
+                this.dynamicBackground = !!e.target.checked;
+                localStorage.setItem('dynamicBg', String(this.dynamicBackground));
             });
         }
 
@@ -387,6 +421,130 @@ async loadNewCatalog(pdfFile) {
     }
 }
 
+// Novo: carregar catálogo de Excel com múltiplas faixas de preço
+async loadExcelCatalog(file) {
+    try {
+        this.isLoading = true;
+        this.updateCatalogStatus('Carregando planilha (.xlsx)...');
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+        const normalize = (s) => String(s || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        const headerMap = {
+            codigo: ['codigo', 'código', 'cod'],
+            produto: ['produto', 'descricao', 'descrição', 'nome'],
+            unidade: ['unidade', 'und', 'uni'],
+            retira: ['retira r$', 'retira', 'preco retira', 'preço retira'],
+            entrega: ['entrega r$', 'entrega', 'preco entrega', 'preço entrega'],
+            km100_199: ['100 a 199 km', '100-199', '100 a 199km'],
+            km200_299: ['200 a 299 km', '200-299', '200 a 299km'],
+            km300_399: ['300 a 399 km', '300-399', '300 a 399km'],
+            km400_499: ['400 a 499 km', '400-499', '400 a 499km'],
+            km500_599: ['500 a 599 km', '500-599', '500 a 599km'],
+            km600_plus: ['acima 600km', 'acima de 600km', '600+', 'acima de 600 km']
+        };
+
+        // Descobrir as colunas da primeira linha
+        if (!rows.length) throw new Error('Planilha vazia');
+
+        const mapColumns = (obj) => {
+            const mapped = {};
+            for (const [key, aliases] of Object.entries(headerMap)) {
+                const foundKey = Object.keys(obj).find(k => aliases.includes(normalize(k)));
+                if (foundKey) mapped[key] = foundKey; // guarda o nome original da coluna
+            }
+            return mapped;
+        };
+
+        const columns = mapColumns(rows[0]);
+        if (!columns.codigo || !columns.produto || !columns.unidade) {
+            throw new Error('Colunas obrigatórias ausentes: Código, Produto, Unidade');
+        }
+
+        const toNumber = (val) => {
+            if (val === null || val === undefined) return 0;
+            if (typeof val === 'number') return val;
+            const s = String(val).replace(/[^\d,.-]/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.');
+            const n = parseFloat(s);
+            return isNaN(n) ? 0 : n;
+        };
+
+        const products = [];
+        for (const row of rows) {
+            const codeRaw = row[columns.codigo];
+            const nameRaw = row[columns.produto];
+            const unitRaw = row[columns.unidade];
+            if (!codeRaw || !nameRaw) continue;
+
+            const code = String(codeRaw).trim();
+            const name = String(nameRaw).trim();
+            const unit = String(unitRaw || 'UN').toUpperCase().trim();
+
+            const prices = {
+                retira: toNumber(row[columns.retira]),
+                entrega: toNumber(row[columns.entrega]),
+                km100_199: toNumber(row[columns.km100_199]),
+                km200_299: toNumber(row[columns.km200_299]),
+                km300_399: toNumber(row[columns.km300_399]),
+                km400_499: toNumber(row[columns.km400_499]),
+                km500_599: toNumber(row[columns.km500_599]),
+                km600_plus: toNumber(row[columns.km600_plus])
+            };
+
+            const priceForBand = prices[this.priceBand] || prices.retira || 0;
+            const product = {
+                id: products.length + 1,
+                code,
+                name,
+                unit,
+                prices,
+                price: priceForBand,
+                formattedPrice: priceForBand.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+                description: this.generateDescription(name),
+                image: this.generateProductImagePath(code),
+                category: this.categorizeProduct(name)
+            };
+            products.push(product);
+        }
+
+        if (!products.length) {
+            throw new Error('Nenhum produto válido encontrado na planilha');
+        }
+
+        this.products = products;
+        this.filteredProducts = [...this.products];
+
+        // Persistir no cache
+        this.saveCatalogToCache({
+            products: this.products,
+            extractedProducts: [],
+            pdfText: '',
+            fileName: file.name || 'Catálogo Excel'
+        });
+
+        this.updateCatalogStatus(`Catálogo Excel carregado: ${this.products.length} produtos`);
+        this.renderProductsGrid();
+
+        // limpar input
+        const fileInput = document.getElementById('catalog-file-input');
+        if (fileInput) fileInput.value = '';
+    } catch (err) {
+        console.error('❌ Erro ao carregar Excel:', err);
+        this.updateCatalogStatus(`Erro ao carregar Excel: ${err.message}`);
+    } finally {
+        this.isLoading = false;
+    }
+}
+
     // Carregar catálogo otimizado com recarregamento forçado de imagens
 async loadPdfCatalog() {
     if (this.isLoading) return;
@@ -505,8 +663,9 @@ async processProductsAdvanced() {
         id: index + 1,
         code: product.cod,
         name: product.produto,
-        price: this.parsePrice(product.preco),
-        formattedPrice: `R$ ${product.preco}`,
+    // Em catálogo PDF não há faixas; manter preço simples
+    price: this.parsePrice(product.preco),
+    formattedPrice: `R$ ${product.preco}`,
         description: this.generateDescription(product.produto),
         image: this.generateProductImagePath(product.cod),
         category: this.categorizeProduct(product.produto),
@@ -828,114 +987,15 @@ handleImageError(imgElement, codigo) {
 
     categorizeProduct(name) {
         const categories = {
-    'Temperos e Condimentos': [
-        'aceto', 'vinagre', 'azeite', 'oleo', 'sal', 'pimenta', 'tempero', 'molho',
-        'colorífico', 'cominho', 'orégano', 'manjericão', 'páprica', 'chimichurri',
-        'mostarda', 'catchup', 'ketchup', 'maionese', 'shoyu', 'barbecue', 'tahine',
-        'wasabi', 'curry', 'alho', 'cebola', 'salsa', 'cebolinha', 'louro',
-        'canela', 'noz moscada', 'gergelim', 'lemon pepper', 'baiano', 'sazón',
-        'ajinomoto', 'glutamato', 'fumaça', 'defumado', 'balsâmico', 'tártaro',
-        'inglês', 'picante', 'agridoce', 'temperos', 'condimentos', 'especiarias'
-    ],
-    
-    'Conservas': [
-        'conserva', 'picles', 'azeitona', 'palmito', 'champignon', 'alcachofra',
-        'aspargos', 'pepininho', 'biquinho', 'jalapeño', 'tomate pelado', 'seco',
-        'pickles', 'cebolinha', 'cogumelo', 'funghi', 'aliche', 'sardinha',
-        'atum', 'bacalhau', 'camarão', 'polvo', 'lulas', 'frutos do mar',
-        'enlatados', 'vidros', 'conservados', 'marinados'
-    ],
-    
-    'Doces e Sobremesas': [
-        'doce', 'geleia', 'compota', 'mel', 'chocolate', 'açúcar', 'doce de leite',
-        'brigadeiro', 'goiabada', 'melado', 'gelatina', 'pudim', 'mousse',
-        'calda', 'abacaxi em calda', 'pêssego em calda', 'figo em calda',
-        'ameixa em calda', 'frutas cristalizadas', 'bombom', 'trufa', 'paçoca',
-        'cocada', 'rapadura', 'bala', 'pirulito', 'chiclete', 'goma', 'pastilha',
-        'sobremesa', 'sobremesas', 'adoçante', 'xarope', 'cobertura', 'recheio'
-    ],
-    
-    'Bebidas': [
-        'suco', 'refrigerante', 'agua', 'cerveja', 'vinho', 'cachaça', 'whisky',
-        'vodka', 'gin', 'rum', 'licor', 'conhaque', 'aperitivo', 'espumante',
-        'champagne', 'tequila', 'saquê', 'coca cola', 'fanta', 'sprite', 'guaraná',
-        'pepsi', 'dolly', 'sukita', 'antarctica', 'brahma', 'skol', 'heineken',
-        'stella', 'corona', 'budweiser', 'energético', 'isotônico', 'gatorade',
-        'red bull', 'monster', 'água tônica', 'schweppes', 'groselha', 'xarope',
-        'concentrado', 'bebida', 'bebidas', 'alcoólico', 'alcoolica'
-    ],
-    
-    'Limpeza': [
-        'detergente', 'sabao', 'sabão', 'desinfetante', 'amaciante', 'água sanitária',
-        'alvejante', 'multiuso', 'limpador', 'limpa vidros', 'cera', 'lustrador',
-        'desengraxante', 'removedor', 'cloro', 'bactericida', 'higiene', 'limpeza',
-        'sanitário', 'antibacteriano', 'antisséptico', 'esponja', 'pano', 'flanela'
-    ],
-    
-    'Carnes': [
-        'carne', 'frango', 'boi', 'suino', 'suína', 'bovino', 'bovina', 'aves',
-        'acém', 'alcatra', 'contrafilé', 'picanha', 'fraldinha', 'maminha',
-        'patinho', 'coxão', 'lagarto', 'músculo', 'costela', 'cupim', 'rabo',
-        'filé mignon', 'chorizo', 'bife', 'peito', 'coxa', 'sobrecoxa', 'asa',
-        'sassami', 'tulipa', 'presunto', 'mortadela', 'salame', 'linguiça',
-        'calabresa', 'pepperoni', 'bacon', 'lombo', 'pernil', 'panceta',
-        'toucinho', 'paio', 'apresuntado', 'blanquet', 'copa', 'hambúrguer',
-        'almôndega', 'steak', 'nuggets', 'empanado', 'congelado', 'resfriado',
-        'defumado', 'salgado', 'temperado', 'marinado', 'matoso', 'friboi'
-    ],
-    
-    'Laticínios': [
-        'leite', 'queijo', 'iogurte', 'manteiga', 'requeijão', 'cream cheese',
-        'muçarela', 'mozzarela', 'parmesão', 'provolone', 'gorgonzola', 'brie',
-        'camembert', 'gouda', 'estepe', 'coalho', 'minas', 'prato', 'colonial',
-        'frescal', 'canastra', 'ricota', 'mascarpone', 'cottage', 'cheddar',
-        'processado', 'fatiado', 'ralado', 'creme de leite', 'leite condensado',
-        'nata', 'chantilly', 'margarina', 'doce de leite', 'bebida láctea',
-        'coalhada', 'kefir', 'zero lactose', 'desnatado', 'integral', 'UHT',
-        'pasteurizado', 'orgânico', 'lácteo', 'laticínio', 'laticínios'
-    ],
-    
-    'Grãos e Cereais': [
-        'arroz', 'feijão', 'lentilha', 'grão de bico', 'soja', 'milho', 'aveia',
-        'quinoa', 'trigo', 'farinha', 'fubá', 'polenta', 'canjica', 'xerém',
-        'tapioca', 'polvilho', 'macarrão', 'massa', 'espaguete', 'penne',
-        'talharim', 'lasanha', 'nhoque', 'cereais', 'grãos', 'integral'
-    ],
-    
-    'Panificação e Confeitaria': [
-        'farinha', 'fermento', 'chocolate', 'açúcar', 'mel', 'essência', 'aroma',
-        'corante', 'bicarbonato', 'melhorador', 'glicose', 'glucose', 'frutose',
-        'emulsificante', 'estabilizante', 'cobertura', 'recheio', 'granulado',
-        'confeitos', 'sprinkles', 'pasta', 'creme', 'chantilly', 'panificação'
-    ],
-    
-    'Frios e Embutidos': [
-        'presunto', 'mortadela', 'salame', 'copa', 'lombo canadense', 'peito de peru',
-        'blanquet', 'apresuntado', 'pastrami', 'rosbeef', 'parma', 'prosciutto',
-        'linguiça', 'calabresa', 'pepperoni', 'bacon', 'panceta', 'toucinho',
-        'frios', 'embutidos', 'defumados', 'curados', 'fatiados'
-    ],
-    
-    'Congelados': [
-        'congelado', 'congelados', 'frozen', 'hambúrguer', 'nuggets', 'empanado',
-        'batata', 'vegetais', 'legumes', 'frutas', 'polpa', 'sorvete', 'picolé',
-        'açaí', 'pizza', 'lasanha', 'pão de açúcar', 'salgados', 'tortas'
-    ],
-    
-    'Higiene e Beleza': [
-        'shampoo', 'condicionador', 'sabonete', 'creme dental', 'escova',
-        'desodorante', 'perfume', 'loção', 'hidratante', 'protetor solar',
-        'papel higiênico', 'absorvente', 'fralda', 'lenço', 'algodão',
-        'higiene', 'beleza', 'cosméticos', 'perfumaria'
-    ],
-    
-    'Outros': [
-        'pet', 'ração', 'brinquedo', 'casa', 'jardim', 'auto', 'eletrônicos',
-        'pilha', 'bateria', 'carregador', 'cabo', 'diversos', 'variados',
-        'utensílios', 'descartáveis', 'embalagens', 'sacolas'
-    ]
-};
-
+            'Temperos e Condimentos': ['aceto', 'vinagre', 'azeite', 'oleo', 'sal', 'pimenta', 'tempero', 'molho'],
+            'Conservas': ['conserva', 'picles', 'azeitona', 'palmito'],
+            'Doces e Sobremesas': ['doce', 'geleia', 'compota', 'mel', 'chocolate', 'açúcar'],
+            'Bebidas': ['suco', 'refrigerante', 'agua', 'cerveja', 'vinho'],
+            'Limpeza': ['detergente', 'sabao', 'desinfetante', 'amaciante'],
+            'Carnes': ['carne', 'frango', 'boi', 'suino', 'bovino', 'aves', 'acém', 'matoso'],
+            'Laticínios': ['leite', 'queijo', 'iogurte', 'manteiga', 'requeijao'],
+            'Outros': []
+        };
 
         const nameLower = name.toLowerCase();
         for (const [category, keywords] of Object.entries(categories)) {
@@ -1005,6 +1065,40 @@ handleImageError(imgElement, codigo) {
         });
     }
 
+    // Aplicar faixa de preço corrente aos produtos que possuem múltiplas faixas (prices)
+    applyPriceBandToProducts() {
+        if (!Array.isArray(this.products)) return;
+        const band = this.priceBand || 'retira';
+        this.products = this.products.map(p => {
+            if (p && p.prices) {
+                const val = p.prices[band] ?? p.prices.retira ?? p.price ?? 0;
+                return {
+                    ...p,
+                    price: val,
+                    formattedPrice: (typeof val === 'number') ? val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : String(val)
+                };
+            }
+            return p;
+        });
+        this.filteredProducts = [...this.products];
+        // Atualiza grid se já houver
+        this.renderProductsGrid();
+        // Se prospecção estiver aberta, atualizar catálogo interno
+        if (window.prospeccaoManager && typeof window.prospeccaoManager.applyPriceBandToLocalCatalog === 'function') {
+            window.prospeccaoManager.applyPriceBandToLocalCatalog(band);
+        }
+    }
+
+    // Alterar faixa de preço
+    setPriceBand(band) {
+        const allowed = ['retira','entrega','km100_199','km200_299','km300_399','km400_499','km500_599','km600_plus'];
+        if (!allowed.includes(band)) return;
+        this.priceBand = band;
+        localStorage.setItem('priceBand', band);
+        this.applyPriceBandToProducts();
+        this.showNotification('Faixa de preço atualizada', 'success', 1500);
+    }
+
     openProductModal(product) {
         this.currentProduct = product;
         const modal = document.getElementById('modal-produto');
@@ -1048,7 +1142,10 @@ handleImageError(imgElement, codigo) {
 
         if (enviarImagemBtn) {
             enviarImagemBtn.addEventListener('click', () => {
-                this.generateProductImage(product);
+                // Usar o sistema de múltiplos produtos para produto único
+                this.selectedProducts = [product];
+                this.generateImageOffersVisual();
+                modal.style.display = 'none';
             });
         }
 
@@ -1088,187 +1185,232 @@ handleImageError(imgElement, codigo) {
         }
     }
 
-    // GERAR IMAGEM INDIVIDUAL COM MESMO PADRÃO DOS MÚLTIPLOS PRODUTOS - CORRIGIDO
-async generateProductImage(product) {
-    try {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        // MESMAS DIMENSÕES DOS PRODUTOS MÚLTIPLOS (dimensões de um quadrante)
-        canvas.width = 900; // Largura individual igual aos múltiplos
-        canvas.height = 1000; // Altura individual igual aos múltiplos
-        
-        // Fundo branco completo (IGUAL AOS MÚLTIPLOS)
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // MESMA ÁREA DE IMAGEM DOS MÚLTIPLOS PRODUTOS
-        const imageArea = {
-            x: 80,
-            y: 80,
-            width: 700, // Imagem muito maior (IGUAL AOS MÚLTIPLOS)
-            height: 700 // Imagem muito maior (IGUAL AOS MÚLTIPLOS)
-        };
-        
-        // Carregar e desenhar a imagem do produto (MÉTODO IDÊNTICO)
-        try {
-            const productImg = new Image();
-            productImg.crossOrigin = 'anonymous';
-            
-            await new Promise((resolve, reject) => {
-                productImg.onload = () => {
-                    ctx.fillStyle = '#ffffffff';
-                    ctx.fillRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
-                    ctx.strokeStyle = '#ffffffff';
-                    ctx.lineWidth = 4; // Borda interna mais visível
-                    ctx.strokeRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
-                    
-                    const imgAspect = productImg.width / productImg.height;
-                    const areaAspect = imageArea.width / imageArea.height;
-                    
-                    let drawWidth, drawHeight, drawX, drawY;
-                    
-                    if (imgAspect > areaAspect) {
-                        drawWidth = imageArea.width - 10;
-                        drawHeight = drawWidth / imgAspect;
-                        drawX = imageArea.x + 5;
-                        drawY = imageArea.y + (imageArea.height - drawHeight) / 2;
-                    } else {
-                        drawHeight = imageArea.height - 10;
-                        drawWidth = drawHeight * imgAspect;
-                        drawX = imageArea.x + (imageArea.width - drawWidth) / 2;
-                        drawY = imageArea.y + 5;
-                    }
-                    
-                    ctx.drawImage(productImg, drawX, drawY, drawWidth, drawHeight);
-                    resolve();
-                };
-                
-                productImg.onerror = () => {
-                    console.log('Erro ao carregar imagem, usando placeholder');
-                    ctx.fillStyle = '#f8f9fa';
-                    ctx.fillRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
-                    ctx.strokeStyle = '#ffffffff';
-                    ctx.lineWidth = 4;
-                    ctx.strokeRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
-                    ctx.fillStyle = '#ffffffff';
-                    ctx.font = '200px Arial'; // Texto muito maior
-                    ctx.textAlign = 'center';
-                    ctx.fillText('📦', imageArea.x + imageArea.width/2, imageArea.y + imageArea.height/2 + 80);
-                    ctx.fillStyle = '#ffffffff';
-                    ctx.font = '70px Arial'; // Texto muito maior
-                    ctx.fillText(product.code, imageArea.x + imageArea.width/2, imageArea.y + imageArea.height/2 + 200);
-                    resolve();
-                };
-                
-                productImg.src = product.image;
-            });
-        } catch (error) {
-            console.log('Erro ao processar imagem:', error);
-        }
-        
-        // PREÇO EM DESTAQUE (POSIÇÃO E ESTILO IDÊNTICOS AOS MÚLTIPLOS)
-        ctx.fillStyle = '#dc3545';
-        ctx.font = 'bold 80px Arial'; // Texto muito maior (IGUAL AOS MÚLTIPLOS)
-        ctx.textAlign = 'center';
-        ctx.fillText(product.formattedPrice, canvas.width / 2, 720); // Posição igual aos múltiplos
-
-        // UNIDADE (POSIÇÃO E ESTILO IDÊNTICOS AOS MÚLTIPLOS)
-        ctx.fillStyle = '#dc3545';
-        ctx.font = '40px Arial'; // Texto muito maior (IGUAL AOS MÚLTIPLOS)
-        ctx.textAlign = 'center';
-        ctx.fillText(`(${product.unit})`, canvas.width / 2, 780); // Posição igual aos múltiplos
-
-        // NOME DO PRODUTO COM QUEBRAS DE LINHA (MÉTODO IDÊNTICO)
-        ctx.fillStyle = '#333333';
-        ctx.font = 'bold 50px Arial'; // Texto muito maior (IGUAL AOS MÚLTIPLOS)
-        ctx.textAlign = 'center';
-        const maxCharsPerLine = 20; // Limite de caracteres por linha (IGUAL AOS MÚLTIPLOS)
-        const lines = [];
-        let currentLine = '';
-        product.name.split(' ').forEach(word => {
-            const testLine = currentLine + (currentLine ? ' ' : '') + word;
-            if (testLine.length > maxCharsPerLine) {
-                lines.push(currentLine);
-                currentLine = word;
-            } else {
-                currentLine = testLine;
-            }
-        });
-        if (currentLine) lines.push(currentLine);
-        const maxLines = 3; // Limite de linhas (IGUAL AOS MÚLTIPLOS)
-        const displayedLines = lines.slice(0, maxLines);
-        if (lines.length > maxLines) displayedLines[maxLines - 1] += '...';
-        displayedLines.forEach((line, index) => {
-            ctx.fillText(line, canvas.width / 2, 850 + (index * 60)); // Posições iguais aos múltiplos
-        });
-        
-        // Converter canvas para blob e copiar (MÉTODO IDÊNTICO)
-        canvas.toBlob(async (blob) => {
-            try {
-                const item = new ClipboardItem({ 'image/png': blob });
-                await navigator.clipboard.write([item]);
-                alert('✅ Imagem do produto copiada para a área de transferência!');
-            } catch (error) {
-                console.error('Erro ao copiar imagem:', error);
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `produto-${product.code}.png`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                alert('✅ Imagem baixada! Você pode compartilhar o arquivo baixado.');
-            }
-        }, 'image/png');
-        
-    } catch (error) {
-        console.error('Erro ao gerar imagem:', error);
-        alert('❌ Erro ao gerar imagem. Tente usar a opção de texto.');
-    }
-}
-
-    // Geração de imagem visual com 4 produtos por linha, borda verde externa, imagens maiores, fundo branco
-// Geração de imagem visual auto-ajustável para 3, 4 ou 5 produtos por linha
+    // Geração de imagem visual auto-ajustável para 1-5 produtos por linha
 async generateImageOffersVisual() {
     if (!this.selectedProducts || this.selectedProducts.length === 0) {
         this.showNotification('Selecione pelo menos um produto para gerar ofertas visuais', 'warning');
         return;
     }
 
+    // TESTE INICIAL DO FUNDO DINÂMICO
+    console.log('🧪 TESTE DE FUNDO DINÂMICO:');
+    console.log('  - this.dynamicBackground:', this.dynamicBackground);
+    console.log('  - localStorage.dynamicBg:', localStorage.getItem('dynamicBg'));
+    console.log('  - Checkbox estado:', document.getElementById('toggle-dynamic-bg')?.checked);
+
     this.updateCatalogStatus('Gerando imagem visual...');
 
     try {
-        // ✅ NOVA LÓGICA AUTO-AJUSTÁVEL PARA PRODUTOS POR LINHA
+        // ✅ NOVA LÓGICA AUTO-AJUSTÁVEL PARA PRODUTOS POR LINHA (1-5)
         const productsPerRow = this.selectOptimalProductsPerRow(this.selectedProducts.length);
         
-        const productWidth = 900; // Aumentado significativamente
-        const productHeight = 1000; // Aumentado significativamente
-        const padding = 40; // Aumentado para melhor espaçamento
-        const logoSectionHeight = 200; // Aumentado ainda mais para logo maior
-
+        // ✅ OBTER DIMENSÕES RESPONSIVAS BASEADAS NO LAYOUT
+        const dims = this.getResponsiveDimensions(productsPerRow);
+        
+        const productWidth = dims.productWidth;
+        const productHeight = dims.productHeight;
+        const padding = dims.padding;
+        
         const rows = Math.ceil(this.selectedProducts.length / productsPerRow);
         const canvasWidth = productsPerRow * (productWidth + padding) + padding;
+        
+        // Logo responsivo baseado nas dimensões do layout
+        let logoSectionHeight = dims.logoMaxHeight + 60;
         const canvasHeight = logoSectionHeight + (rows * (productHeight + padding)) + padding;
 
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        canvas.width = canvasWidth;
-        canvas.height = canvasHeight;
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
         
-        // Fundo branco completo
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Fundo dinâmico ou branco (inline)
+        console.log('🔍 Status do fundo dinâmico:', this.dynamicBackground);
+        console.log('🔍 LocalStorage dynamicBg:', localStorage.getItem('dynamicBg'));
+        if (this.dynamicBackground) {
+            console.log('🖼️ Tentando carregar fundo dinâmico...');
+            
+            // ✅ USAR O TÍTULO COMPLETO DO PRODUTO 1 LIMPO PARA O FUNDO
+            const produto1 = this.selectedProducts[0];
+            
+            // Limpar o nome do produto removendo números, medidas e caracteres especiais
+            const nomeLimpo = produto1.name
+                .toLowerCase()
+                // Remove unidades de medida comuns
+                .replace(/\d+(\.\d+)?\s*(kg|g|ml|l|un|pct|cx|lt|bd|vd|fr|bag|bis|pt|sc|fd|fdo|pç|barr)/gi, '')
+                // Remove números restantes
+                .replace(/\d+/g, '')
+                // Remove caracteres especiais, mantém letras e acentos
+                .replace(/[^a-záàâãéêíóôõúç\s]/g, ' ')
+                // Remove espaços duplos
+                .replace(/\s+/g, ' ')
+                .trim();
+            
+            // Filtrar palavras muito pequenas e conectivos
+            const palavrasIgnorar = ['de', 'da', 'do', 'das', 'dos', 'em', 'na', 'no', 'nas', 'nos', 'com', 'sem', 'para', 'por', 'ao', 'à', 'tipo', 'longa', 'vida'];
+            const palavrasUteis = nomeLimpo.split(' ')
+                .filter(p => p.length > 2 && !palavrasIgnorar.includes(p))
+                .slice(0, 4); // Pegar até 4 palavras principais
+            
+            const tituloLimpo = palavrasUteis.join(' ');
+            
+            // Mapear produtos para categorias mais gerais para melhor busca de imagens
+            const categoriaMap = {
+                'carne': 'meat',
+                'frango': 'chicken', 
+                'boi': 'beef',
+                'bovino': 'beef',
+                'suino': 'pork',
+                'peixe': 'fish',
+                'leite': 'milk',
+                'queijo': 'cheese',
+                'iogurte': 'yogurt',
+                'manteiga': 'butter',
+                'arroz': 'rice',
+                'feijao': 'beans',
+                'macarrao': 'pasta',
+                'massa': 'pasta',
+                'pao': 'bread',
+                'biscoito': 'cookies',
+                'bolacha': 'cookies',
+                'azeite': 'olive oil',
+                'oleo': 'oil',
+                'açucar': 'sugar',
+                'sal': 'salt',
+                'farinha': 'flour',
+                'molho': 'sauce',
+                'tempero': 'spices',
+                'condimento': 'spices',
+                'doce': 'dessert',
+                'chocolate': 'chocolate',
+                'suco': 'juice',
+                'refrigerante': 'soda',
+                'agua': 'water',
+                'cerveja': 'beer',
+                'vinho': 'wine',
+                'cafe': 'coffee',
+                'cha': 'tea',
+                'verdura': 'vegetables',
+                'legume': 'vegetables',
+                'fruta': 'fruits',
+                'banana': 'banana',
+                'maca': 'apple',
+                'laranja': 'orange',
+                'tomate': 'tomato',
+                'cebola': 'onion',
+                'alho': 'garlic',
+                'batata': 'potato'
+            };
+            
+            // Verificar se alguma palavra mapeia para categoria conhecida
+            let termoBusca = tituloLimpo || 'food';
+            for (const [pt, en] of Object.entries(categoriaMap)) {
+                if (tituloLimpo.includes(pt)) {
+                    termoBusca = en;
+                    break;
+                }
+            }
+            
+            // Se não encontrou categoria específica, usar as palavras limpas do produto
+            if (termoBusca === tituloLimpo && palavrasUteis.length > 0) {
+                // Traduzir palavras principais ou manter como estão
+                const palavrasTraduzidas = palavrasUteis.map(palavra => {
+                    return categoriaMap[palavra] || palavra;
+                });
+                termoBusca = palavrasTraduzidas.join(' ');
+            }
+            
+            console.log('🏷️ Produto 1:', produto1.name);
+            console.log('🧹 Nome limpo:', nomeLimpo);
+            console.log('📝 Palavras úteis:', palavrasUteis);
+            console.log('🎯 Termo final para busca:', termoBusca);
+            
+            // Gerar seed baseado no termo de busca
+            const seed = Math.abs(termoBusca.split('').reduce((a, c) => a + c.charCodeAt(0), 0));
+            
+            const w = Math.max(1200, Math.floor(canvas.width));
+            const h = Math.max(800, Math.floor(canvas.height));
+            
+            // Lista de URLs com fallbacks inteligentes
+            const urlsList = [
+                `https://loremflickr.com/${w}/${h}/${encodeURIComponent(termoBusca)}?lock=${seed}`,
+                `https://source.unsplash.com/${w}x${h}/?${encodeURIComponent(termoBusca)},food`,
+                `https://picsum.photos/seed/${encodeURIComponent(termoBusca)}-${seed}/${w}/${h}`,
+                `https://loremflickr.com/${w}/${h}/food,meal?lock=${seed}`,
+                `https://picsum.photos/${w}/${h}?random=${seed}`
+            ];
+            
+            console.log('🔗 URLs de fundo:', urlsList);
+            let drew = false;
+            try {
+                let bg = null;
+                
+                // Tentar cada URL da lista em sequência
+                for (let i = 0; i < urlsList.length && !bg; i++) {
+                    const url = urlsList[i];
+                    const source = url.includes('loremflickr') ? 'LoremFlickr' : 
+                                  url.includes('unsplash') ? 'Unsplash' : 
+                                  url.includes('picsum') ? 'Picsum' : 'Desconhecida';
+                    
+                    console.log(`⏳ Tentativa ${i + 1}/${urlsList.length}: ${source}...`);
+                    bg = await this.loadImageSafely(url);
+                    
+                    if (bg) {
+                        console.log(`✅ Sucesso com ${source}!`);
+                        break;
+                    }
+                }
+                
+                // Se nenhuma URL funcionou, tentar último recurso
+                if (!bg) {
+                    console.log('⏳ Tentando último recurso - placeholder...');
+                    const lastResortUrl = `https://via.placeholder.com/${w}x${h}/4a90e2/ffffff?text=PMG`;
+                    bg = await this.loadImageSafely(lastResortUrl);
+                }
+                
+                if (bg) {
+                    console.log('✅ Fundo carregado com sucesso:', bg.width, 'x', bg.height);
+                    const imgAspect = bg.width / bg.height;
+                    const areaAspect = canvas.width / canvas.height;
+                    let drawW, drawH, drawX, drawY;
+                    if (imgAspect > areaAspect) {
+                        drawH = canvas.height;
+                        drawW = drawH * imgAspect;
+                        drawX = (canvas.width - drawW) / 2;
+                        drawY = 0;
+                    } else {
+                        drawW = canvas.width;
+                        drawH = drawW / imgAspect;
+                        drawX = 0;
+                        drawY = (canvas.height - drawH) / 2;
+                    }
+                    console.log('🎨 Desenhando fundo:', { drawX, drawY, drawW, drawH });
+                    ctx.drawImage(bg, drawX, drawY, drawW, drawH);
+                    drew = true;
+                    console.log('✅ Fundo dinâmico aplicado com sucesso!');
+                } else {
+                    console.warn('❌ Todas as tentativas de carregamento falharam');
+                }
+            } catch (error) {
+                console.error('❌ Erro no carregamento do fundo:', error);
+            }
+            if (!drew) {
+                console.log('🎨 Usando fundo gradiente como fallback');
+                const palette = ['#f8f9fa', '#eef3ff', '#fef6e4', '#eafaf1'];
+                const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+                gradient.addColorStop(0, palette[0]);
+                gradient.addColorStop(1, '#ffffff');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+        } else {
+            console.log('🏳️ Usando fundo branco (fundo dinâmico desabilitado)');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
         
-        // Borda verde externa ao redor de toda a imagem com largura aumentada
-        ctx.strokeStyle = '#28a745';
-        ctx.lineWidth = 50; // Borda muito mais espessa
-        ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
-        
-        // Logo centralizado no topo com tamanho ajustado
-        await this.drawLogo(ctx, canvas.width, padding / 2, 1200); // Aumentado para logo muito maior
+        // ✅ LOGO RESPONSIVO BASEADO NO LAYOUT
+        const logoDrawn = await this.drawLogo(ctx, canvas.width, padding / 2, dims.logoMaxWidth, dims.logoMaxHeight);
         
         // ✅ INFORMAÇÃO VISUAL DO LAYOUT ESCOLHIDO
         console.log(`📐 Layout escolhido: ${productsPerRow} produtos por linha para ${this.selectedProducts.length} produtos total`);
@@ -1280,13 +1422,62 @@ async generateImageOffersVisual() {
             const x = padding + col * (productWidth + padding);
             const y = logoSectionHeight + padding + row * (productHeight + padding);
 
-            // Desenhar produto individual
+            // ✅ OBTER PRODUTO ATUAL DO LOOP
             const product = this.selectedProducts[i];
+
+            // ✅ LAYOUT RESPONSIVO VERTICAL - FOTO, PREÇO, UNIDADE, TÍTULO COLADOS
+            const centerX = x + productWidth / 2;
+            ctx.fillStyle = '#333333';
+            ctx.font = `bold ${dims.baseFontSize}px Arial`;
+            
+            // Função de wrap de texto responsiva
+            const wrapByWidth = (text, maxWidth) => {
+                const words = (text || '').split(/\s+/);
+                const lines = [];
+                let line = '';
+                words.forEach(w => {
+                    const test = line ? line + ' ' + w : w;
+                    if (ctx.measureText(test).width > maxWidth) {
+                        if (line) lines.push(line);
+                        line = w;
+                    } else {
+                        line = test;
+                    }
+                });
+                if (line) lines.push(line);
+                return lines;
+            };
+            
+            const titleMaxWidth = productWidth - 120;
+            let titleLines = wrapByWidth(product.name, titleMaxWidth);
+            const maxLines = 3;
+            if (titleLines.length > maxLines) {
+                titleLines = titleLines.slice(0, maxLines);
+                titleLines[maxLines - 1] = titleLines[maxLines - 1].replace(/\.?$/, '...');
+            }
+            
+            // ✅ LAYOUT VERTICAL RESPONSIVO
+            const imageAreaTop = y + 40;
+            const imageAreaHeight = dims.imageAreaHeight;
+            const imageAreaBottom = imageAreaTop + imageAreaHeight;
+            
+            // Preço com espaçamento responsivo
+            const priceBoxTop = imageAreaBottom + dims.spacing.imageToPrice;
+            
+            // Unidade com espaçamento responsivo  
+            const unitTop = priceBoxTop + Math.floor(dims.priceFontSize * 1.4) + dims.spacing.priceToUnit;
+            const unitBoxHeight = Math.floor(dims.unitFontSize * 1.6); // Altura do fundo da unidade
+            
+            // Título com espaçamento responsivo (considerando altura da unidade)
+            const titleTopNew = unitTop + unitBoxHeight + dims.spacing.unitToTitle;
+            
+            // Área da imagem responsiva
+            const imageWidth = Math.floor(productWidth * 0.78); // 78% da largura do produto
             const imageArea = {
-                x: x + 80,
-                y: y + 80,
-                width: 700, // Imagem muito maior
-                height: 700 // Imagem muito maior
+                x: x + Math.floor((productWidth - imageWidth) / 2),
+                y: imageAreaTop,
+                width: imageWidth,
+                height: imageAreaHeight
             };
 
             try {
@@ -1310,11 +1501,39 @@ async generateImageOffersVisual() {
                             drawY = imageArea.y + 5;
                         }
                         
-                        ctx.drawImage(productImg, drawX, drawY, drawWidth, drawHeight);
+                        // Aplicar chroma key parcial para tornar fundo branco opaco
+                        const tempCanvas = document.createElement('canvas');
+                        tempCanvas.width = Math.floor(drawWidth);
+                        tempCanvas.height = Math.floor(drawHeight);
+                        const tempCtx = tempCanvas.getContext('2d');
+                        
+                        // Desenhar imagem no canvas temporário
+                        tempCtx.drawImage(productImg, 0, 0, tempCanvas.width, tempCanvas.height);
+                        
+                        // Aplicar chroma key parcial (fundo branco fica opaco)
+                        const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                        const data = imageData.data;
+                        
+                        for (let i = 0; i < data.length; i += 4) {
+                            const r = data[i];
+                            const g = data[i + 1];
+                            const b = data[i + 2];
+                            
+                            // Se for quase branco (fundo), reduzir opacidade para 70%
+                            if (r > 230 && g > 230 && b > 230) {
+                                data[i + 3] = Math.floor(data[i + 3] * 0.7); // 70% de opacidade
+                            }
+                        }
+                        
+                        tempCtx.putImageData(imageData, 0, 0);
+                        
+                        // Desenhar a imagem processada no canvas principal
+                        ctx.drawImage(tempCanvas, drawX, drawY);
                         resolve();
                     };
                     
                     productImg.onerror = () => {
+                        // Fundo branco na área da imagem do produto
                         ctx.fillStyle = '#ffffff';
                         ctx.fillRect(imageArea.x, imageArea.y, imageArea.width, imageArea.height);
                         ctx.fillStyle = '#6c757d';
@@ -1333,40 +1552,79 @@ async generateImageOffersVisual() {
                 console.log('Erro ao processar imagem:', error);
             }
 
-            // Preço em destaque
-            ctx.fillStyle = '#dc3545';
-            ctx.font = 'bold 80px Arial'; // Texto muito maior
-            ctx.textAlign = 'center';
-            ctx.fillText(product.formattedPrice, x + productWidth / 2, y + 720); // Ajustado para layout
+            // ✅ CAIXA OPACA RESPONSIVA ATRÁS DO PREÇO E UNIDADE
+            const priceBigFont = `bold ${dims.priceFontSize}px Arial`;
+            const priceSmallFont = `bold ${Math.floor(dims.priceFontSize * 0.55)}px Arial`;
+            const unitFont = `${dims.unitFontSize}px Arial`;
+            
+            // ✅ SISTEMA AUTOMÁTICO DE FUNDOS PARA PREÇO, UNIDADE E TÍTULO
+            
+            // 1. CALCULAR DIMENSÕES AUTOMATICAMENTE
+            const totalPriceWidth = (() => {
+                const parts = String(product.formattedPrice).split(',');
+                const bigText = parts[0] + ',';
+                const smallText = parts[1] || '';
+                ctx.font = priceBigFont; const w1 = ctx.measureText(bigText).width;
+                ctx.font = priceSmallFont; const w2 = ctx.measureText(smallText).width;
+                return w1 + w2;
+            })();
+            
+            ctx.font = unitFont; 
+            const unitText = `(${product.unit})`;
+            const unitWidth = ctx.measureText(unitText).width;
+            
+            // 2. FUNDO AUTOMÁTICO DO PREÇO (MAIS LARGO E ALTO)
+            const priceBoxWidth = totalPriceWidth + 40; // Padding lateral
+            const priceBoxHeight = Math.floor(dims.priceFontSize * 1.4); // Altura baseada na fonte
+            ctx.fillStyle = 'rgba(255,255,255,0.9)';
+            ctx.fillRect(centerX - priceBoxWidth/2, priceBoxTop - 10, priceBoxWidth, priceBoxHeight);
+            
+            // 3. FUNDO AUTOMÁTICO DA UNIDADE (MAIS LARGO E ALTO)
+            const unitBoxWidth = unitWidth + 40; // Padding lateral
+            // Reutilizar unitBoxHeight já declarado anteriormente
+            ctx.fillStyle = 'rgba(255,255,255,0.9)';
+            ctx.fillRect(centerX - unitBoxWidth/2, unitTop - 8, unitBoxWidth, unitBoxHeight);
 
-            // Unidade
+            // 4. DESENHAR PREÇO COM CENTAVOS MENORES
+            const parts = String(product.formattedPrice).split(',');
+            const bigText = parts[0] + ',';
+            const smallText = parts[1] || '';
+            ctx.textAlign = 'left';
             ctx.fillStyle = '#dc3545';
-            ctx.font = '40px Arial'; // Texto muito maior
-            ctx.textAlign = 'center';
-            ctx.fillText(`(${product.unit})`, x + productWidth / 2, y + 780); // Ajustado para layout
+            ctx.font = priceBigFont; 
+            const wBig = ctx.measureText(bigText).width;
+            const startX = centerX - (wBig + (ctx.font = priceSmallFont, ctx.measureText(smallText).width)) / 2;
+            ctx.font = priceBigFont; 
+            ctx.fillText(bigText, startX, priceBoxTop + Math.floor(priceBoxHeight * 0.7));
+            ctx.font = priceSmallFont; 
+            ctx.fillText(smallText, startX + wBig, priceBoxTop + Math.floor(priceBoxHeight * 0.6));
 
-            // Nome do produto com quebras de linha
+            // 5. DESENHAR UNIDADE CENTRALIZADA
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#dc3545';
+            ctx.font = unitFont;
+            ctx.fillText(unitText, centerX, unitTop + Math.floor(unitBoxHeight * 0.7));
+
+            // 6. FUNDO AUTOMÁTICO DO TÍTULO (CALCULADO POR LINHA)
             ctx.fillStyle = '#333333';
-            ctx.font = 'bold 50px Arial'; // Texto muito maior
+            ctx.font = `bold ${dims.baseFontSize}px Arial`;
             ctx.textAlign = 'center';
-            const maxCharsPerLine = 20; // Limite de caracteres por linha
-            const lines = [];
-            let currentLine = '';
-            product.name.split(' ').forEach(word => {
-                const testLine = currentLine + (currentLine ? ' ' : '') + word;
-                if (testLine.length > maxCharsPerLine) {
-                    lines.push(currentLine);
-                    currentLine = word;
-                } else {
-                    currentLine = testLine;
-                }
-            });
-            if (currentLine) lines.push(currentLine);
-            const maxLines = 3; // Limite de linhas
-            const displayedLines = lines.slice(0, maxLines);
-            if (lines.length > maxLines) displayedLines[maxLines - 1] += '...';
-            displayedLines.forEach((line, index) => {
-                ctx.fillText(line, x + productWidth / 2, y + 850 + (index * 60));
+            
+            const lineHeight = Math.floor(dims.baseFontSize * 1.21);
+            let titleBoxWidth = Math.max(...titleLines.map(l => ctx.measureText(l).width)) + 60; // Padding lateral
+            titleBoxWidth = Math.min(titleBoxWidth, productWidth - 40);
+            const titleBoxHeight = titleLines.length * lineHeight + 30; // Padding vertical
+            
+            // Desenhar fundo do título
+            ctx.fillStyle = 'rgba(255,255,255,0.9)';
+            ctx.fillRect(centerX - titleBoxWidth/2, titleTopNew - 5, titleBoxWidth, titleBoxHeight);
+            
+            // Desenhar linhas do título
+            titleLines.forEach((line, i) => {
+                ctx.fillStyle = '#333333';
+                // Centralizar verticalmente na máscara: início + metade da altura - metade do texto total
+                const textY = titleTopNew + (titleBoxHeight / 2) - ((titleLines.length - 1) * lineHeight / 2) + (i * lineHeight);
+                ctx.fillText(line, centerX, textY);
             });
         }
         
@@ -1380,11 +1638,131 @@ async generateImageOffersVisual() {
         this.showNotification('Erro ao gerar imagem visual', 'error');
         this.updateCatalogStatus('Erro ao gerar imagem visual');
     }
+
 }
 
-// ✅ NOVA FUNÇÃO PARA ESCOLHER AUTOMATICAMENTE O MELHOR LAYOUT
+// ✅ NOVO SISTEMA RESPONSIVO PARA DIMENSÕES BASEADO NO LAYOUT
+getResponsiveDimensions(productsPerRow) {
+    let dimensions = {};
+    
+    switch(productsPerRow) {
+        case 1: // Layout de destaque - dimensões maiores
+            dimensions = {
+                productWidth: 1200,
+                productHeight: 1400,
+                imageAreaHeight: 700,
+                padding: 60,
+                logoMaxHeight: 280,
+                logoMaxWidth: 800,
+                baseFontSize: 64,
+                priceFontSize: 90,
+                unitFontSize: 44,
+                spacing: {
+                    imageToPrice: 10,
+                    priceToUnit: 10,
+                    unitToTitle: 50
+                }
+            };
+            break;
+            
+        case 2: // Layout médio
+            dimensions = {
+                productWidth: 1000,
+                productHeight: 1200,
+                imageAreaHeight: 600,
+                padding: 50,
+                logoMaxHeight: 240,
+                logoMaxWidth: 650,
+                baseFontSize: 56,
+                priceFontSize: 80,
+                unitFontSize: 40,
+                spacing: {
+                    imageToPrice: 8,
+                    priceToUnit: 8,
+                    unitToTitle: 45
+                }
+            };
+            break;
+            
+        case 3: // Layout padrão
+            dimensions = {
+                productWidth: 900,
+                productHeight: 1080,
+                imageAreaHeight: 500,
+                padding: 40,
+                logoMaxHeight: 200,
+                logoMaxWidth: 550,
+                baseFontSize: 48,
+                priceFontSize: 80,
+                unitFontSize: 40,
+                spacing: {
+                    imageToPrice: 7,
+                    priceToUnit: 7,
+                    unitToTitle: 40
+                }
+            };
+            break;
+            
+        case 4: // Layout compacto
+            dimensions = {
+                productWidth: 750,
+                productHeight: 950,
+                imageAreaHeight: 420,
+                padding: 35,
+                logoMaxHeight: 180,
+                logoMaxWidth: 480,
+                baseFontSize: 42,
+                priceFontSize: 68,
+                unitFontSize: 34,
+                spacing: {
+                    imageToPrice: 6,
+                    priceToUnit: 6,
+                    unitToTitle: 35
+                }
+            };
+            break;
+            
+        case 5: // Layout denso
+            dimensions = {
+                productWidth: 650,
+                productHeight: 850,
+                imageAreaHeight: 350,
+                padding: 30,
+                logoMaxHeight: 160,
+                logoMaxWidth: 420,
+                baseFontSize: 38,
+                priceFontSize: 58,
+                unitFontSize: 30,
+                spacing: {
+                    imageToPrice: 5,
+                    priceToUnit: 5,
+                    unitToTitle: 30
+                }
+            };
+            break;
+            
+        default:
+            // Fallback para 3 produtos
+            dimensions = this.getResponsiveDimensions(3);
+    }
+    
+    console.log(`📐 Dimensões responsivas para ${productsPerRow} produtos por linha:`, dimensions);
+    return dimensions;
+}
 selectOptimalProductsPerRow(numProducts) {
-    // Priorizar layouts que resultam em múltiplos exatos
+    // Se for apenas 1 produto, usar 1 por linha
+    if (numProducts === 1) {
+        console.log(`📐 Layout otimizado: ${numProducts} produto - usando 1 por linha (destaque)`);
+        return 1;
+    }
+    
+    // Se for 2 produtos, usar 2 por linha para melhor apresentação
+    if (numProducts === 2) {
+        console.log(`📐 Layout otimizado: ${numProducts} produtos - usando 2 por linha`);
+        return 2;
+    }
+    
+    // Priorizar layouts que resultam em múltiplos exatos (3, 4, 5)
     if (numProducts % 4 === 0) {
         console.log(`📐 Layout otimizado: ${numProducts} produtos é múltiplo de 4 - usando 4 por linha`);
         return 4;
@@ -1399,7 +1777,8 @@ selectOptimalProductsPerRow(numProducts) {
         const remainders = {
             4: numProducts % 4,
             3: numProducts % 3,
-            5: numProducts % 5
+            5: numProducts % 5,
+            2: numProducts % 2
         };
         
         const bestDivisor = Object.keys(remainders).reduce((a, b) => 
@@ -1413,31 +1792,41 @@ selectOptimalProductsPerRow(numProducts) {
 
 
     // Função auxiliar para desenhar logo
-async drawLogo(ctx, canvasWidth, currentY) {
+async drawLogo(ctx, canvasWidth, currentY, maxW = 650, maxH = 550) {
     try {
         const logo = new Image();
         logo.crossOrigin = 'anonymous';
         
-        await new Promise((resolve) => {
+    return await new Promise((resolve) => {
             logo.onload = () => {
-                const logoMaxWidth = 650;
-                const logoMaxHeight = 550;
-                const logoAspect = logo.width / logo.height;
-                
-                let logoWidth = logoMaxWidth;
-                let logoHeight = logoMaxHeight;
-                
-                if (logoAspect > logoMaxWidth / logoMaxHeight) {
-                    logoHeight = logoMaxWidth / logoAspect;
+                const aspect = logo.width / logo.height;
+                let logoWidth = maxW;
+                let logoHeight = maxH;
+                if (aspect > maxW / maxH) {
+                    logoHeight = maxW / aspect;
                 } else {
-                    logoWidth = logoMaxHeight * logoAspect;
+                    logoWidth = maxH * aspect;
                 }
-                
                 const logoX = (canvasWidth - logoWidth) / 2;
-                const logoY = currentY + 30;
-                
-                ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
-                resolve();
+                const logoY = currentY + 10;
+                // Desenhar logo em um canvas temporário para aplicar chroma key (remover fundo branco)
+                const tmp = document.createElement('canvas');
+                tmp.width = Math.max(1, Math.floor(logoWidth));
+                tmp.height = Math.max(1, Math.floor(logoHeight));
+                const tctx = tmp.getContext('2d');
+                tctx.drawImage(logo, 0, 0, tmp.width, tmp.height);
+                const imgData = tctx.getImageData(0, 0, tmp.width, tmp.height);
+                const data = imgData.data;
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i], g = data[i+1], b = data[i+2];
+                    // Se for quase branco, tornar transparente (tolerância)
+                    if (r > 240 && g > 240 && b > 240) {
+                        data[i+3] = 0;
+                    }
+                }
+                tctx.putImageData(imgData, 0, 0);
+                ctx.drawImage(tmp, logoX, logoY);
+                resolve({ width: logoWidth, height: logoHeight });
             };
             
             logo.onerror = () => {
@@ -1446,7 +1835,7 @@ async drawLogo(ctx, canvasWidth, currentY) {
                 ctx.font = 'bold 24px Arial';
                 ctx.textAlign = 'center';
                 ctx.fillText('🏪 OFERTAS ESPECIAIS', canvasWidth / 2, currentY + 40);
-                resolve();
+                resolve({ width: 0, height: 30 });
             };
             
             logo.src = './logo.png';
@@ -1964,20 +2353,28 @@ async loadImageSafely(imageSrc) {
         const timeout = setTimeout(() => {
             console.warn('⏰ Timeout ao carregar imagem:', imageSrc);
             resolve(null);
-        }, 5000);
+        }, 10000); // Aumentando timeout para 10 segundos
         
         img.onload = () => {
             clearTimeout(timeout);
+            console.log('✅ Imagem carregada com sucesso:', imageSrc, `(${img.width}x${img.height})`);
             resolve(img);
         };
         
-        img.onerror = () => {
+        img.onerror = (error) => {
             clearTimeout(timeout);
-            console.warn('❌ Erro ao carregar imagem:', imageSrc);
+            console.error('❌ Erro ao carregar imagem:', imageSrc, error);
             resolve(null);
         };
         
-        img.src = imageSrc;
+        console.log('🔄 Iniciando carregamento:', imageSrc);
+        try {
+            img.src = imageSrc;
+        } catch (error) {
+            clearTimeout(timeout);
+            console.error('❌ Erro ao definir src da imagem:', error);
+            resolve(null);
+        }
     });
 }
 

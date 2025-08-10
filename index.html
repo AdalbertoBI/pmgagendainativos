@@ -4,12 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Prospecção de Clientes Inativos</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=2.4.0.0">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icon-192.png" type="image/png">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script>
+        // Versão da aplicação para cache-busting e atualização forçada
+        window.APP_VERSION = '2.4.0.0';
+        (function() {
+            try {
+                const prev = localStorage.getItem('APP_VERSION');
+                if (prev !== window.APP_VERSION) {
+                    localStorage.setItem('APP_VERSION', window.APP_VERSION);
+                    if ('serviceWorker' in navigator) {
+                        navigator.serviceWorker.getRegistrations().then(regs => {
+                            regs.forEach(reg => {
+                                if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                                if (reg.active && reg.active.postMessage) reg.active.postMessage({ type: 'SKIP_WAITING' });
+                                if (reg.update) reg.update();
+                            });
+                        });
+                        let refreshing = false;
+                        navigator.serviceWorker.addEventListener('controllerchange', () => {
+                            if (refreshing) return; refreshing = true; location.reload();
+                        });
+                    }
+                }
+            } catch (e) { /* noop */ }
+        })();
+    </script>
 </head>
 <body>
     <h1>                             Prospecção de Clientes Inativos                                 </h1>
@@ -80,11 +105,28 @@
             <button id="refresh-catalog" class="catalog-btn">🔄 Atualizar Catálogo</button>
             <button id="select-multiple-products" class="catalog-btn">📋 Selecionar Múltiplos</button>
              <button class="catalog-btn" onclick="document.getElementById('catalog-file-input').click()">
-                📁 Carregar Novo Catálogo (.pdf)
+                📁 Carregar Catálogo (.pdf ou .xlsx)
             </button>
 
+            <!-- Seletor de faixa de preço -->
+            <label for="price-band-select" style="margin-left:12px; font-weight:600;">Faixa de preço:</label>
+            <select id="price-band-select" class="catalog-btn" style="min-width: 220px;">
+                <option value="retira">Retira R$</option>
+                <option value="entrega">Entrega R$</option>
+                <option value="km100_199">100 a 199 km</option>
+                <option value="km200_299">200 a 299 km</option>
+                <option value="km300_399">300 a 399 km</option>
+                <option value="km400_499">400 a 499 km</option>
+                <option value="km500_599">500 a 599 km</option>
+                <option value="km600_plus">Acima 600km</option>
+            </select>
+
+            <label style="margin-left:12px; display:inline-flex; align-items:center; gap:6px;">
+                <input type="checkbox" id="toggle-dynamic-bg"> Fundo dinâmico
+            </label>
+
             <!-- ✅ INPUT FILE ADICIONADO -->
-            <input type="file" id="catalog-file-input" accept=".pdf" style="display: none">
+            <input type="file" id="catalog-file-input" accept=".pdf,.xlsx" style="display: none">
             
         </div>
         <div id="catalog-status">Carregando catálogo...</div>
@@ -297,13 +339,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     
-    <script src="database.js"></script>
-    <script src="client-manager.js"></script>
-    <script src="catalog.js"></script>
-    <script src="map.js"></script>
-    <script src="cnpj-api.js"></script>
-    <script src="service-worker.js"></script>
-    <script src="script.js"></script>
+    <script src="database.js?v=2.4.0.0"></script>
+    <script src="client-manager.js?v=2.4.0.0"></script>
+    <script src="catalog.js?v=2.4.0.0"></script>
+    <script src="map.js?v=2.4.0.0"></script>
+    <script src="cnpj-api.js?v=2.4.0.0"></script>
+    <script src="service-worker.js?v=2.4.0.0"></script>
+    <script src="script.js?v=2.4.0.0"></script>
     
     <script>
         // Inicializar managers globais

@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PMG - Prospecção Inteligente em desenvolvimento</title>
-    <link rel="stylesheet" href="prospeccao.css">
-    <link rel="stylesheet" href="social-media-styles.css">
+    <title>PMG - Prospecção Inteligente</title>
+    <link rel="stylesheet" href="prospeccao.css?v=2.4.0.0">
+    <link rel="stylesheet" href="social-media-styles.css?v=2.4.0.0">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -15,9 +15,21 @@
         <div class="header-content">
             <div class="logo">
                 <img src="logo.png" alt="Logo da Empresa" class="company-logo" crossorigin="anonymous">
-                <h1>Prospecção Inteligente em desenvolvimento</h1>
+                <h1>Prospecção Inteligente</h1>
             </div>
-            
+            <div class="price-band-control" style="margin-left:auto; display:flex; align-items:center; gap:8px;">
+                <label for="price-band-select-pros" style="font-weight:600;">Faixa de preço:</label>
+                <select id="price-band-select-pros" style="padding:6px 8px; border-radius:6px;">
+                    <option value="retira">Retira R$</option>
+                    <option value="entrega">Entrega R$</option>
+                    <option value="km100_199">100 a 199 km</option>
+                    <option value="km200_299">200 a 299 km</option>
+                    <option value="km300_399">300 a 399 km</option>
+                    <option value="km400_499">400 a 499 km</option>
+                    <option value="km500_599">500 a 599 km</option>
+                    <option value="km600_plus">Acima 600km</option>
+                </select>
+            </div>
         </div>
     </div>
 
@@ -28,18 +40,50 @@
                 <form id="prospectForm">
                     <div class="form-group">
                         <label for="cnpj">CNPJ:</label>
-                        <input type="text" id="cnpj" placeholder="00.000.000/0001-00" required>
-                        <button type="button" id="searchCnpj" class="btn btn-secondary">
-                            <i class="fas fa-search"></i> Buscar
-                        </button>
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <input type="text" id="cnpj" placeholder="00.000.000/0001-00" required style="flex: 1; min-width: 200px;">
+                            <button type="button" id="searchCnpj" class="btn btn-secondary">
+                                <i class="fas fa-search"></i> Buscar API
+                            </button>
+                            <button type="button" id="searchClients" class="btn btn-primary" style="background: #28a745;">
+                                <i class="fas fa-users"></i> Buscar Clientes
+                            </button>
+                        </div>
+                        <small>Digite o CNPJ ou use "Buscar Clientes" para ver lista de clientes ativos/inativos</small>
                     </div>
 
-                    
+                    <!-- Modal para seleção de clientes -->
+                    <div id="clientModal" class="modal" style="display: none;">
+                        <div class="modal-content" style="max-width: 800px; max-height: 80vh;">
+                            <div class="modal-header">
+                                <h2><i class="fas fa-users"></i> Selecionar Cliente</h2>
+                                <span class="close" id="closeClientModal">&times;</span>
+                            </div>
+                            <div style="padding: 20px; overflow-y: auto; max-height: 60vh;">
+                                <div style="margin-bottom: 15px;">
+                                    <input type="text" id="clientSearch" placeholder="Buscar por nome ou CNPJ..." 
+                                           style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                                </div>
+                                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                                    <button type="button" id="showActiveClients" class="btn btn-success">
+                                        <i class="fas fa-check-circle"></i> Ativos
+                                    </button>
+                                    <button type="button" id="showInactiveClients" class="btn btn-secondary">
+                                        <i class="fas fa-pause-circle"></i> Inativos
+                                    </button>
+                                </div>
+                                <div id="clientList" style="max-height: 400px; overflow-y: auto;">
+                                    <!-- Lista de clientes será carregada aqui -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="form-group">
-                        <label for="cardapio">Preferências (Arquivo TXT):</label>
-                        <input type="file" id="cardapio" accept=".TXT,.mht">
-                        <small>Salve Preferências como TXT no navegador</small>
+                        <label for="keywords">Palavras-chave do Cardápio:</label>
+                        <textarea id="keywords" placeholder="Digite palavras-chave do cardápio separadas por vírgula (ex: pizza, hambúrguer, refrigerante, açaí, carne, frango)" 
+                                  rows="3" style="width: 100%; padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem; resize: vertical; font-family: inherit;"></textarea>
+                        <small>Digite palavras-chave que descrevem o cardápio do cliente para sugestões mais precisas</small>
                     </div>
 
                     <button type="submit" class="btn btn-primary">
@@ -65,7 +109,7 @@
                             <i class="fas fa-map-marker-alt"></i> Analisando localização
                         </div>
                         <div class="step" id="step3">
-                            <i class="fas fa-utensils"></i> Processando Preferências
+                            <i class="fas fa-utensils"></i> Processando cardápio
                         </div>
                         <div class="step" id="step4">
                             <i class="fas fa-chart-line"></i> Sugerindo produtos
@@ -85,7 +129,7 @@
             </div>
 
             <div class="menu-analysis card">
-                <h2><i class="fas fa-chart-pie"></i> Análise de Preferências</h2>
+                <h2><i class="fas fa-chart-pie"></i> Análise do Cardápio</h2>
                 <div id="menuAnalysis"></div>
             </div>
 
@@ -136,7 +180,17 @@
 </div>
 </div>
 
-    <script src="prospeccao.js"></script>
-    <script src="social-media-analyzer.js"></script>
+    <script src="prospeccao.js?v=2.4.0.0"></script>
+    <script src="social-media-analyzer.js?v=2.4.0.0"></script>
+    <script>
+        // Sincroniza valor inicial do seletor com localStorage, caso o JS principal demore
+        (function(){
+            try {
+                var band = localStorage.getItem('priceBand') || 'retira';
+                var sel = document.getElementById('price-band-select-pros');
+                if (sel) sel.value = band;
+            } catch(e) {}
+        })();
+    </script>
 </body>
 </html>

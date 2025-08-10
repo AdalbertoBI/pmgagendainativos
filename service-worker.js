@@ -1,19 +1,25 @@
-const CACHE_NAME = 'agenda-inativos-v2.3.0.0'; // Nova versão incrementada
+const CACHE_NAME = 'agenda-inativos-v1.0.1.6'; // Nova versão incrementada
 const isProduction = location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
 const basePath = isProduction ? '/pmgagendainativos/' : './';
 
 const urlsToCache = [
     basePath,
-    basePath + 'index.html',
-    basePath + 'styles.css',
-    basePath + 'script.js',
-    basePath + 'map.js',
-    basePath + 'catalog.js',
-    basePath + 'client-manager.js',
-    basePath + 'database.js',
-    basePath + 'icon-192.png',
-    basePath + 'icon-512.png',
-    basePath + 'manifest.json'
+    basePath + 'index.html?v=1.0.0.0',
+    basePath + 'styles.css?v=1.0.0.0',
+    basePath + 'script.js?v=1.0.0.0',
+    basePath + 'map.js?v=1.0.0.0',
+    basePath + 'catalog.js?v=1.0.0.0',
+    basePath + 'client-manager.js?v=1.0.0.0',
+    basePath + 'database.js?v=1.0.0.0',
+    basePath + 'prospeccao.html?v=1.0.0.0',
+    basePath + 'prospeccao.js?v=1.0.0.0',
+    basePath + 'prospeccao.css?v=1.0.0.0',
+    basePath + 'social-media-analyzer.js?v=1.0.0.0',
+    basePath + 'social-media-styles.css?v=1.0.0.0',
+    basePath + 'icon-192.png?v=1.0.0.0',
+    basePath + 'icon-512.png?v=1.0.0.0',
+    basePath + 'logo.png?v=1.0.0.0',
+    basePath + 'manifest.json?v=1.0.0.0'
 ].filter(url => typeof url === 'string' && url.length > 0 && !url.includes('undefined'));
 
 // Função para validar URLs
