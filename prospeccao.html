@@ -36,7 +36,7 @@
                                 <i class="fas fa-users"></i> Buscar Clientes
                             </button>
                         </div>
-                        <small>Digite o CNPJ ou use "Buscar Clientes" para ver lista de clientes ativos/inativos</small>
+                        <small>Digite o CNPJ ou use "Buscar Clientes" para ver lista de clientes ativos/inativos. O enriquecimento de dados será feito automaticamente.</small>
                     </div>
 
                     <!-- Modal para seleção de clientes -->
@@ -143,11 +143,6 @@
                 <div id="companyDetails"></div>
             </div>
 
-            <div class="menu-analysis card">
-                <h2><i class="fas fa-chart-pie"></i> Análise do Cardápio</h2>
-                <div id="menuAnalysis"></div>
-            </div>
-
             <div class="sales-script card">
                 <h2><i class="fas fa-microphone"></i> Script de Vendas Personalizado</h2>
                 <div id="salesScript"></div>
@@ -221,6 +216,8 @@
 
     <script src="prospeccao.js?v=2.4.0.0"></script>
     <script src="social-media-analyzer.js?v=2.4.0.0"></script>
+    <script src="cnpj-api.js?v=2.4.0.0"></script>
+    <script src="enriquecimento-dados.js?v=2.4.0.0"></script>
     <script>
         // Sincroniza valor inicial do seletor com localStorage, caso o JS principal demore
         (function(){

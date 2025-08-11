@@ -1738,9 +1738,35 @@ showManualDataEntry(cnpj) {
             await this.updateLoadingStep(1);
             const companyData = await this.getCompanyData(cnpj);
 
+            // 🔍 NOVO: Enriquecimento automático de dados demográficos
+            let enrichedCompanyData = companyData;
+            try {
+                console.log('🔍 Iniciando enriquecimento de dados...');
+                console.log('📋 Dados da empresa antes do enriquecimento:', companyData);
+                
+                // Verificar se a função de enriquecimento está disponível
+                if (typeof enriquecerDadosCliente === 'undefined') {
+                    console.warn('⚠️ Função enriquecerDadosCliente não encontrada - enriquecimento será ignorado');
+                } else {
+                    const dadosEnriquecidos = await enriquecerDadosCliente(companyData);
+                    console.log('📊 Dados retornados do enriquecimento:', dadosEnriquecidos);
+                    
+                    if (dadosEnriquecidos && dadosEnriquecidos !== companyData) {
+                        enrichedCompanyData = dadosEnriquecidos;
+                        console.log('✅ Dados enriquecidos com sucesso - usando dados enriquecidos');
+                        console.log('🎯 Dados finais para renderização:', enrichedCompanyData);
+                    } else {
+                        console.log('⚠️ Enriquecimento não adicionou novos dados - usando dados originais');
+                    }
+                }
+            } catch (enrichError) {
+                console.warn('⚠️ Erro no enriquecimento (continuando sem):', enrichError);
+                // Continua sem enriquecimento em caso de erro
+            }
+
             // Etapa 2: Analisar localização
             await this.updateLoadingStep(2);
-            const locationData = await this.analyzeLocation(companyData);
+            const locationData = await this.analyzeLocation(enrichedCompanyData);
 
             // Etapa 3: Processar cardápio (palavras-chave)
             await this.updateLoadingStep(3);
@@ -1748,12 +1774,12 @@ showManualDataEntry(cnpj) {
 
             // Etapa 4: Sugerir produtos
             await this.updateLoadingStep(4);
-            const suggestions = await this.suggestProducts(companyData, menuData);
+            const suggestions = await this.suggestProducts(enrichedCompanyData, menuData);
 
             // Etapa 5: Criar prospecção
             await this.updateLoadingStep(5);
             this.currentProspect = {
-                company: companyData,
+                company: enrichedCompanyData, // ✅ Usar dados enriquecidos
                 location: locationData,
                 menu: menuData,
                 suggestions: suggestions,
@@ -3149,9 +3175,6 @@ getProductImage(productCode) {
         // Renderizar informações da empresa
         this.renderCompanyInfo();
         
-        // Renderizar análise do cardápio
-        this.renderMenuAnalysis();
-        
         // Renderizar produtos sugeridos
         this.renderProductSuggestions();
         
@@ -3163,140 +3186,221 @@ getProductImage(productCode) {
         const container = document.getElementById('companyDetails');
         const company = this.currentProspect.company;
         
-        container.innerHTML = `
+        // 🔍 DEBUG: Verificar dados recebidos
+        console.log('🏢 renderCompanyInfo chamado');
+        console.log('📋 Dados da empresa recebidos:', company);
+        console.log('🔍 Tem demografia?', !!company.demografia);
+        console.log('🔍 Tem analiseCompetitiva?', !!company.analiseCompetitiva);
+        console.log('🔍 Tem mercadoLocal?', !!company.mercadoLocal);
+        console.log('🔍 Tem economia?', !!company.economia);
+        console.log('🔍 Tem coordenadas?', !!company.coordenadas);
+        
+        // Função auxiliar para formatar dados opcionais
+        const formatOptional = (value, prefix = '', suffix = '') => {
+            return value ? `${prefix}${value}${suffix}` : 'Não informado';
+        };
+        
+        let html = `
             <div class="company-details">
                 <h3><i class="fas fa-building"></i> ${company.fantasia || company.nome}</h3>
                 <div class="info-grid">
                     <div class="info-item">
-                        <strong>CNPJ:</strong> ${company.cnpj}
+                        <strong>CNPJ:</strong> ${company.cnpj || 'Não informado'}
                     </div>
                     <div class="info-item">
-                        <strong>Atividade:</strong> ${company.atividade_principal}
+                        <strong>Atividade:</strong> ${company.atividade_principal || 'Não informada'}
                     </div>
                     <div class="info-item">
-                        <strong>Localização:</strong> ${company.municipio}/${company.uf}
+                        <strong>CNAE:</strong> ${company.cnae || 'Não informado'}
                     </div>
                     <div class="info-item">
-                        <strong>Situação:</strong> ${company.situacao}
+                        <strong>Localização:</strong> ${company.cidade || company.municipio || 'Não informada'}/${company.uf || 'Não informada'}
                     </div>
                     <div class="info-item">
-                        <strong>Abertura:</strong> ${company.abertura}
+                        <strong>Situação:</strong> ${company.situacao || 'Não informada'}
                     </div>
                     <div class="info-item">
-                        <strong>Capital Social:</strong> R$ ${company.capital_social}
+                        <strong>Abertura:</strong> ${company.abertura || 'Não informada'}
+                    </div>
+                    <div class="info-item">
+                        <strong>Capital Social:</strong> ${formatOptional(company.capital_social, 'R$ ')}
+                    </div>
+                    <div class="info-item">
+                        <strong>CEP:</strong> ${company.cep || 'Não informado'}
+                    </div>
+                    <div class="info-item">
+                        <strong>Endereço:</strong> ${[company.endereco, company.numero, company.bairro].filter(Boolean).join(', ') || 'Não informado'}
                     </div>
                 </div>
                 ${company.telefone ? `<p><i class="fas fa-phone"></i> <strong>Telefone:</strong> ${company.telefone}</p>` : ''}
                 ${company.email ? `<p><i class="fas fa-envelope"></i> <strong>Email:</strong> ${company.email}</p>` : ''}
             </div>
-            <div class="location-analysis">
-                <h4><i class="fas fa-map-marker-alt"></i> Análise de Localização</h4>
-                <p><strong>Região:</strong> ${this.currentProspect.location.regiao}</p>
-                <p><strong>Perfil Econômico:</strong> ${this.currentProspect.location.perfil_economico}</p>
-                <p><strong>Alcance Estimado:</strong> ${this.currentProspect.location.populacao_estimada.toLocaleString()}</p>
-                <div class="concurrence-info">
-                    <strong>Concorrência:</strong> ${this.currentProspect.location.concorrencia.nivel}
-                    <br><small>${this.currentProspect.location.concorrencia.observacao}</small>
-                </div>
-            </div>
         `;
-        if (window.socialAnalyzer) {
-        window.socialAnalyzer.setupSocialAnalysisUI();
-    }
-    }
 
-    renderMenuAnalysis() {
-    const container = document.getElementById('menuAnalysis');
-    const menu = this.currentProspect.menu;
-    
-    if (menu.items.length === 0) {
-        container.innerHTML = '<p><i class="fas fa-info-circle"></i> Nenhum cardápio fornecido para análise</p>';
-        return;
-    }
+        // 🔍 NOVO: Seção de dados enriquecidos se disponíveis
+        if (company.demografia || company.analiseCompetitiva || company.mercadoLocal || company.economia) {
+            html += `
+                <div class="enriched-data-section">
+                    <h4><i class="fas fa-chart-line"></i> Análise Demográfica e de Mercado</h4>
+            `;
 
-    // Converter análise de texto para HTML com quebras adequadas
-    const analysisHtml = this.convertAnalysisToHtml(menu.analysis);
+            // Demografia Local
+            if (company.demografia) {
+                const demo = company.demografia;
+                html += `
+                    <div class="enriched-card">
+                        <h5><i class="fas fa-users"></i> Demografia Local</h5>
+                        <div class="enriched-grid">
+                            <div class="enriched-item">
+                                <span class="enriched-label">Estimativa Populacional (raio 5km):</span>
+                                <span class="enriched-value">${demo.populacao_estimada_raio?.toLocaleString() || 'N/A'}</span>
+                            </div>
+                            <div class="enriched-item">
+                                <span class="enriched-label">Cidades na Região:</span>
+                                <span class="enriched-value">${demo.populacao_raio_5km?.toLocaleString() || 'N/A'} habitantes</span>
+                            </div>
+                            <div class="enriched-item">
+                                <span class="enriched-label">Densidade Comercial:</span>
+                                <span class="enriched-value">${demo.densidade_estimada || 'N/A'} hab/km²</span>
+                            </div>
+                            ${demo.cidade_principal ? `
+                            <div class="enriched-item">
+                                <span class="enriched-label">Cidade Principal:</span>
+                                <span class="enriched-value">${demo.cidade_principal.nome} (${demo.cidade_principal.populacao?.toLocaleString()})</span>
+                            </div>
+                            ` : ''}
+                        </div>
+                        ${demo.localidades_proximas?.length > 0 ? `
+                            <p><strong>Localidades Próximas:</strong> ${demo.localidades_proximas.slice(0, 3).map(l => l.nome).join(', ')}</p>
+                        ` : ''}
+                    </div>
+                `;
+            }
 
-    container.innerHTML = `
-        <div class="menu-stats">
-            <div class="stat-card">
-                <span class="stat-number">${menu.items.length}</span>
-                <span class="stat-label">Itens no Cardápio</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-number">${Object.keys(menu.categories).length}</span>
-                <span class="stat-label">Categorias</span>
-            </div>
-        </div>
-        <div class="menu-categories">
-            ${Object.entries(menu.categories).map(([category, items]) => `
-                <div class="category-item">
-                    <strong>${category}:</strong> ${items.length} itens
-                </div>
-            `).join('')}
-        </div>
-        <div class="menu-analysis-text">
-            <h4><i class="fas fa-chart-pie"></i> Análise Detalhada:</h4>
-            <div class="analysis-content">
-                ${analysisHtml}
-            </div>
-        </div>
-    `;
-}
+            // Análise Competitiva
+            if (company.analiseCompetitiva) {
+                const comp = company.analiseCompetitiva;
+                html += `
+                    <div class="enriched-card">
+                        <h5><i class="fas fa-store"></i> Análise Competitiva (5km)</h5>
+                        <div class="enriched-grid">
+                            <div class="enriched-item">
+                                <span class="enriched-label">Estabelecimentos:</span>
+                                <span class="enriched-value">${comp.total_estabelecimentos || 'N/A'}</span>
+                            </div>
+                            <div class="enriched-item">
+                                <span class="enriched-label">Densidade Comercial:</span>
+                                <span class="enriched-value">${comp.densidade_comercial || 'N/A'} est/km²</span>
+                            </div>
+                        </div>
+                        ${comp.tipos_predominantes?.length > 0 ? `
+                            <p><strong>Tipos Predominantes:</strong> 
+                                ${comp.tipos_predominantes.slice(0, 5).map(([tipo, qtd]) => `${tipo} (${qtd})`).join(', ')}
+                            </p>
+                        ` : ''}
+                    </div>
+                `;
+            }
 
-// Novo método para converter análise em HTML formatado
-convertAnalysisToHtml(analysisText) {
-    if (!analysisText) return '<p>Análise não disponível</p>';
-    
-    // Dividir o texto em linhas e processar
-    const lines = analysisText.split('\n');
-    let html = '';
-    
-    lines.forEach(line => {
-        line = line.trim();
-        
-        if (!line) {
-            // Linha vazia - adicionar espaçamento
-            html += '<br>';
-        } else if (line.startsWith('📊 **') && line.endsWith('**')) {
-            // Título principal
-            const title = line.replace(/📊 \*\*(.*)\*\*/, '$1');
-            html += `<h4 class="analysis-title">📊 ${title}</h4>`;
-        } else if (line.startsWith('✅ **') || line.startsWith('📂 **') || line.startsWith('💰 **')) {
-            // Estatísticas principais
-            const text = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            html += `<p class="analysis-stat">${text}</p>`;
-        } else if (line.startsWith('🏷️ **') && line.endsWith('**')) {
-            // Seção de categorias
-            const title = line.replace(/🏷️ \*\*(.*)\*\*/, '$1');
-            html += `<h5 class="analysis-section">🏷️ ${title}</h5>`;
-        } else if (line.startsWith('🎯 **') && line.endsWith('**')) {
-            // Seção de oportunidades
-            const title = line.replace(/🎯 \*\*(.*)\*\*/, '$1');
-            html += `<h5 class="analysis-section opportunities">🎯 ${title}</h5>`;
-        } else if (line.startsWith('📋 **') && line.endsWith('**')) {
-            // Seção de itens
-            const title = line.replace(/📋 \*\*(.*)\*\*/, '$1');
-            html += `<h5 class="analysis-section">📋 ${title}</h5>`;
-        } else if (line.startsWith('• ')) {
-            // Itens de lista
-            const item = line.substring(2);
-            html += `<div class="analysis-item">• ${item}</div>`;
-        } else if (line.startsWith('🍕 **') || line.startsWith('🍔 **') || 
-                  line.startsWith('🍽️ **') || line.startsWith('🥤 **') || 
-                  line.startsWith('🍰 **')) {
-            // Oportunidades específicas
-            const text = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            html += `<div class="opportunity-item">${text}</div>`;
-        } else {
-            // Texto normal
-            html += `<p class="analysis-text">${line}</p>`;
+            // Mercado Local
+            if (company.mercadoLocal) {
+                const mercado = company.mercadoLocal;
+                const scoreClass = mercado.score_atratividade >= 80 ? 'score-alto' : 
+                                  mercado.score_atratividade >= 60 ? 'score-medio' : 
+                                  mercado.score_atratividade >= 40 ? 'score-baixo' : 'score-muito-baixo';
+                html += `
+                    <div class="enriched-card">
+                        <h5><i class="fas fa-crosshairs"></i> Mercado Local (2km)</h5>
+                        <div class="enriched-grid">
+                            <div class="enriched-item">
+                                <span class="enriched-label">Score Atratividade:</span>
+                                <span class="enriched-value ${scoreClass}">${mercado.score_atratividade || 'N/A'}/100</span>
+                            </div>
+                            <div class="enriched-item">
+                                <span class="enriched-label">Classificação:</span>
+                                <span class="enriched-value">${mercado.classificacao_area || 'N/A'}</span>
+                            </div>
+                        </div>
+                        ${mercado.amenidades_proximas ? `
+                            <p><strong>Amenidades:</strong> 
+                                ${Object.entries(mercado.amenidades_proximas).slice(0, 5).map(([tipo, qtd]) => `${tipo} (${qtd})`).join(', ')}
+                            </p>
+                        ` : ''}
+                    </div>
+                `;
+            }
+
+            // Dados Econômicos
+            if (company.economia) {
+                const econ = company.economia;
+                html += `
+                    <div class="enriched-card">
+                        <h5><i class="fas fa-chart-bar"></i> Dados Econômicos Regionais</h5>
+                        <div class="enriched-grid">
+                            <div class="enriched-item">
+                                <span class="enriched-label">Município:</span>
+                                <span class="enriched-value">${econ.municipio || 'N/A'}</span>
+                            </div>
+                            <div class="enriched-item">
+                                <span class="enriched-label">Código IBGE:</span>
+                                <span class="enriched-value">${econ.codigo_ibge || 'N/A'}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Coordenadas (se disponíveis)
+            if (company.coordenadas) {
+                const coord = company.coordenadas;
+                html += `
+                    <div class="enriched-card">
+                        <h5><i class="fas fa-map-pin"></i> Localização Geográfica</h5>
+                        <div class="enriched-grid">
+                            <div class="enriched-item">
+                                <span class="enriched-label">Latitude:</span>
+                                <span class="enriched-value">${coord.lat?.toFixed(6) || 'N/A'}</span>
+                            </div>
+                            <div class="enriched-item">
+                                <span class="enriched-label">Longitude:</span>
+                                <span class="enriched-value">${coord.lng?.toFixed(6) || 'N/A'}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += `</div>`;
         }
-    });
-    
-    return html;
-}
 
+        // Análise de localização original (se não há dados enriquecidos)
+        if (!company.demografia && this.currentProspect.location) {
+            html += `
+                <div class="location-analysis">
+                    <h4><i class="fas fa-map-marker-alt"></i> Análise de Localização</h4>
+                    <p><strong>Região:</strong> ${this.currentProspect.location.regiao}</p>
+                    <p><strong>Perfil Econômico:</strong> ${this.currentProspect.location.perfil_economico}</p>
+                    <p><strong>Alcance Estimado:</strong> ${this.currentProspect.location.populacao_estimada.toLocaleString()}</p>
+                    <div class="concurrence-info">
+                        <strong>Concorrência:</strong> ${this.currentProspect.location.concorrencia.nivel}
+                        <br><small>${this.currentProspect.location.concorrencia.observacao}</small>
+                    </div>
+                </div>
+            `;
+        }
+
+        container.innerHTML = html;
+        
+        // 🔍 DEBUG: Verificar se HTML foi inserido
+        console.log('📝 HTML inserido no container:');
+        console.log('  - Tamanho do HTML:', html.length, 'caracteres');
+        console.log('  - Container após inserção:', container.innerHTML.length, 'caracteres');
+        console.log('  - Primeira parte do HTML:', html.substring(0, 200) + '...');
+        
+        if (window.socialAnalyzer) {
+            window.socialAnalyzer.setupSocialAnalysisUI();
+        }
+    }
 
     renderProductSuggestions() {
         const container = document.getElementById('productSuggestions');
@@ -4501,6 +4605,124 @@ async generateImageOffersVisualProsp() {
             feedback.style.animation = 'slideOutRight 0.3s ease-in forwards';
             setTimeout(() => feedback.remove(), 300);
         }, 4000);
+    }
+
+    // 🔍 NOVO: Função para enriquecer dados do cliente com informações demográficas
+    async enrichClientData() {
+        const cnpjInput = document.getElementById('cnpj');
+        const cnpj = cnpjInput.value.replace(/\D/g, '');
+        
+        if (!cnpj) {
+            this.showFeedback('Por favor, digite um CNPJ primeiro.', 'warning');
+            return;
+        }
+
+        if (cnpj.length !== 14) {
+            this.showFeedback('CNPJ deve conter 14 dígitos.', 'error');
+            return;
+        }
+
+        const enrichBtn = document.getElementById('enrichData');
+        const originalText = enrichBtn.innerHTML;
+        
+        try {
+            // Mostrar loading
+            enrichBtn.disabled = true;
+            enrichBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enriquecendo...';
+            
+            this.showFeedback('🔍 Buscando dados básicos do CNPJ...', 'info');
+            
+            // Primeiro buscar dados básicos do CNPJ (usando as funções existentes)
+            let dadosBasicos = null;
+            
+            // Tentar BrasilAPI primeiro
+            try {
+                const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    dadosBasicos = {
+                        nome: data.legal_name,
+                        fantasia: data.trade_name || data.legal_name,
+                        email: data.email,
+                        telefone: data.phone,
+                        endereco: data.address?.street,
+                        numero: data.address?.number,
+                        bairro: data.address?.district,
+                        cidade: data.address?.city,
+                        uf: data.address?.state,
+                        cep: data.address?.zip_code,
+                        cnae: data.main_activity?.code || data.primary_activity?.[0]?.code,
+                        atividade_principal: data.main_activity?.text || data.primary_activity?.[0]?.text
+                    };
+                }
+            } catch (error) {
+                console.warn('Erro na BrasilAPI:', error);
+            }
+            
+            // Se não conseguiu, tentar CNPJ.ws
+            if (!dadosBasicos || !dadosBasicos.nome) {
+                try {
+                    const response = await fetch(`https://publica.cnpj.ws/cnpj/${cnpj}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        dadosBasicos = {
+                            nome: data.razao_social,
+                            fantasia: data.estabelecimento?.nome_fantasia || data.razao_social,
+                            email: data.estabelecimento?.email,
+                            telefone: data.estabelecimento?.telefone1,
+                            endereco: data.estabelecimento?.logradouro,
+                            numero: data.estabelecimento?.numero,
+                            bairro: data.estabelecimento?.bairro,
+                            cidade: data.estabelecimento?.cidade?.nome,
+                            uf: data.estabelecimento?.estado?.sigla,
+                            cep: data.estabelecimento?.cep,
+                            cnae: data.estabelecimento?.atividade_principal?.codigo || data.cnae_fiscal_principal?.codigo,
+                            atividade_principal: data.estabelecimento?.atividade_principal?.descricao || data.cnae_fiscal_principal?.descricao
+                        };
+                    }
+                } catch (error) {
+                    console.warn('Erro na CNPJ.ws:', error);
+                }
+            }
+            
+            if (!dadosBasicos || !dadosBasicos.nome) {
+                throw new Error('Não foi possível obter dados básicos do CNPJ');
+            }
+            
+            this.showFeedback('✅ Dados básicos obtidos! Iniciando enriquecimento...', 'success');
+            
+            // Agora enriquecer os dados usando o novo sistema
+            const dadosEnriquecidos = await enriquecerDadosCliente(dadosBasicos);
+            
+            if (dadosEnriquecidos) {
+                // Preencher formulário com dados básicos
+                document.getElementById('cliente').value = dadosEnriquecidos.nome || '';
+                document.getElementById('nome-fantasia').value = dadosEnriquecidos.fantasia || '';
+                document.getElementById('email').value = dadosEnriquecidos.email || '';
+                document.getElementById('telefone-comercial').value = dadosEnriquecidos.telefone || '';
+                document.getElementById('endereco').value = dadosEnriquecidos.endereco || '';
+                document.getElementById('numero').value = dadosEnriquecidos.numero || '';
+                document.getElementById('bairro').value = dadosEnriquecidos.bairro || '';
+                document.getElementById('cidade').value = dadosEnriquecidos.cidade || '';
+                document.getElementById('uf').value = dadosEnriquecidos.uf || '';
+                document.getElementById('cep').value = dadosEnriquecidos.cep || '';
+                
+                // Exibir dados enriquecidos
+                exibirDadosEnriquecidos(dadosEnriquecidos);
+                
+                this.showFeedback('🎯 Enriquecimento concluído com sucesso! Dados demográficos e de mercado adicionados.', 'success');
+            } else {
+                this.showFeedback('⚠️ Dados básicos obtidos, mas enriquecimento não disponível para esta localização.', 'warning');
+            }
+            
+        } catch (error) {
+            console.error('Erro no enriquecimento:', error);
+            this.showFeedback(`❌ Erro no enriquecimento: ${error.message}`, 'error');
+        } finally {
+            // Restaurar botão
+            enrichBtn.disabled = false;
+            enrichBtn.innerHTML = originalText;
+        }
     }
 }
 

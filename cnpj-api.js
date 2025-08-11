@@ -53,6 +53,20 @@ async function buscarDadosCNPJ() {
         if (dados && dados.nome) {
             preencherFormulario(dados);
             mostrarSucesso('Dados encontrados e preenchidos automaticamente!');
+            
+            // 🔍 NOVO: Enriquecimento de dados demográficos e de mercado
+            try {
+                mostrarSucesso('Enriquecendo dados com informações demográficas...');
+                const dadosEnriquecidos = await enriquecerDadosCliente(dados);
+                if (dadosEnriquecidos && dadosEnriquecidos !== dados) {
+                    exibirDadosEnriquecidos(dadosEnriquecidos);
+                    mostrarSucesso('✅ Dados enriquecidos com análise de mercado e demografia!');
+                }
+            } catch (enriquecimentoError) {
+                console.warn('Erro no enriquecimento de dados:', enriquecimentoError);
+                // Não falha a operação principal se o enriquecimento der erro
+            }
+            
         } else {
             mostrarErro('Não foi possível encontrar dados para este CNPJ. Verifique se o CNPJ está correto.');
         }
@@ -97,7 +111,9 @@ async function buscarBrasilAPI(cnpj) {
             bairro: data.address?.district,
             cidade: data.address?.city,
             uf: data.address?.state,
-            cep: data.address?.zip_code
+            cep: data.address?.zip_code,
+            cnae: data.main_activity?.code || data.primary_activity?.[0]?.code,
+            atividade_principal: data.main_activity?.text || data.primary_activity?.[0]?.text
         };
 
     } catch (error) {
@@ -180,7 +196,9 @@ async function buscarCNPJws(cnpj) {
             bairro: data.estabelecimento?.bairro,
             cidade: data.estabelecimento?.cidade?.nome,
             uf: data.estabelecimento?.estado?.sigla,
-            cep: data.estabelecimento?.cep
+            cep: data.estabelecimento?.cep,
+            cnae: data.estabelecimento?.atividade_principal?.codigo || data.cnae_fiscal_principal?.codigo,
+            atividade_principal: data.estabelecimento?.atividade_principal?.descricao || data.cnae_fiscal_principal?.descricao
         };
 
     } catch (error) {

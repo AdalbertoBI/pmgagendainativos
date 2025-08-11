@@ -62,9 +62,19 @@ body {
 }
 
 .logo img {
-    height: 35px;
+    height: 50px;
     width: auto;
     object-fit: contain;
+    /* ✅ CHROMA KEY: Remover fundo branco */
+    mix-blend-mode: multiply;
+    filter: 
+        brightness(1.2) 
+        contrast(1.1) 
+        saturate(1.1);
+    /* Remover bordas e sombras */
+    border: none;
+    box-shadow: none;
+    background: transparent;
 }
 
 .logo h1 {
@@ -671,21 +681,29 @@ body {
     z-index: auto;
 }
 
-/* CORREÇÃO DEFINITIVA: Logo da empresa - base fixa */
+/* ✅ LOGO DA EMPRESA - CHROMA KEY E SEM MOLDURA */
 .company-logo {
-    width: 150px !important;
-    height: 150px !important;
-     border-radius: 0 !important;
-    margin: 0 auto 20px auto;
-    border: 4px solid white;
-    object-fit: cover !important; /* MUDANÇA: cover para logo */
+    width: 50px !important;
+    height: 50px !important;
+    border-radius: 0 !important;
+    margin: 0;
+    border: none !important; /* ✅ REMOVIDO: borda branca */
+    object-fit: contain !important; /* ✅ MUDANÇA: contain para preservar proporções */
     object-position: center;
-    background: white;
+    background: transparent !important; /* ✅ FUNDO TRANSPARENTE */
     display: block;
     position: relative;
     z-index: 1;
     flex-shrink: 0;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    box-shadow: none !important; /* ✅ REMOVIDO: sombra */
+    
+    /* ✅ CHROMA KEY: Remover fundo branco do logo */
+    mix-blend-mode: multiply;
+    filter: 
+        brightness(1.2) 
+        contrast(1.1) 
+        saturate(1.1);
+    
     /* NOVO: Garantir aspect ratio */
     aspect-ratio: 1/1;
     /* NOVO: Evitar compressão/esticamento */
@@ -1068,6 +1086,12 @@ body {
     .company-logo {
         width: 80px;
         height: 80px;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        /* CHROMA KEY para remoção de fundo */
+        mix-blend-mode: multiply;
+        filter: brightness(1.2) contrast(1.3) saturate(1.1);
     }
     
     .offer-header h1 {
@@ -1262,10 +1286,10 @@ body {
     width: 150px !important;
     height: 150px !important;
     border-radius: 0 !important;
-    border: 4px solid white !important;
+    border: none !important;
     object-fit: cover !important; /* MANTÉM cover para logo */
     object-position: center !important;
-    background: white !important;
+    background: transparent !important;
     display: block !important;
     margin: 0 auto 20px auto !important;
     position: relative !important;
@@ -1280,6 +1304,9 @@ body {
     min-height: 150px !important;
     /* NOVO: Evitar herança problemática */
     box-sizing: border-box !important;
+    /* CHROMA KEY para remoção de fundo */
+    mix-blend-mode: multiply !important;
+    filter: brightness(1.2) contrast(1.3) saturate(1.1) !important;
     padding: 0;
 }
 
@@ -1319,6 +1346,271 @@ body {
     margin-right: 6px;
     transform: scale(1.1);
     cursor: pointer;
+}
+
+/* ====== ESTILOS PARA DADOS ENRIQUECIDOS ====== */
+.dados-enriquecidos-container {
+    margin-top: 2rem;
+    display: none;
+}
+
+.enriquecimento-dados {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 15px;
+    padding: 2rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+.enriquecimento-dados h3 {
+    color: #2c3e50;
+    margin-bottom: 1.5rem;
+    font-size: 1.4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 0.5rem;
+}
+
+.secao-dados {
+    background: white;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    border-left: 4px solid #667eea;
+}
+
+.secao-dados h4 {
+    color: #495057;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.dados-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.dado-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.dado-item .label {
+    font-weight: 600;
+    color: #495057;
+}
+
+.dado-item .valor {
+    font-weight: 700;
+    color: #2c3e50;
+}
+
+.dado-item .valor.score-alto {
+    color: #28a745;
+}
+
+.dado-item .valor.score-medio {
+    color: #ffc107;
+}
+
+.dado-item .valor.score-baixo {
+    color: #fd7e14;
+}
+
+.dado-item .valor.score-muito-baixo {
+    color: #dc3545;
+}
+
+.tipos-predominantes {
+    margin-top: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.tipos-predominantes strong {
+    color: #495057;
+    margin-right: 0.5rem;
+}
+
+.tipo-tag {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 15px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+/* Responsividade para dados enriquecidos */
+@media (max-width: 768px) {
+    .enriquecimento-dados {
+        padding: 1.5rem;
+    }
+    
+    .dados-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+    
+    .dado-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .tipos-predominantes {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+/* Loading específico para enriquecimento */
+.enriquecimento-loading {
+    text-align: center;
+    padding: 2rem;
+    color: #667eea;
+}
+
+.enriquecimento-loading i {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    animation: pulse 1.5s infinite;
+}
+
+.enriquecimento-loading p {
+    color: #6c757d;
+    font-style: italic;
+}
+
+/* ====== ESTILOS PARA DADOS ENRIQUECIDOS NA SEÇÃO EMPRESA ====== */
+.enriched-data-section {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid #e9ecef;
+}
+
+.enriched-data-section h4 {
+    color: #2c3e50;
+    margin-bottom: 1.5rem;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 0.5rem;
+}
+
+.enriched-card {
+    background: white;
+    border-radius: 10px;
+    padding: 1.25rem;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    border-left: 4px solid #667eea;
+    border: 1px solid #e9ecef;
+}
+
+.enriched-card h5 {
+    color: #495057;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+}
+
+.enriched-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.enriched-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+.enriched-label {
+    font-weight: 500;
+    color: #495057;
+    font-size: 0.9rem;
+}
+
+.enriched-value {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 0.9rem;
+}
+
+.enriched-value.score-alto {
+    color: #28a745;
+    font-weight: 700;
+}
+
+.enriched-value.score-medio {
+    color: #ffc107;
+    font-weight: 700;
+}
+
+.enriched-value.score-baixo {
+    color: #fd7e14;
+    font-weight: 700;
+}
+
+.enriched-value.score-muito-baixo {
+    color: #dc3545;
+    font-weight: 700;
+}
+
+.enriched-card p {
+    margin: 0.5rem 0;
+    color: #495057;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.enriched-card p strong {
+    color: #2c3e50;
+}
+
+/* Responsividade para dados enriquecidos */
+@media (max-width: 768px) {
+    .enriched-grid {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+    
+    .enriched-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+    
+    .enriched-card {
+        padding: 1rem;
+    }
 }
 
 .offer-actions input[type="checkbox"]:checked + span {
