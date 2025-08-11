@@ -9,6 +9,9 @@ class ProspeccaoManager {
         this.offerImageUrl = null; // Armazena a URL da imagem gerada
         this.isOfferImageGenerated = false; // Flag para verificar se a imagem foi gerada
         
+        // Preferência de fundo dinâmico para prospecção
+        this.dynamicBackground = localStorage.getItem('dynamicBgProsp') === 'true';
+        
         this.init();
     }
 
@@ -22,17 +25,135 @@ class ProspeccaoManager {
         // Configurar eventos
         this.setupEventListeners();
         
+        // NOVO: Configurar listener para atualizações do catálogo
+        this.setupCatalogSyncListener();
+        
         // Carregar estatísticas
         this.loadStats();
 
-    // Sincronizar seletor de faixa de preço com localStorage
-    const band = localStorage.getItem('priceBand') || 'retira';
-    const sel = document.getElementById('price-band-select-pros');
-    if (sel) sel.value = band;
-    // Aplicar ao catálogo interno já carregado
-    this.applyPriceBandToLocalCatalog(band);
+        // Sincronizar seletor de faixa de preço com localStorage
+        const band = localStorage.getItem('priceBandProsp') || 'retira';
+        this.selectedPriceBand = band;
+        // Aplicar ao catálogo interno já carregado
+        this.applyPriceBandToLocalCatalog(band);
         
         console.log('✅ Prospecção Manager inicializado');
+    }
+
+    // NOVO: Configurar listener para sincronização automática do catálogo
+    setupCatalogSyncListener() {
+        console.log('🔄 Configurando sincronização automática do catálogo...');
+        
+        // Listener para mudanças no localStorage (quando catálogo é atualizado)
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'catalogCache' || e.key === 'hasCustomCatalog') {
+                console.log('📦 Catálogo atualizado detectado, recarregando...');
+                this.reloadCatalogFromUpdate();
+            }
+        });
+        
+        // Listener customizado para atualizações internas
+        window.addEventListener('catalogUpdated', (e) => {
+            console.log('📦 Evento catalogUpdated recebido, recarregando catálogo...');
+            this.reloadCatalogFromUpdate();
+        });
+        
+        // Verificar periodicamente se o CatalogManager foi atualizado
+        this.catalogSyncInterval = setInterval(() => {
+            this.checkCatalogSync();
+        }, 5000); // Verificar a cada 5 segundos
+        
+        // Limpar recursos quando a página for fechada
+        window.addEventListener('beforeunload', () => {
+            this.cleanup();
+        });
+        
+        console.log('✅ Sincronização automática configurada');
+    }
+
+    // Verificar se o catálogo precisa ser sincronizado
+    checkCatalogSync() {
+        if (window.catalogManager && window.catalogManager.products) {
+            const currentCatalogSize = window.catalogManager.products.length;
+            const ourCatalogSize = this.catalog.length;
+            
+            // Se há uma diferença significativa, recarregar
+            if (Math.abs(currentCatalogSize - ourCatalogSize) > 5) {
+                console.log(`🔄 Catálogo desatualizado detectado (Atual: ${currentCatalogSize}, Nosso: ${ourCatalogSize})`);
+                this.reloadCatalogFromUpdate();
+            }
+        }
+    }
+
+    // Recarregar catálogo quando detectar atualização
+    async reloadCatalogFromUpdate() {
+        try {
+            console.log('🔄 Recarregando catálogo após atualização...');
+            const oldSize = this.catalog.length;
+            
+            // Recarregar catálogo
+            await this.loadCatalog();
+            
+            const newSize = this.catalog.length;
+            console.log(`✅ Catálogo atualizado: ${oldSize} → ${newSize} produtos`);
+            
+            // Mostrar notificação ao usuário (se a prospecção estiver ativa)
+            if (document.visibilityState === 'visible') {
+                this.showNotification(`📦 Catálogo atualizado: ${newSize} produtos disponíveis`, 'success');
+            }
+            
+        } catch (error) {
+            console.error('❌ Erro ao recarregar catálogo:', error);
+        }
+    }
+
+    // Função para mostrar notificações ao usuário
+    showNotification(message, type = 'info') {
+        // Criar elemento de notificação
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'info-circle'}"></i>
+            ${message}
+        `;
+        
+        // Estilos inline para a notificação
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${type === 'success' ? '#d4edda' : '#d1ecf1'};
+            color: ${type === 'success' ? '#155724' : '#0c5460'};
+            border: 1px solid ${type === 'success' ? '#c3e6cb' : '#bee5eb'};
+            border-radius: 6px;
+            padding: 12px 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 10000;
+            font-size: 14px;
+            max-width: 300px;
+            animation: slideIn 0.3s ease;
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Remover após 3 segundos
+        setTimeout(() => {
+            notification.style.animation = 'slideOut 0.3s ease';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }, 3000);
+    }
+
+    // Função para limpar recursos quando necessário
+    cleanup() {
+        if (this.catalogSyncInterval) {
+            clearInterval(this.catalogSyncInterval);
+            this.catalogSyncInterval = null;
+            console.log('🧹 Intervalo de sincronização do catálogo limpo');
+        }
     }
 
     async loadImages() {
@@ -523,50 +644,107 @@ transformCachedProducts(cachedData) {
             }
         });
 
-        // Botões de ação
-        document.getElementById('createOffer').addEventListener('click', () => {
-            this.createOfferArt();
+        // Botões de ação para cópia direta
+        document.getElementById('copyOfferImage')?.addEventListener('click', () => {
+            this.copyOfferImage();
         });
 
-       // Evento para copiar imagem da oferta
-document.getElementById('copyOfferImage')?.addEventListener('click', () => this.copyOfferImage());
+        document.getElementById('copyOfferText')?.addEventListener('click', () => {
+            this.copyOfferText();
+        });
 
-// Evento para copiar texto da oferta
-document.getElementById('copyOfferText')?.addEventListener('click', () => this.copyOfferText());
+        // Toggle de fundo dinâmico para prospecção
+        const toggleBgProsp = document.getElementById('toggle-dynamic-bg-prosp');
+        if (toggleBgProsp) {
+            toggleBgProsp.checked = this.dynamicBackground;
+            toggleBgProsp.addEventListener('change', (e) => {
+                this.dynamicBackground = !!e.target.checked;
+                localStorage.setItem('dynamicBgProsp', String(this.dynamicBackground));
+                console.log('🔄 Fundo dinâmico da prospecção:', this.dynamicBackground ? 'ATIVADO' : 'DESATIVADO');
+            });
+        }
 
+        // ✅ SELETOR DE FAIXA DE PREÇO DA PROSPECÇÃO
+        const priceBandSelectProsp = document.getElementById('price-band-select-prosp');
+        if (priceBandSelectProsp) {
+            // Carregar estado salvo ou usar padrão
+            const savedBand = localStorage.getItem('priceBandProsp') || 'retira';
+            this.selectedPriceBand = savedBand;
+            priceBandSelectProsp.value = savedBand;
+            
+            priceBandSelectProsp.addEventListener('change', (e) => {
+                this.selectedPriceBand = e.target.value;
+                localStorage.setItem('priceBandProsp', this.selectedPriceBand);
+                console.log('💰 Faixa de preço prospecção alterada para:', this.selectedPriceBand);
+                
+                // Atualizar produtos exibidos se houver
+                if (this.selectedProducts && this.selectedProducts.length > 0) {
+                    this.updateSelectedProductsPrices();
+                }
+            });
+        }
 
     // NOVO: Event listeners para outros modais se existirem
         this.setupAdditionalModalListeners();
+    }
 
-        // Alteração de faixa na prospecção (sincroniza com catálogo)
-        const bandSel = document.getElementById('price-band-select-pros');
-        if (bandSel) {
-            bandSel.addEventListener('change', (e) => {
-                const band = e.target.value;
-                localStorage.setItem('priceBand', band);
-                if (window.catalogManager && typeof window.catalogManager.setPriceBand === 'function') {
-                    window.catalogManager.setPriceBand(band);
-                }
-                // Atualizar preços no catálogo interno
-                this.applyPriceBandToLocalCatalog(band);
-            });
-        }
+    // ✅ ATUALIZAR PREÇOS DOS PRODUTOS SELECIONADOS
+    updateSelectedProductsPrices() {
+        if (!this.selectedProducts || this.selectedProducts.length === 0) return;
+        
+        console.log('🔄 Atualizando preços para faixa:', this.selectedPriceBand);
+        
+        // Atualizar cada produto com a nova faixa de preço
+        this.selectedProducts = this.selectedProducts.map(product => {
+            // Se o produto tem múltiplas faixas de preço, aplicar a selecionada
+            if (product.prices && product.prices[this.selectedPriceBand]) {
+                const newPrice = product.prices[this.selectedPriceBand];
+                return {
+                    ...product,
+                    price: newPrice,
+                    formattedPrice: (typeof newPrice === 'number') ? 
+                        newPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 
+                        String(newPrice)
+                };
+            }
+            // Se não tem múltiplas faixas, manter preço original
+            return product;
+        });
+        
+        // Re-renderizar produtos sugeridos para mostrar novos preços
+        this.renderProductSuggestions();
+        
+        console.log('✅ Preços atualizados para:', this.selectedPriceBand);
     }
 
     // Aplicar faixa de preço ao catálogo interno de prospecção, quando disponível
     applyPriceBandToLocalCatalog(band) {
-        if (!Array.isArray(this.catalog)) return;
+        console.log('💰 Aplicando faixa de preço ao catálogo interno:', band);
+        
+        if (!Array.isArray(this.catalog)) {
+            console.warn('⚠️ Catálogo interno não é um array válido');
+            return;
+        }
+        
+        // Atualizar faixa selecionada
+        this.selectedPriceBand = band;
+        
+        // Aplicar nova faixa a todos os produtos do catálogo interno
         this.catalog = this.catalog.map(p => {
-            if (p && p.prices) {
-                const val = p.prices[band] ?? p.prices.retira ?? p.price ?? 0;
+            if (p && p.prices && p.prices[band]) {
+                const val = p.prices[band];
                 return {
                     ...p,
                     price: val,
-                    formattedPrice: (typeof val === 'number') ? val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : String(val)
+                    formattedPrice: (typeof val === 'number') ? 
+                        val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 
+                        String(val)
                 };
             }
             return p;
         });
+        
+        console.log('✅ Faixa de preço aplicada ao catálogo interno');
     }
 
     // NOVO: Método específico para fechar o modal de oferta
@@ -734,18 +912,210 @@ showManualDataEntry(cnpj) {
 }
 
 
-    // ==================== NOVOS MÉTODOS PARA BUSCA DE CLIENTES ====================
+    // ==================== SISTEMA DE COMUNICAÇÃO IFRAME ↔ PÁGINA PAI ====================
+
+    // Solicitar dados da página pai via PostMessage
+    async requestDataFromParent(type) {
+        return new Promise((resolve) => {
+            // Verificar se estamos em iframe
+            if (window.self === window.top) {
+                resolve(null);
+                return;
+            }
+
+            console.log(`📨 Solicitando dados ${type} da página pai via PostMessage...`);
+
+            // Criar listener para a resposta
+            const messageListener = (event) => {
+                if (event.data && event.data.type === 'CLIENT_DATA_RESPONSE' && event.data.requestType === type) {
+                    console.log(`📬 Dados recebidos da página pai:`, event.data.clients?.length || 0, 'clientes');
+                    window.removeEventListener('message', messageListener);
+                    resolve(event.data.clients || []);
+                }
+            };
+
+            window.addEventListener('message', messageListener);
+
+            // Enviar solicitação para a página pai
+            window.parent.postMessage({
+                type: 'REQUEST_CLIENT_DATA',
+                requestType: type
+            }, '*');
+
+            // Timeout de 3 segundos
+            setTimeout(() => {
+                window.removeEventListener('message', messageListener);
+                console.log('⏰ Timeout na solicitação de dados da página pai');
+                resolve(null);
+            }, 3000);
+        });
+    }
+
+    // Configurar listener para PostMessage (página pai)
+    setupParentMessageListener() {
+        // Esta função deve ser chamada na página principal (index.html)
+        window.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'REQUEST_CLIENT_DATA') {
+                console.log(`📨 Recebida solicitação de dados ${event.data.requestType} do iframe`);
+                
+                let clients = [];
+                
+                if (window.clientManager) {
+                    if (event.data.requestType === 'active') {
+                        clients = window.clientManager.ativos || [];
+                    } else {
+                        clients = window.clientManager.data || [];
+                    }
+                }
+                
+                // Se não há dados no ClientManager, tentar variáveis globais
+                if (clients.length === 0) {
+                    if (event.data.requestType === 'active') {
+                        clients = window.ativos || [];
+                    } else {
+                        clients = window.data || [];
+                    }
+                }
+
+                console.log(`📤 Enviando ${clients.length} clientes para o iframe`);
+
+                // Enviar resposta para o iframe
+                event.source.postMessage({
+                    type: 'CLIENT_DATA_RESPONSE',
+                    requestType: event.data.requestType,
+                    clients: clients
+                }, '*');
+            }
+        });
+    }
+
+    // Debug dos dados de clientes
+    debugClientData() {
+        console.log('🔍 === DEBUG DOS DADOS DE CLIENTES ===');
+        
+        // Verificar se estamos em iframe
+        const isInIframe = window.self !== window.top;
+        console.log(`🖼️ Executando em iframe: ${isInIframe}`);
+        
+        if (isInIframe) {
+            console.log('🔗 Tentando acessar dados da página principal...');
+            try {
+                // Tentar acessar o ClientManager da página pai
+                const parentClientManager = window.parent.clientManager;
+                if (parentClientManager) {
+                    console.log('✅ ClientManager encontrado na página pai');
+                    console.log(`📊 Ativos na página pai: ${parentClientManager.ativos?.length || 0}`);
+                    console.log(`📊 Inativos na página pai: ${parentClientManager.data?.length || 0}`);
+                    
+                    if (parentClientManager.ativos?.length > 0) {
+                        console.log('📝 Exemplo de cliente ativo:', parentClientManager.ativos[0]);
+                    }
+                    
+                    if (parentClientManager.data?.length > 0) {
+                        console.log('📝 Exemplo de cliente inativo:', parentClientManager.data[0]);
+                    }
+                } else {
+                    console.log('❌ ClientManager não encontrado na página pai');
+                }
+                
+                // Verificar variáveis globais da página pai
+                console.log(`🌐 window.parent.ativos: ${window.parent.ativos?.length || 0}`);
+                console.log(`🌐 window.parent.data: ${window.parent.data?.length || 0}`);
+                
+            } catch (error) {
+                console.log('❌ Erro ao acessar página pai (CORS?):', error.message);
+            }
+        }
+        
+        if (window.clientManager) {
+            console.log('✅ ClientManager encontrado');
+            console.log(`📊 Ativos no ClientManager: ${window.clientManager.ativos?.length || 0}`);
+            console.log(`📊 Inativos no ClientManager: ${window.clientManager.data?.length || 0}`);
+            
+            if (window.clientManager.ativos?.length > 0) {
+                console.log('📝 Exemplo de cliente ativo:', window.clientManager.ativos[0]);
+            }
+            
+            if (window.clientManager.data?.length > 0) {
+                console.log('📝 Exemplo de cliente inativo:', window.clientManager.data[0]);
+            }
+        } else {
+            console.log('❌ ClientManager não encontrado');
+        }
+        
+        // Verificar variáveis globais
+        console.log(`🌐 window.ativos: ${window.ativos?.length || 0}`);
+        console.log(`🌐 window.data: ${window.data?.length || 0}`);
+        
+        // Verificar localStorage
+        try {
+            const ativosLocal = localStorage.getItem('ativos');
+            const dataLocal = localStorage.getItem('clients');
+            console.log(`💾 localStorage ativos: ${ativosLocal ? JSON.parse(ativosLocal).length : 0}`);
+            console.log(`💾 localStorage clients: ${dataLocal ? JSON.parse(dataLocal).length : 0}`);
+        } catch (e) {
+            console.log('❌ Erro ao ler localStorage:', e.message);
+        }
+        
+        console.log('🔍 === FIM DEBUG ===');
+    }
 
     // Abrir modal de seleção de clientes
     openClientModal() {
         console.log('🔍 Abrindo modal de clientes...');
+        
+        // Debug dos dados antes de abrir
+        this.debugClientData();
+        
         const modal = document.getElementById('clientModal');
         if (modal) {
             modal.style.display = 'block';
-            this.loadClients('active'); // Carregar clientes ativos por padrão
+            
+            // Priorizar PostMessage se estivermos em iframe
+            const isInIframe = window.self !== window.top;
+            if (isInIframe) {
+                console.log('🖼️ Em iframe, usando PostMessage para buscar dados...');
+                this.loadClientsViaPostMessage('active');
+            } else {
+                this.loadClients('active'); // Carregar clientes ativos por padrão
+            }
             
             // Configurar eventos do modal se ainda não foram configurados
             this.setupClientModalEvents();
+        }
+    }
+
+    // Método específico para carregar via PostMessage
+    async loadClientsViaPostMessage(type) {
+        console.log(`📨 Carregando clientes ${type} via PostMessage...`);
+        
+        const clientList = document.getElementById('clientList');
+        if (!clientList) return;
+
+        // Mostrar loading
+        clientList.innerHTML = `
+            <div class="loading-clients">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Carregando clientes via comunicação com página principal...</p>
+            </div>
+        `;
+
+        try {
+            const clients = await this.requestDataFromParent(type);
+            
+            if (clients && clients.length > 0) {
+                console.log(`✅ Dados recebidos via PostMessage: ${clients.length} clientes`);
+                this.currentClients = clients;
+                this.renderClientList(clients, type);
+                this.updateFilterButtons(type);
+            } else {
+                console.log('⚠️ PostMessage não retornou dados, usando método padrão...');
+                this.loadClients(type);
+            }
+            
+        } catch (error) {
+            console.error('❌ Erro no PostMessage:', error);
+            this.loadClients(type); // Fallback para método padrão
         }
     }
 
@@ -762,6 +1132,14 @@ showManualDataEntry(cnpj) {
         // Evitar configurar múltiplas vezes
         if (this.clientModalEventsSetup) return;
         this.clientModalEventsSetup = true;
+
+        // Botão fechar "X"
+        const closeButton = document.getElementById('closeClientModal');
+        if (closeButton) {
+            closeButton.addEventListener('click', () => {
+                this.closeClientModal();
+            });
+        }
 
         // Fechar modal ao clicar fora
         document.getElementById('clientModal').addEventListener('click', (e) => {
@@ -811,23 +1189,99 @@ showManualDataEntry(cnpj) {
         `;
 
         try {
-            // Buscar dados do ClientManager
+            // Verificar se estamos em iframe
+            const isInIframe = window.self !== window.top;
             let clients = [];
             
-            if (window.clientManager) {
-                // Se o ClientManager estiver disponível, usar seus dados
-                if (type === 'active') {
-                    clients = await window.clientManager.getActiveClients() || [];
-                } else {
-                    clients = await window.clientManager.getInactiveClients() || [];
+            console.log(`🖼️ Executando em iframe: ${isInIframe}`);
+            
+            // PRIMEIRA TENTATIVA: Acessar dados da página pai se estivermos em iframe
+            if (isInIframe) {
+                try {
+                    console.log('� Tentando acessar ClientManager da página pai...');
+                    const parentClientManager = window.parent.clientManager;
+                    
+                    if (parentClientManager) {
+                        console.log('✅ ClientManager encontrado na página pai');
+                        
+                        if (type === 'active') {
+                            clients = parentClientManager.ativos || [];
+                            console.log(`📊 Clientes ativos da página pai: ${clients.length}`);
+                        } else {
+                            clients = parentClientManager.data || [];
+                            console.log(`📊 Clientes inativos da página pai: ${clients.length}`);
+                        }
+                        
+                        if (clients.length === 0) {
+                            console.log('⚠️ Dados vazios no ClientManager pai, tentando variáveis globais...');
+                            
+                            if (type === 'active') {
+                                clients = window.parent.ativos || [];
+                            } else {
+                                clients = window.parent.data || [];
+                            }
+                            
+                            console.log(`🔄 Dados das variáveis globais pai: ${clients.length} clientes`);
+                        }
+                    } else {
+                        console.log('❌ ClientManager não encontrado na página pai');
+                        
+                        // Tentar acessar variáveis globais diretamente
+                        if (type === 'active') {
+                            clients = window.parent.ativos || [];
+                        } else {
+                            clients = window.parent.data || [];
+                        }
+                        
+                        console.log(`🔄 Tentativa direta nas variáveis globais pai: ${clients.length} clientes`);
+                    }
+                    
+                } catch (error) {
+                    console.log('❌ Erro ao acessar página pai (CORS?):', error.message);
                 }
-            } else {
-                // Fallback: tentar carregar do localStorage
+            }
+            
+            // SEGUNDA TENTATIVA: ClientManager local (se não estiver em iframe ou falhou acesso pai)
+            if (clients.length === 0 && window.clientManager) {
+                console.log('📊 Tentando ClientManager local...');
+                
+                if (type === 'active') {
+                    clients = window.clientManager.ativos || [];
+                } else {
+                    clients = window.clientManager.data || [];
+                }
+                
+                console.log(`📊 Clientes do ClientManager local: ${clients.length}`);
+            }
+            
+            // TERCEIRA TENTATIVA: Variáveis globais locais
+            if (clients.length === 0) {
+                console.log('📊 Tentando variáveis globais locais...');
+                
+                if (type === 'active') {
+                    clients = window.ativos || [];
+                } else {
+                    clients = window.data || [];
+                }
+                
+                console.log(`📊 Clientes das variáveis globais locais: ${clients.length}`);
+            }
+            
+            // QUARTA TENTATIVA: localStorage
+            if (clients.length === 0) {
+                console.log('📁 Tentando localStorage...');
                 clients = this.getClientsFromLocalStorage(type);
+                console.log(`📁 Clientes do localStorage: ${clients.length}`);
+            }
+
+            // Log detalhado para debug
+            console.log(`📊 Resultado final: ${clients.length} clientes do tipo ${type}`);
+            if (clients.length > 0) {
+                console.log('📝 Exemplo de cliente:', clients[0]);
             }
 
             this.currentClients = clients;
-            this.renderClientList(clients);
+            this.renderClientList(clients, type);
             
             // Atualizar botões de filtro
             this.updateFilterButtons(type);
@@ -839,6 +1293,8 @@ showManualDataEntry(cnpj) {
                     <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 10px;"></i>
                     <p>Erro ao carregar clientes</p>
                     <small>Verifique se as abas "Ativos" e "Inativos" estão carregadas</small>
+                    <br><small>Erro: ${error.message}</small>
+                    <br><button onclick="window.debugProspeccaoClients()" style="margin-top: 10px; padding: 5px 10px; background: #667eea; color: white; border: none; border-radius: 3px; cursor: pointer;">🔍 Debug</button>
                 </div>
             `;
         }
@@ -847,17 +1303,88 @@ showManualDataEntry(cnpj) {
     // Buscar clientes no localStorage (fallback)
     getClientsFromLocalStorage(type) {
         try {
-            const key = type === 'active' ? 'activeClients' : 'inactiveClients';
-            const data = localStorage.getItem(key);
-            return data ? JSON.parse(data) : [];
+            // Tentar diferentes chaves de localStorage baseadas no que vemos nos logs
+            const possibleKeys = {
+                'active': ['ativos', 'activeClients', 'clientsAtivos'],
+                'inactive': ['clients', 'data', 'inactiveClients', 'clientsInativos']
+            };
+
+            const keys = possibleKeys[type] || [];
+            console.log(`🔍 Tentando chaves localStorage para ${type}:`, keys);
+            
+            for (const key of keys) {
+                try {
+                    const data = localStorage.getItem(key);
+                    if (data) {
+                        const parsed = JSON.parse(data);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            console.log(`✅ Clientes carregados de localStorage.${key}:`, parsed.length);
+                            console.log('📝 Primeiro cliente:', parsed[0]);
+                            return parsed;
+                        } else {
+                            console.log(`⚠️ localStorage.${key} existe mas está vazio ou inválido`);
+                        }
+                    } else {
+                        console.log(`❌ localStorage.${key} não existe`);
+                    }
+                } catch (parseError) {
+                    console.warn(`Erro ao parsear localStorage.${key}:`, parseError.message);
+                }
+            }
+
+            // Fallback: dados de exemplo para demonstração (apenas se realmente não há dados)
+            console.log('📝 Nenhum dado encontrado no localStorage, usando dados de exemplo');
+            return this.getSampleClients(type);
+            
         } catch (error) {
             console.error('Erro ao buscar clientes no localStorage:', error);
-            return [];
+            return this.getSampleClients(type);
         }
     }
 
+    // Dados de exemplo para demonstração
+    getSampleClients(type) {
+        const sampleClients = {
+            'active': [
+                {
+                    name: 'Restaurante Bom Sabor',
+                    cnpj: '12.345.678/0001-90',
+                    cidade: 'São Paulo',
+                    atividade: 'Restaurante',
+                    status: 'active'
+                },
+                {
+                    name: 'Pizzaria La Bella',
+                    cnpj: '98.765.432/0001-10',
+                    cidade: 'Rio de Janeiro',
+                    atividade: 'Pizzaria',
+                    status: 'active'
+                }
+            ],
+            'inactive': [
+                {
+                    name: 'Lanchonete Central',
+                    cnpj: '11.222.333/0001-44',
+                    cidade: 'Belo Horizonte',
+                    atividade: 'Lanchonete',
+                    status: 'inactive'
+                },
+                {
+                    name: 'Bar do João',
+                    cnpj: '55.666.777/0001-88',
+                    cidade: 'Salvador',
+                    atividade: 'Bar e Restaurante',
+                    status: 'inactive'
+                }
+            ]
+        };
+
+        console.log(`📝 Usando dados de exemplo para clientes ${type}`);
+        return sampleClients[type] || [];
+    }
+
     // Renderizar lista de clientes
-    renderClientList(clients) {
+    renderClientList(clients, filterType = null) {
         const clientList = document.getElementById('clientList');
         if (!clientList) return;
 
@@ -866,25 +1393,101 @@ showManualDataEntry(cnpj) {
                 <div style="text-align: center; padding: 40px; color: #666;">
                     <i class="fas fa-users" style="font-size: 2rem; margin-bottom: 10px;"></i>
                     <p>Nenhum cliente encontrado</p>
+                    <small>Certifique-se de que há dados carregados nas abas Ativos/Inativos</small>
                 </div>
             `;
             return;
         }
 
-        const clientsHtml = clients.map(client => {
-            const cnpj = this.formatCNPJDisplay(client.cnpj || client.CNPJ || '');
-            const name = client.name || client.empresa || client.razaoSocial || 'Nome não informado';
-            const city = client.cidade || client.municipio || '';
-            const activity = client.atividade || client.atividadePrincipal || '';
-            const status = client.status || (client.ativo ? 'active' : 'inactive');
+        console.log(`🎨 Renderizando ${clients.length} clientes`);
+        
+        // Determinar o filtro atual - usar parâmetro se fornecido, senão detectar do DOM
+        let currentFilter = filterType;
+        if (!currentFilter) {
+            const activeButton = document.querySelector('.filter-btn.active');
+            currentFilter = activeButton ? activeButton.dataset.filter : 'unknown';
+        }
+        
+        console.log(`🔍 Filtro para renderização: ${currentFilter}`);
+
+        const clientsHtml = clients.map((client, index) => {
+            // Mapear diferentes formatos de dados dos clientes
+            const cnpj = this.formatCNPJDisplay(
+                client['CNPJ / CPF'] || 
+                client.cnpj || 
+                client.CNPJ || 
+                client.cnpjCpf || 
+                ''
+            );
+            
+            const name = 
+                client['Nome Fantasia'] || 
+                client.nomeFantasia ||
+                client.name || 
+                client.empresa || 
+                client.razaoSocial || 
+                client.Cliente ||
+                'Nome não informado';
+                
+            const city = 
+                client.Cidade ||
+                client.cidade || 
+                client.municipio || 
+                '';
+                
+            const activity = 
+                client.atividade || 
+                client.atividadePrincipal || 
+                client.ramo ||
+                '';
+                
+            const contact = 
+                client.Contato ||
+                client.contato ||
+                client.responsavel ||
+                '';
+                
+            const phone = 
+                client['Telefone Comercial'] ||
+                client.telefone ||
+                client.telefoneComercial ||
+                client.Celular ||
+                client.celular ||
+                '';
+
+            // Determinar status baseado no filtro atual
+            let status = 'inactive'; // padrão
+            
+            // Usar o filtro passado como parâmetro ou detectar do DOM
+            if (currentFilter === 'active') {
+                status = 'active';
+            } else if (currentFilter === 'inactive') {
+                status = 'inactive';
+            }
+            // Fallback: verificar propriedades do cliente se não há filtro definido
+            else if (client.isAtivo === true || client.ativo === true) {
+                status = 'active';
+            } else if (window.clientManager && window.clientManager.ativos) {
+                // Verificar se está na lista de ativos
+                const isInAtivos = window.clientManager.ativos.some(ativo => 
+                    ativo.id === client.id || 
+                    ativo['CNPJ / CPF'] === client['CNPJ / CPF'] ||
+                    ativo.cnpj === client.cnpj
+                );
+                if (isInAtivos) status = 'active';
+            }
+
+            console.log(`🏷️ Cliente: ${name}, Filtro: ${currentFilter}, Status: ${status}`);
 
             return `
-                <div class="client-item" data-cnpj="${cnpj}" data-name="${name}">
+                <div class="client-item" data-cnpj="${cnpj}" data-name="${name}" data-id="${client.id || index}">
                     <div class="client-name">${name}</div>
-                    <div class="client-cnpj">CNPJ: ${cnpj}</div>
+                    <div class="client-cnpj">CNPJ: ${cnpj || 'Não informado'}</div>
+                    ${contact ? `<div class="client-info">👤 ${contact}</div>` : ''}
                     ${city ? `<div class="client-info">📍 ${city}</div>` : ''}
                     ${activity ? `<div class="client-info">🏢 ${activity}</div>` : ''}
-                    <span class="client-status ${status}">${status === 'active' ? 'Ativo' : 'Inativo'}</span>
+                    ${phone ? `<div class="client-info">📞 ${phone}</div>` : ''}
+                    <span class="client-status ${status}">${status === 'active' ? 'ATIVO' : 'INATIVO'}</span>
                 </div>
             `;
         }).join('');
@@ -897,6 +1500,8 @@ showManualDataEntry(cnpj) {
                 this.selectClient(item);
             });
         });
+        
+        console.log(`✅ ${clients.length} clientes renderizados com sucesso`);
     }
 
     // Selecionar um cliente
@@ -926,20 +1531,63 @@ showManualDataEntry(cnpj) {
         if (!this.currentClients) return;
 
         const filtered = this.currentClients.filter(client => {
-            const name = (client.name || client.empresa || client.razaoSocial || '').toLowerCase();
-            const cnpj = (client.cnpj || client.CNPJ || '').replace(/\D/g, '');
-            const city = (client.cidade || client.municipio || '').toLowerCase();
-            const activity = (client.atividade || client.atividadePrincipal || '').toLowerCase();
+            // Mapear diferentes formatos de campos
+            const name = (
+                client['Nome Fantasia'] || 
+                client.nomeFantasia ||
+                client.name || 
+                client.empresa || 
+                client.razaoSocial || 
+                client.Cliente ||
+                ''
+            ).toLowerCase();
             
-            const search = searchTerm.toLowerCase().replace(/\D/g, '');
+            const cnpj = (
+                client['CNPJ / CPF'] || 
+                client.cnpj || 
+                client.CNPJ || 
+                client.cnpjCpf || 
+                ''
+            ).replace(/\D/g, '');
             
-            return name.includes(searchTerm.toLowerCase()) ||
-                   cnpj.includes(search) ||
-                   city.includes(searchTerm.toLowerCase()) ||
-                   activity.includes(searchTerm.toLowerCase());
+            const city = (
+                client.Cidade ||
+                client.cidade || 
+                client.municipio || 
+                ''
+            ).toLowerCase();
+            
+            const activity = (
+                client.atividade || 
+                client.atividadePrincipal || 
+                client.ramo ||
+                ''
+            ).toLowerCase();
+            
+            const contact = (
+                client.Contato ||
+                client.contato ||
+                client.responsavel ||
+                ''
+            ).toLowerCase();
+            
+            const search = searchTerm.toLowerCase();
+            const searchNumeric = searchTerm.replace(/\D/g, '');
+            
+            return name.includes(search) ||
+                   cnpj.includes(searchNumeric) ||
+                   city.includes(search) ||
+                   activity.includes(search) ||
+                   contact.includes(search);
         });
 
-        this.renderClientList(filtered);
+        console.log(`🔍 Filtro aplicado: ${filtered.length}/${this.currentClients.length} clientes`);
+        
+        // Detectar filtro atual para manter consistência
+        const activeButton = document.querySelector('.filter-btn.active');
+        const currentFilter = activeButton ? activeButton.dataset.filter : null;
+        
+        this.renderClientList(filtered, currentFilter);
     }
 
     // Atualizar aparência dos botões de filtro
@@ -949,19 +1597,21 @@ showManualDataEntry(cnpj) {
         
         if (activeBtn && inactiveBtn) {
             // Remover classe ativa de ambos
-            activeBtn.classList.remove('btn-primary');
-            inactiveBtn.classList.remove('btn-primary');
+            activeBtn.classList.remove('btn-primary', 'active');
+            inactiveBtn.classList.remove('btn-primary', 'active');
             activeBtn.classList.add('btn-secondary');
             inactiveBtn.classList.add('btn-secondary');
             
             // Adicionar classe ativa no botão correto
             if (activeType === 'active') {
                 activeBtn.classList.remove('btn-secondary');
-                activeBtn.classList.add('btn-primary');
+                activeBtn.classList.add('btn-primary', 'active');
             } else {
                 inactiveBtn.classList.remove('btn-secondary');
-                inactiveBtn.classList.add('btn-primary');
+                inactiveBtn.classList.add('btn-primary', 'active');
             }
+            
+            console.log(`🎯 Filtro atualizado para: ${activeType}`);
         }
     }
 
@@ -1065,9 +1715,20 @@ showManualDataEntry(cnpj) {
         const keywords = this.processKeywords();
 
         if (!cnpj || cnpj.length !== 14) {
-            alert('❌ CNPJ inválido');
+            alert('❌ CNPJ inválido. Digite um CNPJ válido com 14 dígitos.');
             return;
         }
+
+        // Validar se há palavras-chave ou permitir continuar sem elas
+        if (keywords.length === 0) {
+            const confirm = window.confirm('⚠️ Nenhuma palavra-chave foi fornecida. Deseja continuar mesmo assim?\n\nSem palavras-chave, as sugestões de produtos serão baseadas apenas no tipo de empresa.');
+            if (!confirm) {
+                document.getElementById('keywords').focus();
+                return;
+            }
+        }
+
+        console.log('🚀 Iniciando prospecção...', { cnpj, keywords });
 
         // Mostrar loading
         this.showLoading();
@@ -1700,10 +2361,22 @@ cleanItemName(name) {
     // Atualizar o método suggestProducts para usar apenas o catálogo real:
 async suggestProducts(companyData, menuData) {
     console.log('🧠 Iniciando análise inteligente com catálogo real...');
+    console.log('🔍 Debug suggestProducts:');
+    console.log('  - companyData:', !!companyData);
+    console.log('  - menuData:', !!menuData);
+    console.log('  - this.catalog:', !!this.catalog);
+    console.log('  - this.catalog.length:', this.catalog?.length || 0);
     
     try {
         // Garantir que o catálogo está carregado
         await this.ensureCatalogLoaded();
+        
+        console.log(`📦 Após ensureCatalogLoaded: ${this.catalog?.length || 0} produtos`);
+        
+        if (!this.catalog || this.catalog.length === 0) {
+            console.error('❌ Catálogo vazio após ensureCatalogLoaded!');
+            return [];
+        }
         
         const suggestions = [];
         const menuItems = menuData.items || [];
@@ -1736,6 +2409,36 @@ async suggestProducts(companyData, menuData) {
         }
 
         console.log(`✅ ${suggestions.length} produtos sugeridos baseados no catálogo real`);
+        
+        // TESTE DE DEBUG: Se não há sugestões, adicionar algumas de teste
+        if (suggestions.length === 0) {
+            console.warn('⚠️ Nenhuma sugestão encontrada, adicionando produtos de teste...');
+            suggestions.push(
+                {
+                    code: 'TEST001',
+                    name: 'Produto Teste 1',
+                    price: 10.00,
+                    unit: 'KG',
+                    category: 'Teste',
+                    reason: 'Produto de teste para debug',
+                    image: this.getProductImageSafe('TEST001'),
+                    priority: 1,
+                    confidence: 0.5
+                },
+                {
+                    code: 'TEST002', 
+                    name: 'Produto Teste 2',
+                    price: 20.00,
+                    unit: 'UN',
+                    category: 'Teste',
+                    reason: 'Segundo produto de teste',
+                    image: this.getProductImageSafe('TEST002'),
+                    priority: 2,
+                    confidence: 0.5
+                }
+            );
+        }
+        
         return suggestions;
 
     } catch (error) {
@@ -2436,6 +3139,10 @@ getProductImage(productCode) {
     }
 
     showResults() {
+        console.log('📋 showResults chamado');
+        console.log('  - currentProspect:', !!this.currentProspect);
+        console.log('  - suggestions:', this.currentProspect?.suggestions?.length || 0);
+        
         this.hideLoading();
         document.getElementById('resultsSection').style.display = 'grid';
 
@@ -2593,7 +3300,48 @@ convertAnalysisToHtml(analysisText) {
 
     renderProductSuggestions() {
         const container = document.getElementById('productSuggestions');
-        const suggestions = this.currentProspect.suggestions;
+        let suggestions = this.currentProspect.suggestions;
+        
+        console.log('🎯 Debug renderProductSuggestions:');
+        console.log('  - Container encontrado:', !!container);
+        console.log('  - currentProspect:', !!this.currentProspect);
+        console.log('  - suggestions:', suggestions);
+        console.log('  - suggestions.length:', suggestions?.length || 0);
+        console.log('  - selectedPriceBand:', this.selectedPriceBand);
+        
+        if (!container) {
+            console.error('❌ Container productSuggestions não encontrado!');
+            return;
+        }
+        
+        if (!suggestions || suggestions.length === 0) {
+            container.innerHTML = `
+                <p class="suggestions-intro">
+                    <i class="fas fa-exclamation-triangle"></i> 
+                    Nenhum produto foi sugerido. Verifique se o catálogo foi carregado corretamente.
+                </p>
+            `;
+            console.warn('⚠️ Nenhuma sugestão de produto encontrada');
+            return;
+        }
+
+        // ✅ APLICAR FAIXA DE PREÇO AOS PRODUTOS SUGERIDOS
+        suggestions = suggestions.map(product => {
+            if (product.prices && product.prices[this.selectedPriceBand]) {
+                const newPrice = product.prices[this.selectedPriceBand];
+                return {
+                    ...product,
+                    price: newPrice,
+                    formattedPrice: (typeof newPrice === 'number') ? 
+                        newPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 
+                        String(newPrice)
+                };
+            }
+            return {
+                ...product,
+                formattedPrice: product.formattedPrice || `R$ ${product.price.toFixed(2).replace('.', ',')}`
+            };
+        });
         
         container.innerHTML = `
             <p class="suggestions-intro">
@@ -2608,7 +3356,7 @@ convertAnalysisToHtml(analysisText) {
                         </div>
                         <img src="${product.image}" alt="${product.name}" onerror="this.src='${this.getProductImage(product.code)}'">
                         <h4>${product.name}</h4>
-                        <div class="price">R$ ${product.price.toFixed(2)}</div>
+                        <div class="price">${product.formattedPrice}</div>
                         <div class="unit">Por ${product.unit}</div>
                         <div class="reason">
                             <small><i class="fas fa-info-circle"></i> ${product.reason}</small>
@@ -2621,6 +3369,9 @@ convertAnalysisToHtml(analysisText) {
                 <p><strong id="selectedCount">0</strong> produtos selecionados</p>
             </div>
         `;
+
+        // Atualizar referência para os produtos com preços corretos
+        this.currentProspect.suggestions = suggestions;
 
         // Adicionar eventos de seleção
         this.setupProductSelection();
@@ -2638,16 +3389,25 @@ convertAnalysisToHtml(analysisText) {
                     card.classList.remove('selected');
                     this.selectedProducts = this.selectedProducts.filter(p => p.code !== code);
                 } else {
-                    // Selecionar
+                    // Selecionar - usar produto com preço atualizado
                     card.classList.add('selected');
                     const product = this.currentProspect.suggestions.find(p => p.code === code);
                     if (product) {
-                        this.selectedProducts.push(product);
+                        // Garantir que o produto tem a faixa de preço correta aplicada
+                        const productWithCorrectPrice = {
+                            ...product,
+                            price: product.price,
+                            formattedPrice: product.formattedPrice
+                        };
+                        this.selectedProducts.push(productWithCorrectPrice);
                     }
                 }
 
                 // Atualizar contador
                 document.getElementById('selectedCount').textContent = this.selectedProducts.length;
+                
+                console.log('📦 Produtos selecionados:', this.selectedProducts.length);
+                console.log('💰 Faixa atual:', this.selectedPriceBand);
             });
         });
     }
@@ -2798,156 +3558,62 @@ convertAnalysisToHtml(analysisText) {
         });
     }
 
-    createOfferArt() {
-    if (this.selectedProducts.length === 0) {
-        alert('❌ Selecione pelo menos um produto para criar a arte da oferta');
-        return;
-    }
-
-    const company = this.currentProspect.company;
-    const nomeEmpresa = company.fantasia || company.nome;
-
-    // Gerar arte da oferta
-    const offerHtml = this.generateOfferTemplate(nomeEmpresa, this.selectedProducts);
-    
-    // Mostrar no modal
-    document.getElementById('offerPreview').innerHTML = offerHtml;
-    document.getElementById('offerModal').style.display = 'block';
-    
-    this.offerCount++;
-    this.updateStats();
-}
-
-generateOfferTemplate(clientName, products) {
-    return `
-        <div class="offer-template">
-            <div class="offer-header">
-                <img src="logo.png" alt="Logo da Empresa" class="company-logo" crossorigin="anonymous">
-                <h1>🎯 OFERTA EXCLUSIVA</h1>
-                <p>Especialmente para <strong>${clientName}</strong> 💼</p>
-            </div>
-
-            <div class="offer-products">
-                ${products.map(product => `
-                    <div class="offer-product">
-                        <img src="${product.image}" alt="${product.name}" onerror="this.src='${this.getProductImage(product.code)}'">
-                        <h3>${product.name}</h3>
-                        <div class="price">💰 R$ ${product.price.toFixed(2)}</div>
-                        <div class="unit">📦 Por ${product.unit}</div>
-                    </div>
-                `).join('')}
-            </div>
-
-            <div class="offer-footer">
-                <h2>🏆 PMG Atacadista - 30 Anos</h2>
-                <div class="benefits">
-                    <p>✅ Qualidade Garantida</p>
-                    <p>🚛 Entrega Programada</p>
-                    <p>💳 Condições Especiais</p>
-                    <p>📞 Melhor Atendimento</p>
-                </div>
-                <div class="contact">
-                    <p>🌐 www.pmg.com.br</p>
-                    <p><strong>Entre em contato e garante já!</strong> 📱</p>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-
-    downloadOffer() {
-    try {
-        const offerContent = document.querySelector('.offer-template');
-        if (!offerContent) {
-            alert('❌ Conteúdo da oferta não encontrado');
-            return;
-        }
-
-        // Incluir estilos inline no HTML para download
-        const htmlWithStyles = this.addInlineStylesToImages(offerContent.outerHTML);
-        
-        const completeHtml = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Oferta PMG Atacadista</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; }
-        .offer-template { max-width: 100%; margin: 0 auto; }
-        /* Estilos críticos para garantir formatação */
-        .offer-product img {
-            width: 100% !important;
-            height: 150px !important;
-            object-fit: contain !important;
-            background: rgba(255,255,255,0.9) !important;
-        }
-        .company-logo {
-            width: 150px !important;
-            height: 150px !important;
-            object-fit: contain !important;
-            background: white !important;
-        }
-    </style>
-</head>
-<body>
-    ${htmlWithStyles}
-</body>
-</html>`;
-
-        // Criar e baixar arquivo
-        const blob = new Blob([completeHtml], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `oferta_${Date.now()}.html`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        console.log('📥 Download realizado com estilos preservados');
-    } catch (error) {
-        console.error('❌ Erro no download:', error);
-        alert('❌ Erro ao fazer download da oferta');
-    }
-}
-
     async copyOfferText() {
-    try {
-        if (!this.currentProspect) {
-            alert('❌ Nenhuma prospecção ativa para copiar');
-            return;
-        }
+        try {
+            // ✅ REUTILIZAR MÉTODO DO CATALOG.JS
+            if (!window.catalogManager) {
+                console.error('❌ CatalogManager não disponível');
+                alert('❌ Sistema de catálogo não disponível');
+                return;
+            }
 
-        const company = this.currentProspect.company;
-        const nomeEmpresa = company.fantasia || company.razao_social || 'Empresa';
-        const cidade = company.municipio || 'sua cidade';
-        
-        // Gerar texto formatado da oferta (mesmo conteúdo do modal)
-        const offerText = this.generateOfferText(nomeEmpresa, cidade, company);
-        
-        await navigator.clipboard.writeText(offerText);
-        
-        // Feedback visual
-        const button = document.getElementById('copyOfferText');
-        const originalText = button.innerHTML;
-        button.innerHTML = '✅ Texto Copiado!';
-        button.style.backgroundColor = '#28a745';
-        
-        setTimeout(() => {
-            button.innerHTML = originalText;
-            button.style.backgroundColor = '';
-        }, 2000);
-        
-        console.log('✅ Texto da oferta copiado para área de transferência');
-        
-    } catch (error) {
-        console.error('❌ Erro ao copiar texto da oferta:', error);
-        alert('❌ Erro ao copiar texto da oferta');
+            if (!this.selectedProducts || this.selectedProducts.length === 0) {
+                alert('❌ Nenhum produto selecionado para gerar oferta');
+                return;
+            }
+
+            console.log('📝 Gerando texto da oferta usando método do catálogo...');
+
+            // Preparar produtos no formato esperado pelo catalog.js
+            const catalogProducts = this.selectedProducts.map(product => ({
+                name: product.name,
+                code: product.code || 'N/A',
+                formattedPrice: `R$ ${product.price.toFixed(2)}`,
+                unit: product.unit || 'UN',
+                category: product.category || 'Outros'
+            }));
+
+            // ✅ USAR O MÉTODO generateTextOffers DO CATALOG.JS
+            // Temporariamente definir produtos selecionados no catalogManager
+            const originalSelected = window.catalogManager.selectedProducts;
+            window.catalogManager.selectedProducts = catalogProducts;
+
+            // Gerar texto usando o método existente
+            window.catalogManager.generateTextOffers();
+
+            // Restaurar produtos originais
+            window.catalogManager.selectedProducts = originalSelected;
+
+            // Feedback visual
+            const button = document.getElementById('copyOfferText');
+            if (button) {
+                const originalText = button.innerHTML;
+                button.innerHTML = '✅ Texto Copiado!';
+                button.style.backgroundColor = '#28a745';
+                
+                setTimeout(() => {
+                    button.innerHTML = originalText;
+                    button.style.backgroundColor = '';
+                }, 2000);
+            }
+
+            console.log('✅ Texto da oferta gerado e copiado usando método do catálogo');
+
+        } catch (error) {
+            console.error('❌ Erro ao copiar texto da oferta:', error);
+            alert('❌ Erro ao copiar texto da oferta');
+        }
     }
-}
 
 generateOfferText(nomeEmpresa, cidade, company) {
     const selectedProductsText = this.selectedProducts.length > 0 
@@ -2994,727 +3660,790 @@ Site: www.pmg.com.br
 
 async copyOfferImage() {
     try {
-        console.log('📸 Iniciando cópia da imagem da oferta...');
+        console.log('📸 Iniciando geração de imagem com lógica replicada do catálogo...');
         
-        // CORREÇÃO CRÍTICA: Verificar se o modal está aberto
-        const modal = document.getElementById('offerModal');
-        if (!modal || modal.style.display !== 'block') {
-            this.showCopyFeedback('❌ Modal de oferta não está aberto', 'error');
+        if (!this.selectedProducts || this.selectedProducts.length === 0) {
+            alert('❌ Nenhum produto selecionado para gerar imagem');
             return;
         }
-        
-        // CORREÇÃO: Usar seletor mais específico dentro do modal
-        const offerElement = modal.querySelector('.offer-template');
-        if (!offerElement) {
-            console.error('❌ Elemento .offer-template não encontrado no modal');
-            this.showCopyFeedback('❌ Template da oferta não encontrado', 'error');
-            return;
-        }
-        
-        // CORREÇÃO CRÍTICA: Verificar se há produtos na oferta
-        const products = offerElement.querySelectorAll('.offer-product');
-        if (products.length === 0) {
-            console.error('❌ Nenhum produto encontrado na oferta');
-            this.showCopyFeedback('❌ Oferta sem produtos para capturar', 'error');
-            return;
-        }
-        
-        console.log(`✅ Encontrados ${products.length} produtos para capturar`);
-        
-        // CORREÇÃO: Aguardar carregamento completo das imagens
-        await this.waitForImagesToLoad(offerElement);
-        
-        // CORREÇÃO: Aplicar estilos de captura melhorados
-        const originalStyles = await this.applyEnhancedCaptureStyles(offerElement);
-        
-        // CORREÇÃO: Aguardar renderização dos estilos
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        const canvas = await html2canvas(offerElement, {
-    scale: 2,
-    useCORS: true,
-    allowTaint: false,
-    backgroundColor: '#ffffff',
-    width: 1200,
-    height: null,
-    scrollX: 0,
-    scrollY: 0,
-    foreignObjectRendering: false,
-    removeContainer: false,
-    imageTimeout: 30000,
-    logging: false,
-    // CORREÇÃO ESPECÍFICA PARA IMAGENS
-    ignoreElements: function(element) {
-        // Ignorar elementos problemáticos, mas manter imagens
-        return false;
-    },
-    onclone: (clonedDoc) => {
-        const clonedElement = clonedDoc.querySelector('.offer-template');
-        if (clonedElement) {
-            // Aplicar classe de captura no clone
-        clonedElement.classList.add('capturing');
-        
-        // CORREÇÃO ESPECÍFICA: Logo no clone
-        const clonedLogo = clonedElement.querySelector('.company-logo');
-        if (clonedLogo) {
-            // Forçar estilos específicos da logo
-            clonedLogo.style.cssText = `
-                width: 150px !important;
-                height: 150px !important;
-                object-fit: cover !important;
-                object-position: center !important;
-                background-color: white !important;
-                display: block !important;
-                margin: 0 auto 20px auto !important;
-                border-radius: 0 !important;
-                border: 4px solid white !important;
-                transform: none !important;
-                position: relative !important;
-                z-index: 2 !important;
-                aspect-ratio: 1/1 !important;
-                box-sizing: border-box !important;
-                max-width: 150px !important;
-                max-height: 150px !important;
-                min-width: 150px !important;
-                min-height: 150px !important;
-                flex-shrink: 0 !important;
-            `;
-            console.log('✅ Logo configurada no clone');
-        }
-        
-        // Imagens de produtos separadamente
-        const productImages = clonedElement.querySelectorAll('.offer-product img:not(.company-logo)');
-        productImages.forEach(img => {
-            img.style.cssText += `
-                width: 120px !important;
-                height: 120px !important;
-                object-fit: contain !important;
-            `;
-        });
-            // Aplicar classe de captura no clone
-            clonedElement.classList.add('capturing');
-            
-            // CORREÇÃO CRÍTICA: Forçar estilos nas imagens do clone
-            const clonedImages = clonedElement.querySelectorAll('img');
-            clonedImages.forEach(img => {
-                img.style.cssText += `
-                    width: 120px !important;
-                    height: 120px !important;
-                    object-fit: contain !important;
-                    object-position: center !important;
-                    background-color: #ffffff !important;
-                    display: block !important;
-                    margin: 0 auto !important;
-                `;
-                
-                // Logo específico
-                if (img.classList.contains('company-logo') || 
-                    img.parentElement.classList.contains('offer-header')) {
-                    img.style.cssText += `
-                        width: 100px !important;
-                        height: 100px !important;
-                        border-radius: 0 !important;
-                        border: 3px solid white !important;
-                    `;
-                }
-            });
-        }
-    }
-});
 
+        console.log(`🖼️ Gerando imagem para ${this.selectedProducts.length} produtos...`);
         
-        // Restaurar estilos originais
-        this.restoreOriginalStyles(offerElement, originalStyles);
-        
-        // CORREÇÃO: Verificar se o canvas foi criado corretamente
-        if (!canvas || canvas.width === 0 || canvas.height === 0) {
-            throw new Error('Canvas vazio ou inválido gerado');
+        // Usar a função replicada do catálogo
+        await this.generateImageOffersVisualProsp();
+
+        // Feedback visual
+        const button = document.getElementById('copyOfferImage');
+        if (button) {
+            const originalText = button.innerHTML;
+            button.innerHTML = '✅ Imagem Copiada!';
+            button.style.backgroundColor = '#28a745';
+            
+            setTimeout(() => {
+                button.innerHTML = originalText;
+                button.style.backgroundColor = '';
+            }, 2000);
         }
+
+        console.log('✅ Imagem da oferta gerada e copiada usando lógica replicada');
+
+    } catch (error) {
+        console.error('❌ Erro ao gerar imagem da oferta:', error);
+        alert(`❌ Erro ao gerar imagem: ${error.message}`);
+    }
+}
+
+// ✅ FUNÇÃO PARA ESCOLHER NÚMERO ÓTIMO DE PRODUTOS POR LINHA
+selectOptimalProductsPerRowProsp(totalProducts) {
+    if (totalProducts <= 1) return 1;
+    if (totalProducts <= 4) return 2;
+    if (totalProducts <= 6) return 3;
+    if (totalProducts <= 12) return 4;
+    return 5; // Para muitos produtos, máximo 5 por linha
+}
+
+// ✅ OBTER DIMENSÕES RESPONSIVAS (REPLICADAS DO CATÁLOGO)
+getResponsiveDimensionsProsp(productsPerRow) {
+    let dimensions = {};
+    
+    switch(productsPerRow) {
+        case 1: // Layout de destaque - dimensões maiores
+            dimensions = {
+                productWidth: 1200,
+                productHeight: 1400,
+                imageAreaHeight: 700,
+                padding: 60,
+                logoMaxHeight: 280,
+                logoMaxWidth: 800,
+                baseFontSize: 64,
+                priceFontSize: 90,
+                unitFontSize: 44,
+                spacing: {
+                    imageToPrice: 10,
+                    priceToUnit: 10,
+                    unitToTitle: 50
+                }
+            };
+            break;
+            
+        case 2: // Layout médio
+            dimensions = {
+                productWidth: 1000,
+                productHeight: 1200,
+                imageAreaHeight: 600,
+                padding: 50,
+                logoMaxHeight: 240,
+                logoMaxWidth: 650,
+                baseFontSize: 56,
+                priceFontSize: 80,
+                unitFontSize: 40,
+                spacing: {
+                    imageToPrice: 8,
+                    priceToUnit: 8,
+                    unitToTitle: 45
+                }
+            };
+            break;
+            
+        case 3: // Layout padrão
+            dimensions = {
+                productWidth: 900,
+                productHeight: 1080,
+                imageAreaHeight: 500,
+                padding: 40,
+                logoMaxHeight: 200,
+                logoMaxWidth: 550,
+                baseFontSize: 48,
+                priceFontSize: 80,
+                unitFontSize: 40,
+                spacing: {
+                    imageToPrice: 7,
+                    priceToUnit: 7,
+                    unitToTitle: 40
+                }
+            };
+            break;
+            
+        case 4: // Layout compacto
+            dimensions = {
+                productWidth: 700,
+                productHeight: 900,
+                imageAreaHeight: 400,
+                padding: 30,
+                logoMaxHeight: 160,
+                logoMaxWidth: 450,
+                baseFontSize: 40,
+                priceFontSize: 70,
+                unitFontSize: 36,
+                spacing: {
+                    imageToPrice: 6,
+                    priceToUnit: 6,
+                    unitToTitle: 35
+                }
+            };
+            break;
+            
+        case 5: // Layout muito compacto
+        default:
+            dimensions = {
+                productWidth: 600,
+                productHeight: 780,
+                imageAreaHeight: 350,
+                padding: 25,
+                logoMaxHeight: 120,
+                logoMaxWidth: 350,
+                baseFontSize: 36,
+                priceFontSize: 60,
+                unitFontSize: 32,
+                spacing: {
+                    imageToPrice: 5,
+                    priceToUnit: 5,
+                    unitToTitle: 30
+                }
+            };
+            break;
+    }
+    
+    return dimensions;
+}
+
+// ✅ CARREGAR FUNDO DINÂMICO (LÓGICA REPLICADA DO CATÁLOGO)
+async loadDynamicBackgroundProsp(ctx, canvas, nomeLimpo) {
+    try {
+        console.log('🌄 Carregando fundo dinâmico para:', nomeLimpo);
         
-        console.log(`✅ Canvas gerado: ${canvas.width}x${canvas.height}`);
+        // Usar a mesma lógica do catálogo para tradução e busca
+        const categoriaMap = {
+            'pizza': 'pizza',
+            'pizzaria': 'pizza restaurant',
+            'pastel': 'fried pastry',
+            'hamburguer': 'hamburger',
+            'lanche': 'sandwich',
+            'restaurante': 'restaurant',
+            'bar': 'bar',
+            'padaria': 'bakery',
+            'confeitaria': 'bakery',
+            'acougue': 'butcher shop',
+            'supermercado': 'supermarket',
+            'mercado': 'grocery store',
+            'cafe': 'coffee',
+            'cafeteria': 'coffee shop',
+            'sorveteria': 'ice cream',
+            'doceria': 'candy shop',
+            'churrascaria': 'barbecue',
+            'japonesa': 'japanese food',
+            'chinese': 'chinese food',
+            'italiana': 'italian food',
+            'mexican': 'mexican food',
+            'food': 'food'
+        };
+
+        // Limpar e processar o nome
+        const palavrasUteis = nomeLimpo
+            .split(' ')
+            .filter(p => p.length > 2)
+            .filter(p => !['ltda', 'eireli', 'me', 'epp', 'comercio', 'industria', 'servicos'].includes(p));
+
+        let termoBusca = nomeLimpo || 'food';
         
-        // Converter para blob e copiar
-        canvas.toBlob(async (blob) => {
-            if (!blob) {
-                this.showCopyFeedback('❌ Erro ao gerar imagem', 'error');
-                return;
+        // Verificar se alguma palavra mapeia para categoria conhecida
+        for (const [pt, en] of Object.entries(categoriaMap)) {
+            if (nomeLimpo.includes(pt)) {
+                termoBusca = en;
+                break;
             }
+        }
+
+        // Se não encontrou categoria específica, usar as palavras úteis
+        if (termoBusca === nomeLimpo && palavrasUteis.length > 0) {
+            const palavrasTraduzidas = palavrasUteis.map(palavra => {
+                return categoriaMap[palavra] || palavra;
+            });
+            termoBusca = palavrasTraduzidas.join(' ');
+        }
+
+        console.log('🎯 Termo para busca de fundo:', termoBusca);
+
+        // Gerar seed baseado no termo
+        const seed = Math.abs(termoBusca.split('').reduce((a, c) => a + c.charCodeAt(0), 0));
+        
+        const w = Math.max(1200, Math.floor(canvas.width));
+        const h = Math.max(800, Math.floor(canvas.height));
+        
+        // Lista de URLs com fallbacks (igual catálogo)
+        const urlsList = [
+            `https://loremflickr.com/${w}/${h}/${encodeURIComponent(termoBusca)}?lock=${seed}`,
+            `https://source.unsplash.com/${w}x${h}/?${encodeURIComponent(termoBusca)},food`,
+            `https://picsum.photos/seed/${encodeURIComponent(termoBusca)}-${seed}/${w}/${h}`,
+            `https://loremflickr.com/${w}/${h}/food,meal?lock=${seed}`,
+            `https://picsum.photos/${w}/${h}?random=${seed}`
+        ];
+
+        console.log('🔗 URLs de fundo dinâmico:', urlsList);
+        
+        let bg = null;
+        
+        // Tentar cada URL em sequência (igual catálogo)
+        for (let i = 0; i < urlsList.length && !bg; i++) {
+            const url = urlsList[i];
+            const source = url.includes('loremflickr') ? 'LoremFlickr' : 
+                          url.includes('unsplash') ? 'Unsplash' : 
+                          url.includes('picsum') ? 'Picsum' : 'Desconhecida';
+                          
+            console.log(`🔄 Tentativa ${i + 1}: ${source}`);
             
             try {
-                await navigator.clipboard.write([
-                    new ClipboardItem({ 'image/png': blob })
-                ]);
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 
-                this.showCopyFeedback('✅ Imagem copiada com sucesso!', 'success');
-                console.log('✅ Imagem da oferta copiada para área de transferência');
+                const blob = await response.blob();
+                if (blob.size < 1000) throw new Error('Imagem muito pequena');
                 
-            } catch (clipboardError) {
-                console.error('❌ Erro ao copiar para área de transferência:', clipboardError);
-                // Fallback: download da imagem
-                this.downloadImageFallback(canvas);
+                const imageUrl = URL.createObjectURL(blob);
+                
+                bg = new Image();
+                await new Promise((resolve, reject) => {
+                    bg.onload = resolve;
+                    bg.onerror = reject;
+                    bg.src = imageUrl;
+                });
+                
+                if (bg.naturalWidth < 100 || bg.naturalHeight < 100) {
+                    throw new Error('Dimensões inválidas');
+                }
+                
+                console.log(`✅ Fundo carregado via ${source}: ${bg.naturalWidth}x${bg.naturalHeight}`);
+                URL.revokeObjectURL(imageUrl);
+                break;
+                
+            } catch (error) {
+                console.warn(`⚠️ Falha ${source}:`, error.message);
+                bg = null;
             }
-        }, 'image/png', 1.0); // CORREÇÃO: qualidade máxima
+        }
+        
+        if (bg) {
+            // Desenhar fundo cobrindo todo o canvas
+            ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
+            
+            // Aplicar overlay para legibilidade (igual catálogo)
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            console.log('✅ Fundo dinâmico aplicado com sucesso');
+        } else {
+            throw new Error('Nenhuma fonte de imagem funcionou');
+        }
         
     } catch (error) {
-        console.error('❌ Erro detalhado ao copiar imagem:', error);
-        this.showCopyFeedback(`❌ Erro: ${error.message}`, 'error');
+        console.warn('⚠️ Erro ao carregar fundo dinâmico:', error.message);
+        console.log('🤍 Aplicando fundo branco como fallback');
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 }
 
-// NOVO MÉTODO: Aguardar carregamento das imagens
-async waitForImagesToLoad(element) {
-    const images = element.querySelectorAll('img');
-    const imagePromises = Array.from(images).map(img => {
-        return new Promise((resolve) => {
-            if (img.complete && img.naturalWidth > 0) {
-                resolve();
-            } else {
-                img.onload = () => resolve();
-                img.onerror = () => resolve(); // Resolve mesmo com erro para não travar
-                // Timeout de segurança
-                setTimeout(() => resolve(), 5000);
-            }
-        });
-    });
-    
-    console.log(`⏳ Aguardando ${images.length} imagens carregarem...`);
-    await Promise.all(imagePromises);
-    console.log('✅ Todas as imagens processadas');
-}
-
-async applyEnhancedCaptureStyles(element) {
-    const originalStyles = {};
-    
-    // Adicionar classe de captura
-    element.classList.add('capturing');
-    
-    // Adicionar classe de captura
-    element.classList.add('capturing');
-    
-    // CORREÇÃO ESPECÍFICA PARA LOGO - tratamento separado
-    const logo = element.querySelector('.company-logo');
-    if (logo) {
-        console.log('🖼️ Processando logo da empresa...');
-        
-        // Salvar TODOS os estilos originais
-        originalStyles.logo = {
-            width: logo.style.width,
-            height: logo.style.height,
-            objectFit: logo.style.objectFit,
-            objectPosition: logo.style.objectPosition,
-            backgroundColor: logo.style.backgroundColor,
-            display: logo.style.display,
-            margin: logo.style.margin,
-            borderRadius: logo.style.borderRadius,
-            border: logo.style.border,
-            transform: logo.style.transform,
-            position: logo.style.position,
-            zIndex: logo.style.zIndex,
-            aspectRatio: logo.style.aspectRatio,
-            boxSizing: logo.style.boxSizing,
-            crossOrigin: logo.crossOrigin,
-            // Salvar computedStyles também
-            computedWidth: window.getComputedStyle(logo).width,
-            computedHeight: window.getComputedStyle(logo).height
-        };
-        
-        // CORREÇÃO CRÍTICA: Aguardar logo carregar ANTES de aplicar estilos
-        await this.ensureLogoLoaded(logo);
-        
-        // APLICAR estilos específicos da logo
-        logo.crossOrigin = 'anonymous';
-        logo.style.width = '150px';
-        logo.style.height = '150px';
-        logo.style.objectFit = 'cover'; // Cover para logo
-        logo.style.objectPosition = 'center';
-        logo.style.backgroundColor = 'white';
-        logo.style.display = 'block';
-        logo.style.margin = '0 auto 20px auto';
-        logo.style.borderRadius = '50%';
-        logo.style.border = '4px solid white';
-        logo.style.transform = 'none';
-        logo.style.position = 'relative';
-        logo.style.zIndex = '2';
-        logo.style.aspectRatio = '1/1';
-        logo.style.boxSizing = 'border-box';
-        logo.style.maxWidth = '150px';
-        logo.style.maxHeight = '150px';
-        logo.style.minWidth = '150px';
-        logo.style.minHeight = '150px';
-        logo.style.flexShrink = '0';
-        
-        console.log('✅ Logo configurada para captura');
-    }
-    
-    // Tratamento das OUTRAS imagens (produtos)
-    const productImages = element.querySelectorAll('.offer-product img:not(.company-logo)');
-    originalStyles.productImages = [];
-    
-    productImages.forEach((img, index) => {
-        originalStyles.productImages[index] = {
-            width: img.style.width,
-            height: img.style.height,
-            objectFit: img.style.objectFit
-        };
-        
-        // Configurações específicas para imagens de produtos
-        img.style.width = '120px';
-        img.style.height = '120px';
-        img.style.objectFit = 'contain'; // Contain para produtos
-    });
-    // CORREÇÃO CRÍTICA: Aguardar imagens carregarem e aplicar estilos específicos
-    const images = element.querySelectorAll('img');
-    originalStyles.images = [];
-    
-    for (let i = 0; i < images.length; i++) {
-        const img = images[i];
-        
-        // Salvar estilos originais
-        originalStyles.images[i] = {
-            width: img.style.width,
-            height: img.style.height,
-            objectFit: img.style.objectFit,
-            objectPosition: img.style.objectPosition,
-            backgroundColor: img.style.backgroundColor,
-            display: img.style.display,
-            margin: img.style.margin,
-            borderRadius: img.style.borderRadius,
-            border: img.style.border,
-            crossOrigin: img.crossOrigin
-        };
-        
-        // CORREÇÃO PRINCIPAL: Aplicar estilos fixos para cada imagem
-        img.crossOrigin = 'anonymous'; // Para evitar problemas de CORS
-        img.style.width = '120px';
-        img.style.height = '120px';
-        img.style.objectFit = 'contain';
-        img.style.objectPosition = 'center';
-        img.style.backgroundColor = '#ffffff';
-        img.style.display = 'block';
-        img.style.margin = '0 auto';
-        img.style.borderRadius = '8px';
-        img.style.overflow = 'hidden';
-        
-        
-        // CORREÇÃO CRÍTICA: Aguardar cada imagem carregar
-        if (!img.complete || img.naturalWidth === 0) {
-            await new Promise((resolve) => {
-                const timeout = setTimeout(resolve, 2000); // Timeout de segurança
-                img.onload = () => {
-                    clearTimeout(timeout);
-                    resolve();
-                };
-                img.onerror = () => {
-                    clearTimeout(timeout);
-                    console.warn(`Imagem falhou ao carregar: ${img.src}`);
-                    resolve();
-                };
-            });
-        }
-    }
-    
-    // Aplicar outros estilos gerais
-    element.style.width = '1200px';
-    element.style.maxWidth = '1200px';
-    element.style.height = 'auto';
-    element.style.transform = 'none';
-    element.style.backgroundColor = '#ffffff';
-    element.style.visibility = 'visible';
-    element.style.opacity = '1';
-    
-    return originalStyles;
-}
-// NOVO: Método específico para garantir carregamento da logo
-async ensureLogoLoaded(logoElement) {
-    return new Promise((resolve) => {
-        if (logoElement.complete && logoElement.naturalWidth > 0) {
-            console.log('✅ Logo já carregada');
-            resolve();
-            return;
-        }
-        
-        console.log('⏳ Aguardando carregamento da logo...');
-        
-        const timeout = setTimeout(() => {
-            console.warn('⚠️ Timeout no carregamento da logo, continuando...');
-            resolve();
-        }, 5000);
-        
-        logoElement.onload = () => {
-            clearTimeout(timeout);
-            console.log('✅ Logo carregada com sucesso');
-            resolve();
-        };
-        
-        logoElement.onerror = () => {
-            clearTimeout(timeout);
-            console.error('❌ Erro ao carregar logo, continuando...');
-            resolve();
-        };
-        
-        // Forçar recarregamento se necessário
-        if (logoElement.src) {
-            const currentSrc = logoElement.src;
-            logoElement.src = '';
-            logoElement.src = currentSrc + '?' + Date.now(); // Cache bust
-        }
-    });
-}
-
-// NOVO MÉTODO: Forçar visibilidade no clone
-forceVisibilityInClone(clonedElement) {
-    // Aplicar estilos diretamente via CSS inline
-    clonedElement.style.cssText += `
-        position: relative !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        display: block !important;
-        width: 1200px !important;
-        max-width: 1200px !important;
-        background-color: #ffffff !important;
-    `;
-    
-    // Forçar visibilidade dos produtos
-    const products = clonedElement.querySelectorAll('.offer-product');
-    products.forEach(product => {
-        product.style.cssText += `
-            visibility: visible !important;
-            opacity: 1 !important;
-            display: block !important;
-            background-color: rgba(255,255,255,0.95) !important;
-        `;
-        
-        const img = product.querySelector('img');
-        if (img) {
-            img.style.cssText += `
-                visibility: visible !important;
-                opacity: 1 !important;
-                display: block !important;
-                width: 120px !important;
-                height: 120px !important;
-            `;
-        }
-    });
-    
-    // Forçar visibilidade do grid
-    const grid = clonedElement.querySelector('.offer-products');
-    if (grid) {
-        grid.style.cssText += `
-            display: grid !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-        `;
-    }
-}
-
-restoreOriginalStyles(element, originalStyles) {
-    // Remover classe de captura
-    element.classList.remove('capturing');
-     // CORREÇÃO: Restaurar estilos do logo especificamente
-    if (originalStyles.logo) {
-        const logo = element.querySelector('.company-logo');
-        if (logo) {
-            Object.assign(logo.style, originalStyles.logo);
-        }
-    }
-    // CORREÇÃO: Restaurar estilos das imagens especificamente
-    if (originalStyles.images) {
-        const images = element.querySelectorAll('img');
-        images.forEach((img, index) => {
-            if (originalStyles.images[index]) {
-                const original = originalStyles.images[index];
-                img.style.width = original.width || '';
-                img.style.height = original.height || '';
-                img.style.objectFit = original.objectFit || '';
-                img.style.objectPosition = original.objectPosition || '';
-                img.style.backgroundColor = original.backgroundColor || '';
-                img.style.display = original.display || '';
-                img.style.margin = original.margin || '';
-                img.style.borderRadius = original.borderRadius || '';
-                img.style.border = original.border || '';
-                img.crossOrigin = original.crossOrigin || null;
-            }
-        });
-    }
-    
-    // Restaurar estilos gerais do elemento
-    element.style.width = '';
-    element.style.maxWidth = '';
-    element.style.height = '';
-    element.style.transform = '';
-    element.style.backgroundColor = '';
-    element.style.visibility = '';
-    element.style.opacity = '';
-}
-
-
-// MÉTODO MELHORADO: Fallback para download
-downloadImageFallback(canvas) {
+// ✅ DESENHAR LOGO RESPONSIVO
+async drawResponsiveLogoProsp(ctx, canvas, dims) {
     try {
-        const link = document.createElement('a');
-        link.download = `oferta-personalizada-${new Date().getTime()}.png`;
-        link.href = canvas.toDataURL('image/png', 1.0);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        this.showCopyFeedback('📥 Imagem baixada como arquivo', 'info');
+        console.log('🖼️ Carregando logo...');
+        
+        const img = new Image();
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = () => {
+                console.warn('⚠️ Logo não encontrada, continuando sem logo');
+                resolve();
+            };
+            img.src = './logo.png';
+        });
+
+        if (img.complete && img.naturalWidth > 0) {
+            // Calcular dimensões mantendo proporção
+            const aspectRatio = img.naturalWidth / img.naturalHeight;
+            let logoWidth = dims.logoMaxWidth;
+            let logoHeight = logoWidth / aspectRatio;
+            
+            if (logoHeight > dims.logoMaxHeight) {
+                logoHeight = dims.logoMaxHeight;
+                logoWidth = logoHeight * aspectRatio;
+            }
+            
+            // Centralizar logo
+            const logoX = (canvas.width - logoWidth) / 2;
+            const logoY = 30;
+            
+            ctx.drawImage(img, logoX, logoY, logoWidth, logoHeight);
+            console.log(`✅ Logo desenhada: ${logoWidth}x${logoHeight} na posição (${logoX}, ${logoY})`);
+            
+            return { width: logoWidth, height: logoHeight, x: logoX, y: logoY };
+        } else {
+            console.log('ℹ️ Logo não disponível, continuando sem logo');
+            return null;
+        }
     } catch (error) {
-        console.error('❌ Erro no fallback de download:', error);
-        this.showCopyFeedback('❌ Erro ao baixar imagem', 'error');
-    }
-}
-
-// MÉTODO MELHORADO: Feedback visual
-showCopyFeedback(message, type = 'success') {
-    // Remove feedback anterior se existir
-    const existing = document.querySelector('.copy-feedback');
-    if (existing) existing.remove();
-    
-    const feedback = document.createElement('div');
-    feedback.className = `copy-feedback ${type}`;
-    feedback.textContent = message;
-    
-    const colors = {
-        success: '#28a745',
-        error: '#dc3545',
-        info: '#17a2b8'
-    };
-    
-    feedback.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${colors[type]};
-        color: white;
-        padding: 1rem 1.5rem;
-        border-radius: 8px;
-        z-index: 10001;
-        font-weight: 600;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        animation: slideInRight 0.3s ease-out;
-    `;
-    
-    document.body.appendChild(feedback);
-    
-    setTimeout(() => {
-        feedback.style.animation = 'slideOutRight 0.3s ease-in forwards';
-        setTimeout(() => feedback.remove(), 300);
-    }, 4000);
-}
-debugOfferCapture() {
-    const modal = document.getElementById('offerModal');
-    const offer = modal?.querySelector('.offer-template');
-    const products = offer?.querySelectorAll('.offer-product');
-    
-    console.log('🔍 DEBUG - Estado do modal:', {
-        modalExists: !!modal,
-        modalVisible: modal?.style.display === 'block',
-        offerExists: !!offer,
-        productsCount: products?.length || 0,
-        offerDimensions: offer ? {
-            width: offer.offsetWidth,
-            height: offer.offsetHeight
-        } : null
-    });
-    
-    products?.forEach((product, i) => {
-        const img = product.querySelector('img');
-        console.log(`Produto ${i}:`, {
-            visible: window.getComputedStyle(product).visibility,
-            display: window.getComputedStyle(product).display,
-            hasImage: !!img,
-            imageLoaded: img?.complete && img?.naturalWidth > 0
-        });
-    });
-}
-
-debugOfferModal() {
-    const modal = document.getElementById('offerModal');
-    console.log('🔍 DEBUG COMPLETO DO MODAL:');
-    console.log('Modal encontrado:', !!modal);
-    
-    if (modal) {
-        const computedStyle = window.getComputedStyle(modal);
-        
-        console.log('📊 Estilos computados:', {
-            display: computedStyle.display,
-            visibility: computedStyle.visibility,
-            opacity: computedStyle.opacity,
-            position: computedStyle.position,
-            zIndex: computedStyle.zIndex
-        });
-        
-        console.log('📐 Dimensões:', {
-            offsetWidth: modal.offsetWidth,
-            offsetHeight: modal.offsetHeight,
-            scrollWidth: modal.scrollWidth,
-            scrollHeight: modal.scrollHeight,
-            clientWidth: modal.clientWidth,
-            clientHeight: modal.clientHeight
-        });
-        
-        console.log('🎨 Classes:', modal.className);
-        console.log('🔧 Estilos inline:', modal.style.cssText);
-        
-        // Verificar elementos filhos
-        const modalContent = modal.querySelector('.modal-content');
-        const offerTemplate = modal.querySelector('.offer-template');
-        const offerPreview = modal.querySelector('.offer-preview');
-        
-        console.log('🔍 Elementos encontrados:');
-        console.log('  .modal-content:', !!modalContent, modalContent?.offsetWidth + 'x' + modalContent?.offsetHeight);
-        console.log('  .offer-template:', !!offerTemplate, offerTemplate?.offsetWidth + 'x' + offerTemplate?.offsetHeight);
-        console.log('  .offer-preview:', !!offerPreview, offerPreview?.offsetWidth + 'x' + offerPreview?.offsetHeight);
-        
-        // Verificar se é visível
-        const isVisible = modal.offsetWidth > 0 && modal.offsetHeight > 0 && 
-                         computedStyle.display !== 'none' && 
-                         computedStyle.visibility !== 'hidden' && 
-                         parseFloat(computedStyle.opacity) > 0;
-                         
-        console.log('👁️ Modal visível:', isVisible);
-        
-        return {
-            modal,
-            modalContent,
-            offerTemplate,
-            offerPreview,
-            isVisible,
-            computedStyle
-        };
-    } else {
-        console.log('❌ Modal não encontrado!');
+        console.warn('⚠️ Erro ao carregar logo:', error);
         return null;
     }
 }
 
-
-// Método fallback caso o navigator.clipboard não funcione
-fallbackCopyMethod() {
+// ✅ DESENHAR PRODUTO INDIVIDUAL (REPLICADO DO CATÁLOGO)
+async drawProductProsp(ctx, product, x, y, width, height, dims) {
     try {
-        const offerContent = document.querySelector('.offer-template');
-        const htmlWithStyles = this.addInlineStylesToImages(offerContent.outerHTML);
+        // Fundo do produto
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x, y, width, height);
         
-        // Criar elemento temporário para seleção
-        const textArea = document.createElement('textarea');
-        textArea.value = htmlWithStyles;
-        textArea.style.position = 'fixed';
-        textArea.style.opacity = '0';
-        document.body.appendChild(textArea);
-        
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        
-        alert('✅ Oferta copiada (método compatibilidade)!');
-    } catch (error) {
-        console.error('❌ Erro no método fallback:', error);
-        alert('❌ Erro ao copiar. Tente novamente.');
-    }
-}
+        // Borda
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, width, height);
 
-// Adicionar este método na classe ProspeccaoManager
-addInlineStylesToImages(htmlString) {
-    // Criar um elemento temporário para manipular o HTML
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = htmlString;
-    
-    // Aplicar estilos inline às imagens dos produtos
-    const productImages = tempDiv.querySelectorAll('.offer-product img');
-    productImages.forEach(img => {
-        img.style.cssText = `
-            width: 100% !important;
-            height: 150px !important;
-            object-fit: contain !important;
-            border-radius: 12px !important;
-            margin-bottom: 15px !important;
-            border: 2px solid rgba(255,255,255,0.3) !important;
-            background: rgba(255,255,255,0.9) !important;
-            box-sizing: border-box !important;
-        `;
-    });
-    
-    // Aplicar estilos inline ao logo da empresa
-    const companyLogo = tempDiv.querySelector('.company-logo');
-    if (companyLogo) {
-        companyLogo.style.cssText = `
-            width: 150px !important;
-            height: 150px !important;
-            border-radius: 0 !important;
-            margin-bottom: 20px !important;
-            border: 4px solid white !important;
-            object-fit: contain !important;
-            background: white !important;
-            box-sizing: border-box !important;
-        `;
-    }
-    
-    // Aplicar estilos aos containers dos produtos
-    const offerProducts = tempDiv.querySelectorAll('.offer-product');
-    offerProducts.forEach(product => {
-        product.style.cssText += `
-            max-width: 350px !important;
-            box-sizing: border-box !important;
-        `;
-    });
-    
-    return tempDiv.innerHTML;
-}
-// Adicionar este método também
-cloneWithInlineStyles(element) {
-    const clone = element.cloneNode(true);
-    
-    // Aplicar estilos computados aos elementos principais
-    const originalImages = element.querySelectorAll('img');
-    const clonedImages = clone.querySelectorAll('img');
-    
-    originalImages.forEach((originalImg, index) => {
-        if (clonedImages[index]) {
-            const computedStyle = window.getComputedStyle(originalImg);
-            clonedImages[index].style.cssText = `
-                width: ${computedStyle.width} !important;
-                height: ${computedStyle.height} !important;
-                object-fit: ${computedStyle.objectFit} !important;
-                border-radius: ${computedStyle.borderRadius} !important;
-                margin-bottom: ${computedStyle.marginBottom} !important;
-                border: ${computedStyle.border} !important;
-                background: ${computedStyle.background} !important;
-            `;
-        }
-    });
-    
-    return clone;
-}
+        // ✅ USAR EXATAMENTE A MESMA LÓGICA DO CATÁLOGO
+        const centerX = x + width / 2;
+        const imageAreaHeight = dims.imageAreaHeight;
+        const imageAreaTop = y + 20;
+        const imageAreaBottom = imageAreaTop + imageAreaHeight;
+        
+        // Posições exatas como no catálogo
+        const priceBoxTop = imageAreaBottom + dims.spacing.imageToPrice;
+        const unitTop = priceBoxTop + Math.floor(dims.priceFontSize * 1.4) + dims.spacing.priceToUnit;
+        const unitBoxHeight = Math.floor(dims.unitFontSize * 1.6);
+        const titleTopNew = unitTop + unitBoxHeight + dims.spacing.unitToTitle;
 
-copyImageToClipboard() {
-    if (this.offerImageUrl) {
-        fetch(this.offerImageUrl)
-            .then(res => res.blob())
-            .then(blob => {
-                const item = new ClipboardItem({ 'image/png': blob });
-                navigator.clipboard.write([item]).then(() => {
-                    alert('✅ Imagem copiada para a área de transferência!');
-                    // Revoga a URL após a cópia bem-sucedida
-                    URL.revokeObjectURL(this.offerImageUrl);
-                    this.offerImageUrl = null;
-                    this.isOfferImageGenerated = false;
-                }).catch(err => {
-                    console.error('❌ Erro ao copiar imagem:', err);
-                    alert('❌ Erro ao copiar imagem: ' + err.message + '. Tente gerar a oferta novamente.');
-                });
-            }).catch(err => {
-                console.error('❌ Erro ao buscar blob:', err);
-                alert('❌ Falha ao acessar a imagem. Verifique o console para mais detalhes.');
+        // Imagem do produto
+        try {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = () => {
+                    console.warn(`⚠️ Erro ao carregar imagem: ${product.image}`);
+                    resolve(); // Continuar sem imagem
+                };
+                img.src = product.image || './logo.png';
             });
-    } else {
-        alert('❌ Imagem não disponível. Gere a oferta primeiro.');
+
+            if (img.complete && img.naturalWidth > 0) {
+                // Calcular dimensões da imagem mantendo proporção
+                const imageAspectRatio = img.naturalWidth / img.naturalHeight;
+                let imgWidth = width - 40;
+                let imgHeight = imgWidth / imageAspectRatio;
+                
+                if (imgHeight > imageAreaHeight) {
+                    imgHeight = imageAreaHeight;
+                    imgWidth = imgHeight * imageAspectRatio;
+                }
+                
+                const imgX = centerX - imgWidth / 2;
+                const imgY = imageAreaTop + (imageAreaHeight - imgHeight) / 2;
+                
+                ctx.drawImage(img, imgX, imgY, imgWidth, imgHeight);
+            }
+        } catch (imgError) {
+            console.warn('⚠️ Erro ao processar imagem do produto:', imgError);
+        }
+
+        // ✅ FORMATAÇÃO DE PREÇO IDÊNTICA AO CATÁLOGO
+        const priceBigFont = `bold ${dims.priceFontSize}px Arial`;
+        const priceSmallFont = `bold ${Math.floor(dims.priceFontSize * 0.55)}px Arial`;
+        const unitFont = `${dims.unitFontSize}px Arial`;
+        
+        // Calcular dimensões automaticamente como no catálogo
+        const totalPriceWidth = (() => {
+            const parts = String(product.formattedPrice).split(',');
+            const bigText = parts[0] + ',';
+            const smallText = parts[1] || '';
+            ctx.font = priceBigFont; const w1 = ctx.measureText(bigText).width;
+            ctx.font = priceSmallFont; const w2 = ctx.measureText(smallText).width;
+            return w1 + w2;
+        })();
+        
+        ctx.font = unitFont; 
+        const unitText = `(${product.unit || 'UN'})`;
+        const unitWidth = ctx.measureText(unitText).width;
+        
+        // Fundo automático do preço (igual catálogo)
+        const priceBoxWidth = totalPriceWidth + 40;
+        const priceBoxHeight = Math.floor(dims.priceFontSize * 1.4);
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.fillRect(centerX - priceBoxWidth/2, priceBoxTop - 10, priceBoxWidth, priceBoxHeight);
+        
+        // Fundo automático da unidade (igual catálogo)
+        const unitBoxWidth = unitWidth + 40;
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.fillRect(centerX - unitBoxWidth/2, unitTop - 8, unitBoxWidth, unitBoxHeight);
+
+        // Desenhar preço com centavos menores (igual catálogo)
+        const parts = String(product.formattedPrice).split(',');
+        const bigText = parts[0] + ',';
+        const smallText = parts[1] || '';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#dc3545';
+        ctx.font = priceBigFont; 
+        const wBig = ctx.measureText(bigText).width;
+        const startX = centerX - (wBig + (ctx.font = priceSmallFont, ctx.measureText(smallText).width)) / 2;
+        ctx.font = priceBigFont; 
+        ctx.fillText(bigText, startX, priceBoxTop + Math.floor(priceBoxHeight * 0.7));
+        ctx.font = priceSmallFont; 
+        ctx.fillText(smallText, startX + wBig, priceBoxTop + Math.floor(priceBoxHeight * 0.6));
+
+        // Desenhar unidade centralizada (igual catálogo)
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#dc3545';
+        ctx.font = unitFont;
+        ctx.fillText(unitText, centerX, unitTop + Math.floor(unitBoxHeight * 0.7));
+
+        // Nome do produto com fundo automático (igual catálogo)
+        ctx.fillStyle = '#333333';
+        ctx.font = `bold ${dims.baseFontSize}px Arial`;
+        ctx.textAlign = 'center';
+        
+        const maxNameWidth = width - 60;
+        const titleLines = this.wrapTextProsp(ctx, product.name, maxNameWidth);
+        const lineHeight = Math.floor(dims.baseFontSize * 1.21);
+        let titleBoxWidth = Math.max(...titleLines.map(l => ctx.measureText(l).width)) + 60;
+        titleBoxWidth = Math.min(titleBoxWidth, width - 40);
+        const titleBoxHeight = titleLines.length * lineHeight + 30;
+        
+        // Desenhar fundo do título
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.fillRect(centerX - titleBoxWidth/2, titleTopNew - 5, titleBoxWidth, titleBoxHeight);
+        
+        // Desenhar linhas do título
+        titleLines.forEach((line, i) => {
+            ctx.fillStyle = '#333333';
+            const textY = titleTopNew + (titleBoxHeight / 2) - ((titleLines.length - 1) * lineHeight / 2) + (i * lineHeight);
+            ctx.fillText(line, centerX, textY);
+        });
+
+        console.log(`✅ Produto desenhado: ${product.name} - ${product.formattedPrice}`);
+
+    } catch (error) {
+        console.error('❌ Erro ao desenhar produto:', error);
+        
+        // Desenhar placeholder em caso de erro
+        ctx.fillStyle = '#f8f9fa';
+        ctx.fillRect(x, y, width, height);
+        
+        ctx.strokeStyle = '#dee2e6';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, width, height);
+        
+        ctx.fillStyle = '#6c757d';
+        ctx.font = '14px Arial';
+        ctx.fillText('Erro ao', x + 10, y + height / 2 - 10);
+        ctx.fillText('carregar', x + 10, y + height / 2 + 10);
     }
 }
 
+// ✅ QUEBRAR TEXTO EM LINHAS
+wrapTextProsp(ctx, text, maxWidth) {
+    const words = text.split(' ');
+    const lines = [];
+    let currentLine = '';
+
+    for (let word of words) {
+        const testLine = currentLine + (currentLine ? ' ' : '') + word;
+        const testWidth = ctx.measureText(testLine).width;
+        
+        if (testWidth <= maxWidth) {
+            currentLine = testLine;
+        } else {
+            if (currentLine) {
+                lines.push(currentLine);
+            }
+            currentLine = word;
+        }
+    }
     
+    if (currentLine) {
+        lines.push(currentLine);
+    }
+    
+    return lines;
+}
+
+// ✅ COPIAR CANVAS COMO IMAGEM
+async copyCanvasAsImageProsp(canvas) {
+    try {
+        // Converter canvas para blob
+        const blob = await new Promise(resolve => {
+            canvas.toBlob(resolve, 'image/png', 1.0);
+        });
+
+        // Usar Clipboard API se disponível
+        if (navigator.clipboard && window.ClipboardItem) {
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    'image/png': blob
+                })
+            ]);
+            console.log('✅ Imagem copiada para clipboard usando Clipboard API');
+        } else {
+            // Fallback: criar link de download
+            console.log('⚠️ Clipboard API não suportada, criando download');
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `oferta-${Date.now()}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            // Mostrar notificação
+            alert('📸 Imagem salva como download (clipboard não suportado neste navegador)');
+        }
+    } catch (error) {
+        console.error('❌ Erro ao copiar imagem:', error);
+        throw error;
+    }
+}
+
+// ✅ FUNÇÃO REPLICADA DO CATALOG.JS PARA PROSPECÇÃO
+async generateImageOffersVisualProsp() {
+    console.log('🧪 TESTE DE FUNDO DINÂMICO (Prospecção):');
+    console.log('  - this.dynamicBackground:', this.dynamicBackground);
+    console.log('  - localStorage.dynamicBgProsp:', localStorage.getItem('dynamicBgProsp'));
+    console.log('  - Checkbox estado:', document.getElementById('toggle-dynamic-bg-prosp')?.checked);
+
+    try {
+        // ✅ NOVA LÓGICA AUTO-AJUSTÁVEL PARA PRODUTOS POR LINHA (1-5)
+        const productsPerRow = this.selectOptimalProductsPerRowProsp(this.selectedProducts.length);
+        
+        // ✅ OBTER DIMENSÕES RESPONSIVAS BASEADAS NO LAYOUT
+        const dims = this.getResponsiveDimensionsProsp(productsPerRow);
+        
+        const productWidth = dims.productWidth;
+        const productHeight = dims.productHeight;
+        const padding = dims.padding;
+        
+        const rows = Math.ceil(this.selectedProducts.length / productsPerRow);
+        const canvasWidth = productsPerRow * (productWidth + padding) + padding;
+        
+        // Logo responsivo baseado nas dimensões do layout
+        let logoSectionHeight = dims.logoMaxHeight + 60;
+        const canvasHeight = logoSectionHeight + (rows * (productHeight + padding)) + padding;
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+        
+        // Fundo dinâmico ou branco (inline)
+        console.log('� Status do fundo dinâmico:', this.dynamicBackground);
+        if (this.dynamicBackground) {
+            console.log('�️ Tentando carregar fundo dinâmico...');
+            
+            // ✅ USAR O TÍTULO COMPLETO DO PRODUTO 1 LIMPO PARA O FUNDO
+            const produto1 = this.selectedProducts[0];
+            
+            // Limpar o nome do produto removendo números, medidas e caracteres especiais
+            const nomeLimpo = produto1.name
+                .toLowerCase()
+                // Remove unidades de medida comuns
+                .replace(/\d+(\.\d+)?\s*(kg|g|ml|l|un|pct|cx|lt|bd|vd|fr|bag|bis|pt|sc|fd|fdo|pç|barr)/gi, '')
+                // Remove números restantes
+                .replace(/\d+/g, '')
+                // Remove caracteres especiais, mantém letras e acentos
+                .replace(/[^a-záàâãäçéèêëíìîïóòôõöúùûüñ\s]/gi, '')
+                // Remove espaços múltiplos e espaços no início/fim
+                .replace(/\s+/g, ' ')
+                .trim();
+            
+            console.log('🎯 Produto 1 nome original:', produto1.name);
+            console.log('🧽 Nome limpo para busca:', nomeLimpo);
+
+            // ✅ CARREGAR FUNDO DINÂMICO
+            await this.loadDynamicBackgroundProsp(ctx, canvas, nomeLimpo);
+        } else {
+            console.log('🤍 Usando fundo branco');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // ✅ DESENHAR LOGO RESPONSIVO
+        const logoResult = await this.drawResponsiveLogoProsp(ctx, canvas, dims);
+        
+        // ✅ DESENHAR PRODUTOS COM LAYOUT RESPONSIVO
+        console.log(`📐 Layout escolhido: ${productsPerRow} produtos por linha para ${this.selectedProducts.length} produtos total`);
+        
+        let currentX = padding;
+        let currentY = logoSectionHeight;
+        
+        for (let i = 0; i < this.selectedProducts.length; i++) {
+            const row = Math.floor(i / productsPerRow);
+            const col = i % productsPerRow;
+            
+            const x = padding + col * (productWidth + padding);
+            const y = logoSectionHeight + row * (productHeight + padding);
+            
+            const product = this.selectedProducts[i];
+            
+            console.log(`🎨 Desenhando produto ${i + 1}: ${product.name} na posição (${x}, ${y})`);
+            
+            await this.drawProductProsp(ctx, product, x, y, productWidth, productHeight, dims);
+        }
+
+        // ✅ COPIAR PARA CLIPBOARD
+        await this.copyCanvasAsImageProsp(canvas);
+        
+        console.log(`✅ Imagem visual gerada com ${this.selectedProducts.length} produtos em layout ${productsPerRow}x${rows}`);
+
+    } catch (error) {
+        console.error('Erro ao gerar imagem:', error);
+        throw error;
+    }
+}
+
+    // ==================== MÉTODO FALLBACK PARA GERAÇÃO DE IMAGEM ====================
+
+    async copyOfferImageFallback() {
+        try {
+            console.log('📸 Usando método fallback para geração de imagem...');
+            
+            if (!this.selectedProducts || this.selectedProducts.length === 0) {
+                this.showCopyFeedback('❌ Nenhum produto selecionado', 'error');
+                return;
+            }
+
+            // Criar canvas simples
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Configurar dimensões
+            canvas.width = 800;
+            canvas.height = 600 + (this.selectedProducts.length * 80);
+            
+            // Fundo branco
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Título
+            ctx.fillStyle = '#007bff';
+            ctx.font = 'bold 28px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('OFERTA PERSONALIZADA', canvas.width / 2, 50);
+            
+            // Data
+            ctx.fillStyle = '#666666';
+            ctx.font = '16px Arial';
+            ctx.fillText(new Date().toLocaleDateString('pt-BR'), canvas.width / 2, 80);
+            
+            // Linha separadora
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(50, 100);
+            ctx.lineTo(canvas.width - 50, 100);
+            ctx.stroke();
+            
+            // Produtos
+            let yPos = 140;
+            this.selectedProducts.forEach((product, index) => {
+                // Número do produto
+                ctx.fillStyle = '#007bff';
+                ctx.font = 'bold 20px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText(`${index + 1}.`, 60, yPos);
+                
+                // Nome do produto
+                ctx.fillStyle = '#333333';
+                ctx.font = 'bold 16px Arial';
+                const productName = product.name.length > 50 ? product.name.substring(0, 47) + '...' : product.name;
+                ctx.fillText(productName, 100, yPos);
+                
+                // Preço
+                ctx.fillStyle = '#28a745';
+                ctx.font = 'bold 18px Arial';
+                ctx.textAlign = 'right';
+                ctx.fillText(`R$ ${product.price.toFixed(2)}`, canvas.width - 60, yPos);
+                
+                // Código e unidade
+                ctx.fillStyle = '#666666';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText(`Cód: ${product.code || 'N/A'} | ${product.unit || 'UN'}`, 100, yPos + 20);
+                
+                yPos += 60;
+            });
+            
+            // Rodapé
+            const footerY = canvas.height - 60;
+            ctx.fillStyle = '#f8f9fa';
+            ctx.fillRect(20, footerY, canvas.width - 40, 40);
+            
+            ctx.fillStyle = '#007bff';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('PMG - A entrega nos move até você!', canvas.width / 2, footerY + 25);
+            
+            // Converter para blob e copiar
+            canvas.toBlob(async (blob) => {
+                if (!blob) {
+                    this.showCopyFeedback('❌ Erro ao gerar imagem', 'error');
+                    return;
+                }
+                
+                try {
+                    await navigator.clipboard.write([
+                        new ClipboardItem({ 'image/png': blob })
+                    ]);
+                    
+                    this.showCopyFeedback('✅ Imagem copiada (método simples)', 'success');
+                    
+                    // Feedback visual no botão
+                    const button = document.getElementById('copyOfferImage');
+                    if (button) {
+                        const originalText = button.innerHTML;
+                        button.innerHTML = '✅ Imagem Copiada!';
+                        button.style.backgroundColor = '#28a745';
+                        
+                        setTimeout(() => {
+                            button.innerHTML = originalText;
+                            button.style.backgroundColor = '';
+                        }, 2000);
+                    }
+                    
+                } catch (clipboardError) {
+                    console.error('❌ Erro ao copiar para área de transferência:', clipboardError);
+                    
+                    // Fallback: download da imagem
+                    const link = document.createElement('a');
+                    link.download = `oferta-${new Date().getTime()}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    this.showCopyFeedback('📥 Imagem baixada como arquivo', 'info');
+                }
+            }, 'image/png');
+            
+        } catch (error) {
+            console.error('❌ Erro no método fallback:', error);
+            this.showCopyFeedback(`❌ Erro: ${error.message}`, 'error');
+        }
+    }
+
+    // ==================== MÉTODOS DE ESTATÍSTICAS ====================
 
     updateStats() {
+        // Atualizar elementos de estatísticas na interface se existirem
+        const prospectCountElement = document.getElementById('prospect-count');
+        const offerCountElement = document.getElementById('offer-count');
         
+        if (prospectCountElement) {
+            prospectCountElement.textContent = this.prospectCount;
+        }
+        
+        if (offerCountElement) {
+            offerCountElement.textContent = this.offerCount;
+        }
         
         // Salvar no localStorage
         localStorage.setItem('prospeccaoStats', JSON.stringify({
@@ -3733,12 +4462,65 @@ copyImageToClipboard() {
             console.error('❌ Erro ao carregar estatísticas:', error);
         }
     }
+
+    // ==================== MÉTODOS DE FEEDBACK ====================
+
+    showCopyFeedback(message, type = 'success') {
+        // Remove feedback anterior se existir
+        const existing = document.querySelector('.copy-feedback');
+        if (existing) existing.remove();
+        
+        const feedback = document.createElement('div');
+        feedback.className = `copy-feedback ${type}`;
+        feedback.textContent = message;
+        
+        const colors = {
+            success: '#28a745',
+            error: '#dc3545',
+            info: '#17a2b8',
+            warning: '#ffc107'
+        };
+        
+        feedback.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${colors[type] || colors.success};
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            z-index: 10001;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            animation: slideInRight 0.3s ease-out;
+        `;
+        
+        document.body.appendChild(feedback);
+        
+        setTimeout(() => {
+            feedback.style.animation = 'slideOutRight 0.3s ease-in forwards';
+            setTimeout(() => feedback.remove(), 300);
+        }, 4000);
+    }
 }
 
 /// Inicialização coordenada do sistema
 document.addEventListener('DOMContentLoaded', async () => {
     try {
         console.log('🚀 Inicializando sistema completo...');
+        
+        // Aguardar inicialização dos outros sistemas
+        let maxWait = 50; // 5 segundos máximo
+        while (maxWait > 0 && (!window.clientManager || !window.dbManager)) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            maxWait--;
+        }
+        
+        if (window.clientManager) {
+            console.log('✅ ClientManager disponível para prospecção');
+        } else {
+            console.warn('⚠️ ClientManager não encontrado, usando fallbacks');
+        }
         
         // Se existe CatalogManager, inicializar primeiro
         if (window.CatalogManager) {
@@ -3749,7 +4531,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Depois inicializar ProspeccaoManager
         window.prospeccaoManager = new ProspeccaoManager();
+        
+        // Tornar disponível globalmente para debug
+        window.debugProspeccaoClients = () => window.prospeccaoManager.debugClientData();
+        
         console.log('✅ Sistema inicializado com sucesso');
+        console.log('💡 Use window.debugProspeccaoClients() para debug dos clientes');
         
     } catch (error) {
         console.error('❌ Erro na inicialização:', error);

@@ -36,6 +36,17 @@ saveCatalogToCache(catalogData) {
         // Salvar flag indicando que existe catálogo personalizado
         localStorage.setItem('hasCustomCatalog', 'true');
         
+        // NOVO: Disparar evento para notificar outras abas/componentes
+        const catalogUpdateEvent = new CustomEvent('catalogUpdated', {
+            detail: {
+                productsCount: cacheData.products.length,
+                fileName: cacheData.fileName,
+                savedAt: cacheData.savedAt
+            }
+        });
+        window.dispatchEvent(catalogUpdateEvent);
+        console.log('📡 Evento catalogUpdated disparado');
+        
     } catch (error) {
         console.error('❌ Erro ao salvar catálogo no cache:', error);
     }
@@ -133,6 +144,9 @@ async init() {
             priceBandSelect.value = this.priceBand;
         }
         
+        // Inicializar seção de produtos selecionados
+        this.updateSelectedProductsDisplay();
+        
     } catch (error) {
         console.error('❌ Erro na inicialização:', error);
         this.updateCatalogStatus('Erro na inicialização. Carregando produtos de exemplo...');
@@ -192,11 +206,26 @@ if (refreshBtn) {
 }
 
 
-        // Botão de seleção múltipla
-        const selectMultipleBtn = document.getElementById('select-multiple-products');
-        if (selectMultipleBtn) {
-            selectMultipleBtn.addEventListener('click', () => {
-                this.openProductSelectionModal();
+        // Botões de cópia direta
+        const copyTextBtn = document.getElementById('copy-text-direct');
+        if (copyTextBtn) {
+            copyTextBtn.addEventListener('click', () => {
+                this.generateTextOffers();
+            });
+        }
+
+        const copyImageBtn = document.getElementById('copy-image-direct');
+        if (copyImageBtn) {
+            copyImageBtn.addEventListener('click', () => {
+                this.generateImageOffersVisual();
+            });
+        }
+
+        // Botão limpar seleção
+        const clearSelectionBtn = document.getElementById('clear-selection');
+        if (clearSelectionBtn) {
+            clearSelectionBtn.addEventListener('click', () => {
+                this.clearSelection();
             });
         }
 
@@ -212,10 +241,18 @@ if (refreshBtn) {
         const toggleBg = document.getElementById('toggle-dynamic-bg');
         if (toggleBg) {
             toggleBg.checked = this.dynamicBackground;
+            console.log('🔧 Configurando toggle de fundo dinâmico:');
+            console.log('  - Estado inicial:', this.dynamicBackground);
+            console.log('  - localStorage:', localStorage.getItem('dynamicBg'));
+            console.log('  - Checkbox configurado:', toggleBg.checked);
+            
             toggleBg.addEventListener('change', (e) => {
                 this.dynamicBackground = !!e.target.checked;
                 localStorage.setItem('dynamicBg', String(this.dynamicBackground));
+                console.log('🔄 Fundo dinâmico alterado para:', this.dynamicBackground);
             });
+        } else {
+            console.warn('⚠️ Checkbox toggle-dynamic-bg não encontrado!');
         }
 
         // Modal de produto
@@ -1031,8 +1068,10 @@ handleImageError(imgElement, codigo) {
 
         grid.innerHTML = '';
         this.filteredProducts.forEach(product => {
+            const isSelected = this.selectedProducts.some(p => p.id === product.id);
             const productCard = document.createElement('div');
-            productCard.className = 'product-card';
+            productCard.className = `product-card ${isSelected ? 'selected' : ''}`;
+            
             productCard.innerHTML = `
                 <div class="product-image">
                     <img src="${product.image}" alt="${product.name}" loading="lazy"
@@ -1046,8 +1085,21 @@ handleImageError(imgElement, codigo) {
                 </div>
             `;
 
+            // Click no card para selecionar/desselecionar
             productCard.addEventListener('click', () => {
-                this.openProductModal(product);
+                const isCurrentlySelected = this.selectedProducts.some(p => p.id === product.id);
+                
+                if (isCurrentlySelected) {
+                    // Remover da seleção
+                    this.selectedProducts = this.selectedProducts.filter(p => p.id !== product.id);
+                    productCard.classList.remove('selected');
+                } else {
+                    // Adicionar à seleção
+                    this.selectedProducts.push(product);
+                    productCard.classList.add('selected');
+                }
+                
+                this.updateSelectedProductsDisplay();
             });
 
             grid.appendChild(productCard);
@@ -1089,6 +1141,45 @@ handleImageError(imgElement, codigo) {
         }
     }
 
+    // ====== NOVAS FUNÇÕES PARA SELEÇÃO DIRETA ======
+
+    updateSelectedProductsDisplay() {
+        const section = document.getElementById('selected-products-section');
+        const count = document.getElementById('selected-products-count');
+        const list = document.getElementById('selected-products-list');
+
+        if (!section || !count || !list) return;
+
+        if (this.selectedProducts.length === 0) {
+            section.style.display = 'none';
+            return;
+        }
+
+        section.style.display = 'block';
+        count.textContent = this.selectedProducts.length;
+
+        list.innerHTML = this.selectedProducts.map(product => `
+            <div class="selected-product-item" style="display: inline-block; margin: 5px; padding: 10px; background: #f8f9fa; border-radius: 5px; border: 1px solid #dee2e6;">
+                <img src="${product.image}" alt="${product.name}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 3px; vertical-align: middle; margin-right: 8px;">
+                <span style="font-weight: 500;">${product.name}</span>
+                <span style="color: #007bff; margin-left: 8px;">${product.formattedPrice}</span>
+                <button onclick="catalogManager.removeFromSelection('${product.id}')" style="margin-left: 8px; background: #dc3545; color: white; border: none; border-radius: 3px; padding: 2px 6px; cursor: pointer; font-size: 12px;">×</button>
+            </div>
+        `).join('');
+    }
+
+    removeFromSelection(productId) {
+        this.selectedProducts = this.selectedProducts.filter(p => p.id !== productId);
+        this.updateSelectedProductsDisplay();
+        this.renderProductsGrid(); // Atualizar visual dos produtos na grade
+    }
+
+    clearSelection() {
+        this.selectedProducts = [];
+        this.updateSelectedProductsDisplay();
+        this.renderProductsGrid(); // Atualizar visual dos produtos na grade
+    }
+
     // Alterar faixa de preço
     setPriceBand(band) {
         const allowed = ['retira','entrega','km100_199','km200_299','km300_399','km400_499','km500_599','km600_plus'];
@@ -1099,6 +1190,8 @@ handleImageError(imgElement, codigo) {
         this.showNotification('Faixa de preço atualizada', 'success', 1500);
     }
 
+    // FUNÇÃO DESABILITADA - NÃO USAMOS MAIS MODAL DE PRODUTO ÚNICO
+    /*
     openProductModal(product) {
         this.currentProduct = product;
         const modal = document.getElementById('modal-produto');
@@ -1151,7 +1244,10 @@ handleImageError(imgElement, codigo) {
 
         modal.style.display = 'flex';
     }
+    */
 
+    // FUNÇÃO DESABILITADA - NÃO USAMOS MAIS MODAL DE PRODUTO ÚNICO
+    /*
     async copyProductText(product) {
         const productText = `🛒 **OFERTA ESPECIAL** 🛒
 
@@ -1184,6 +1280,7 @@ handleImageError(imgElement, codigo) {
             document.body.removeChild(textArea);
         }
     }
+    */
 
     // Geração de imagem visual auto-ajustável para 1-5 produtos por linha
 async generateImageOffersVisual() {

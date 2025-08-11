@@ -17,19 +17,6 @@
                 <img src="logo.png" alt="Logo da Empresa" class="company-logo" crossorigin="anonymous">
                 <h1>Prospecção Inteligente</h1>
             </div>
-            <div class="price-band-control" style="margin-left:auto; display:flex; align-items:center; gap:8px;">
-                <label for="price-band-select-pros" style="font-weight:600;">Faixa de preço:</label>
-                <select id="price-band-select-pros" style="padding:6px 8px; border-radius:6px;">
-                    <option value="retira">Retira R$</option>
-                    <option value="entrega">Entrega R$</option>
-                    <option value="km100_199">100 a 199 km</option>
-                    <option value="km200_299">200 a 299 km</option>
-                    <option value="km300_399">300 a 399 km</option>
-                    <option value="km400_499">400 a 499 km</option>
-                    <option value="km500_599">500 a 599 km</option>
-                    <option value="km600_plus">Acima 600km</option>
-                </select>
-            </div>
         </div>
     </div>
 
@@ -65,10 +52,10 @@
                                            style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
                                 </div>
                                 <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                                    <button type="button" id="showActiveClients" class="btn btn-success">
+                                    <button type="button" id="showActiveClients" class="btn btn-success filter-btn" data-filter="active">
                                         <i class="fas fa-check-circle"></i> Ativos
                                     </button>
-                                    <button type="button" id="showInactiveClients" class="btn btn-secondary">
+                                    <button type="button" id="showInactiveClients" class="btn btn-secondary filter-btn" data-filter="inactive">
                                         <i class="fas fa-pause-circle"></i> Inativos
                                     </button>
                                 </div>
@@ -81,9 +68,37 @@
 
                     <div class="form-group">
                         <label for="keywords">Palavras-chave do Cardápio:</label>
-                        <textarea id="keywords" placeholder="Digite palavras-chave do cardápio separadas por vírgula (ex: pizza, hambúrguer, refrigerante, açaí, carne, frango)" 
+                        <textarea id="keywords" placeholder="Digite palavras-chave do cardápio separadas por vírgula (ex: pizza, hambúrguer, refrigerante, açaí, carne, frango, batata frita, sorvete)" 
                                   rows="3" style="width: 100%; padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem; resize: vertical; font-family: inherit;"></textarea>
                         <small>Digite palavras-chave que descrevem o cardápio do cliente para sugestões mais precisas</small>
+                        <div style="margin-top: 10px;">
+                            <strong>💡 Clique nos segmentos para adicionar insumos automaticamente:</strong>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 6px; margin-top: 8px;">
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'pizza, mussarela, molho de tomate, farinha, fermento, oregano, azeitona, calabresa, presunto, queijo'">🍕 Pizzaria</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'carne bovina, frango, peixe, arroz, feijão, óleo, temperos, legumes, verduras, batata, cebola'">🍽️ Restaurante</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'pão hambúrguer, carne, frango, batata frita, refrigerante, maionese, ketchup, mostarda, alface, tomate'">🍔 Lanchonete</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'farinha trigo, fermento, açúcar, ovos, leite, manteiga, sal, chocolate, frutas, recheios'">🥖 Padaria</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'carnes, frios, laticínios, bebidas, enlatados, congelados, higiene, limpeza, hortifruti, cereais'">🛒 Supermercado</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'massa pastel, óleo fritura, queijo, presunto, carne moída, palmito, catupiry, molhos'">🥟 Pastelaria</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'cerveja, bebidas alcoólicas, refrigerantes, petiscos, amendoim, azeitona, queijos, carnes frias'">🍺 Bar/Choperia</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'arroz, feijão, açúcar, óleo, enlatados, massas, temperos, produtos limpeza, bebidas'">� Mercearia</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'carnes, aves, peixes, frutos mar, temperos, sal grosso, embalagens, papel filme, luvas'">🏨 Hotel/Pousada</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'massa esfiha, carne, cebola, tomate, temperos árabes, queijo, ricota, espinafre'">🥙 Esfiharia</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'shoyu, missô, nori, wasabi, gengibre, sake, arroz sushi, salmão, atum, pepino japonês'">🍱 Cozinha Oriental</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'ingredientes grande escala, carnes, verduras, temperos, óleo, arroz, feijão, massas, conservas'">🏭 Cozinha Industrial</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'carne bovina, linguiça, frango, sal grosso, carvão, farofa, vinagrete, pão alho'">🔥 Churrascaria</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'farinha trigo, ovos, semolina, massa fresca, molhos, queijos, azeite, ervas'">� Fábrica Massas</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'açúcar, chocolate, farinha, ovos, leite, creme leite, frutas, essências, corantes, confeitos'">🧁 Confeitaria</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'leite, queijos, iogurte, manteiga, creme leite, requeijão, embalagens, conservantes'">🧀 Laticínios</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'refrigerantes, sucos, água, snacks, salgadinhos, doces, cigarros, produtos conveniência'">🏪 Loja Conveniência</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'carnes bovinas, suínas, aves, peixes, temperos, sal, embalagens, papel, luvas descartáveis'">🥩 Açougue</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'frango assado, temperos, óleo, batata, polenta, farofa, molhos, embalagens'">🍗 Rotisserie</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'vinhos, espumantes, cervejas especiais, queijos, embutidos, petiscos gourmet, taças'">🍷 Adega</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'ingredientes eventos, carnes, saladas, bebidas, descartáveis, decoração comestível'">🏛️ Clube/Associação</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'pratos prontos, saladas, carnes, acompanhamentos, sobremesas, bebidas, descartáveis'">�️ Buffet</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'pão hambúrguer, carne, bacon, queijo, alface, tomate, batata, molhos, refrigerantes'">🍔 Hamburgueria</span>
+                            </div>
+                        </div>
                     </div>
 
                     <button type="submit" class="btn btn-primary">
@@ -143,11 +158,35 @@
             
 
             <div class="product-suggestions card">
-                <h2><i class="fas fa-lightbulb"></i> Produtos Sugeridos (Escolha multiplos de 3 produtos para geração de imagem)</h2>
+                <h2><i class="fas fa-lightbulb"></i> Produtos Sugeridos</h2>
+                
                 <div id="productSuggestions"></div>
-                <button id="createOffer" class="btn btn-success">
-                    <i class="fas fa-palette"></i> Criar Arte da Oferta
-                </button>
+                <div class="offer-actions" style="display: flex; gap: 10px; margin-top: 15px; align-items: center; justify-content: center; flex-wrap: wrap;">
+                    <button id="copyOfferText" class="btn btn-primary">
+                        <i class="fas fa-copy"></i> Copiar Texto
+                    </button>
+                    <button id="copyOfferImage" class="btn btn-success">
+                        <i class="fas fa-image"></i> Copiar Imagem
+                    </button>
+                    
+                    <!-- ✅ SELETOR DE FAIXA DE PREÇO -->
+                    <label for="price-band-select-prosp" style="margin-left: 20px; font-weight: 500; color: #333;">Faixa de preço:</label>
+                    <select id="price-band-select-prosp" class="btn btn-secondary" style="min-width: 160px; height: 38px; border: 1px solid #ddd; border-radius: 4px; padding: 0 8px;">
+                        <option value="retira">Retira R$</option>
+                        <option value="entrega">Entrega R$</option>
+                        <option value="km100_199">100 a 199 km</option>
+                        <option value="km200_299">200 a 299 km</option>
+                        <option value="km300_399">300 a 399 km</option>
+                        <option value="km400_499">400 a 499 km</option>
+                        <option value="km500_599">500 a 599 km</option>
+                        <option value="km600_plus">Acima 600km</option>
+                    </select>
+                    
+                    <!-- Controle de fundo dinâmico ao lado dos botões -->
+                    <label style="display:inline-flex; align-items:center; gap:6px; margin-left: 15px; font-weight: 500; color: #333;">
+                        <input type="checkbox" id="toggle-dynamic-bg-prosp"> Fundo dinâmico
+                    </label>
+                </div>
             </div>
 
             

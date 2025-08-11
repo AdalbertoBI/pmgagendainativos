@@ -103,27 +103,34 @@
         <div id="catalog-controls">
             <input type="text" id="product-search" placeholder="Buscar produtos...">
             <button id="refresh-catalog" class="catalog-btn">🔄 Atualizar Catálogo</button>
-            <button id="select-multiple-products" class="catalog-btn">📋 Selecionar Múltiplos</button>
+            <button id="copy-text-direct" class="catalog-btn">📝 Copiar Texto</button>
+            <button id="copy-image-direct" class="catalog-btn">�️ Copiar Imagem</button>
              <button class="catalog-btn" onclick="document.getElementById('catalog-file-input').click()">
                 📁 Carregar Catálogo (.pdf ou .xlsx)
             </button>
 
-            <!-- Seletor de faixa de preço -->
-            <label for="price-band-select" style="margin-left:12px; font-weight:600;">Faixa de preço:</label>
-            <select id="price-band-select" class="catalog-btn" style="min-width: 220px;">
-                <option value="retira">Retira R$</option>
-                <option value="entrega">Entrega R$</option>
-                <option value="km100_199">100 a 199 km</option>
-                <option value="km200_299">200 a 299 km</option>
-                <option value="km300_399">300 a 399 km</option>
-                <option value="km400_499">400 a 499 km</option>
-                <option value="km500_599">500 a 599 km</option>
-                <option value="km600_plus">Acima 600km</option>
-            </select>
-
-            <label style="margin-left:12px; display:inline-flex; align-items:center; gap:6px;">
-                <input type="checkbox" id="toggle-dynamic-bg"> Fundo dinâmico
-            </label>
+            <!-- ✅ CONTROLES LADO A LADO: FAIXA DE PREÇO E FUNDO DINÂMICO -->
+            <div style="display: inline-flex; align-items: center; gap: 15px; margin-left: 12px;">
+                <!-- Seletor de faixa de preço -->
+                <div style="display: inline-flex; align-items: center; gap: 6px;">
+                    <label for="price-band-select" style="font-weight:600; color: #333;">Faixa de preço:</label>
+                    <select id="price-band-select" class="catalog-btn" style="min-width: 160px; height: 32px;">
+                        <option value="retira">Retira R$</option>
+                        <option value="entrega">Entrega R$</option>
+                        <option value="km100_199">100 a 199 km</option>
+                        <option value="km200_299">200 a 299 km</option>
+                        <option value="km300_399">300 a 399 km</option>
+                        <option value="km400_499">400 a 499 km</option>
+                        <option value="km500_599">500 a 599 km</option>
+                        <option value="km600_plus">Acima 600km</option>
+                    </select>
+                </div>
+                
+                <!-- Controle de fundo dinâmico -->
+                <label style="display:inline-flex; align-items:center; gap:6px; font-weight: 500; color: #333;">
+                    <input type="checkbox" id="toggle-dynamic-bg"> Fundo dinâmico
+                </label>
+            </div>
 
             <!-- ✅ INPUT FILE ADICIONADO -->
             <input type="file" id="catalog-file-input" accept=".pdf,.xlsx" style="display: none">
@@ -131,6 +138,15 @@
         </div>
         <div id="catalog-status">Carregando catálogo...</div>
         <div id="products-grid"></div>
+        
+        <!-- Seção de produtos selecionados -->
+        <div id="selected-products-section" class="selected-products-card" style="display: none; margin-top: 20px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <h3><i class="fas fa-shopping-cart"></i> Produtos Selecionados (<span id="selected-products-count">0</span>)</h3>
+            <div id="selected-products-list" style="margin-top: 15px;"></div>
+            <div style="margin-top: 15px; display: flex; gap: 10px; justify-content: center;">
+                <button id="clear-selection" class="catalog-btn" style="background: #dc3545;">🗑️ Limpar Seleção</button>
+            </div>
+        </div>
     </div>
 
     <!-- Modal de Detalhes -->
@@ -285,7 +301,7 @@
     <div id="modal-product-selection" class="modal">
         <div id="modal-product-selection-content" class="modal-content">
             <span id="close-product-selection" class="close">&times;</span>
-            <h2>📋 Selecionar Produtos para Jornal de Ofertas, multiplos de 3, 4 e 5 iténs</h2>
+            <h2>📋 Selecionar Produtos para Jornal de Ofertas, até 20 iténs</h2>
             
             <div id="product-selection-controls">
                 <input type="text" id="search-products-selection" placeholder="Buscar produtos...">
@@ -351,6 +367,41 @@
         // Inicializar managers globais
         window.clientManager = new ClientManager();
         window.catalogManager = new CatalogManager();
+        
+        // Configurar comunicação com iframe da prospecção
+        window.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'REQUEST_CLIENT_DATA') {
+                console.log(`📨 Recebida solicitação de dados ${event.data.requestType} do iframe`);
+                
+                let clients = [];
+                
+                if (window.clientManager) {
+                    if (event.data.requestType === 'active') {
+                        clients = window.clientManager.ativos || [];
+                    } else {
+                        clients = window.clientManager.data || [];
+                    }
+                }
+                
+                // Se não há dados no ClientManager, tentar variáveis globais
+                if (clients.length === 0) {
+                    if (event.data.requestType === 'active') {
+                        clients = window.ativos || [];
+                    } else {
+                        clients = window.data || [];
+                    }
+                }
+
+                console.log(`📤 Enviando ${clients.length} clientes para o iframe`);
+
+                // Enviar resposta para o iframe
+                event.source.postMessage({
+                    type: 'CLIENT_DATA_RESPONSE',
+                    requestType: event.data.requestType,
+                    clients: clients
+                }, '*');
+            }
+        });
     </script>
     
 </body>

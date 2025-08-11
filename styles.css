@@ -2213,3 +2213,94 @@ button:active {
         gap: 0.5rem;
     }
 }
+
+/* ====== ESTILOS PARA SELEÇÃO DIRETA DE PRODUTOS ====== */
+
+/* Card clicável com hover effect */
+.product-card {
+    position: relative;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.product-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+}
+
+.product-card:active {
+    transform: translateY(0px);
+    transition: all 0.1s ease;
+}
+
+/* Card selecionado */
+.product-card.selected {
+    border: 2px solid #007bff !important;
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3) !important;
+    transform: translateY(-2px);
+}
+
+/* Indicador visual de seleção */
+.product-card.selected::before {
+    content: '✓';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #007bff;
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 14px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    z-index: 10;
+}
+
+/* Seção de produtos selecionados */
+.selected-products-card {
+    border: 1px solid #dee2e6;
+}
+
+.selected-products-card h3 {
+    margin: 0 0 15px 0;
+    color: #007bff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.selected-product-item {
+    transition: all 0.2s ease;
+}
+
+.selected-product-item:hover {
+    background-color: #e9ecef !important;
+    transform: translateY(-1px);
+}
+
+.selected-product-item button {
+    transition: all 0.2s ease;
+}
+
+.selected-product-item button:hover {
+    background-color: #c82333 !important;
+    transform: scale(1.1);
+}
+
+/* Responsividade para produtos selecionados */
+@media (max-width: 768px) {
+    .selected-product-item {
+        display: block !important;
+        margin: 8px 0 !important;
+        padding: 12px !important;
+    }
+    
+    .selected-product-item img {
+        width: 30px !important;
+        height: 30px !important;
+    }
+}
