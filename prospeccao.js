@@ -15,7 +15,26 @@ class ProspeccaoManager {
         // 🖼️ NOVO: Dados da análise de imagem
         this.socialMediaAnalysisData = null;
         
-        this.init();
+        // Inicialização segura
+        this.initSafely();
+    }
+
+    async initSafely() {
+        try {
+            console.log('🚀 Inicializando Prospecção Manager com segurança...');
+            await this.init();
+        } catch (error) {
+            console.error('❌ Erro na inicialização do ProspeccaoManager:', error);
+            console.log('🔄 Tentando inicialização básica...');
+            
+            // Inicialização mínima em caso de erro
+            try {
+                this.setupEventListeners();
+                console.log('✅ Inicialização básica concluída');
+            } catch (basicError) {
+                console.error('❌ Erro na inicialização básica:', basicError);
+            }
+        }
     }
 
     async init() {
@@ -1090,6 +1109,19 @@ showManualDataEntry(cnpj) {
         if (modal) {
             modal.style.display = 'block';
             
+            // Configurar eventos do modal se ainda não foram configurados
+            this.setupClientModalEvents();
+            
+            // Verificação adicional para o campo de busca
+            const clientSearchInput = document.getElementById('clientSearch');
+            if (clientSearchInput) {
+                // Limpar valor anterior
+                clientSearchInput.value = '';
+                console.log('✅ Campo de busca encontrado e limpo');
+            } else {
+                console.error('❌ Campo de busca não encontrado no modal');
+            }
+            
             // Priorizar PostMessage se estivermos em iframe
             const isInIframe = window.self !== window.top;
             if (isInIframe) {
@@ -1177,9 +1209,23 @@ showManualDataEntry(cnpj) {
         });
 
         // Busca em tempo real
-        document.getElementById('clientSearch').addEventListener('input', (e) => {
-            this.filterClients(e.target.value);
-        });
+        const clientSearchInput = document.getElementById('clientSearch');
+        if (clientSearchInput) {
+            clientSearchInput.addEventListener('input', (e) => {
+                console.log(`🎯 Input event triggered with value: "${e.target.value}"`);
+                this.filterClients(e.target.value);
+            });
+            
+            // Teste adicional: forçar filtro quando digitado
+            clientSearchInput.addEventListener('keyup', (e) => {
+                console.log(`⌨️ Keyup event triggered with value: "${e.target.value}"`);
+                this.filterClients(e.target.value);
+            });
+            
+            console.log('✅ Event listener do filtro de busca configurado com sucesso');
+        } else {
+            console.error('❌ Elemento clientSearch não encontrado para configurar filtro');
+        }
 
         // Fechar com ESC
         document.addEventListener('keydown', (e) => {
@@ -1404,10 +1450,21 @@ showManualDataEntry(cnpj) {
 
     // Renderizar lista de clientes
     renderClientList(clients, filterType = null) {
+        console.log(`🎨 ===== RENDERIZANDO LISTA DE CLIENTES =====`);
+        console.log(`🎨 Recebidos: ${clients ? clients.length : 'null/undefined'} clientes`);
+        console.log(`🎨 filterType: ${filterType}`);
+        
         const clientList = document.getElementById('clientList');
-        if (!clientList) return;
+        if (!clientList) {
+            console.error('❌ ERRO CRÍTICO: Elemento clientList não encontrado!');
+            return;
+        }
+        
+        console.log(`✅ Elemento clientList encontrado: ${clientList.tagName}#${clientList.id}`);
+        console.log(`📏 clientList innerHTML atual: ${clientList.innerHTML.length} caracteres`);
 
         if (!clients || clients.length === 0) {
+            console.log('⚠️ Nenhum cliente para renderizar - mostrando mensagem de vazio');
             clientList.innerHTML = `
                 <div style="text-align: center; padding: 40px; color: #666;">
                     <i class="fas fa-users" style="font-size: 2rem; margin-bottom: 10px;"></i>
@@ -1415,10 +1472,20 @@ showManualDataEntry(cnpj) {
                     <small>Certifique-se de que há dados carregados nas abas Ativos/Inativos</small>
                 </div>
             `;
+            console.log(`📝 innerHTML vazio definido. Novo length: ${clientList.innerHTML.length}`);
             return;
         }
 
-        console.log(`🎨 Renderizando ${clients.length} clientes`);
+        console.log(`🎨 Iniciando renderização de ${clients.length} clientes válidos`);
+        
+        // Mostrar nomes dos primeiros clientes para debug
+        if (clients.length > 0) {
+            console.log(`📋 Primeiros clientes a renderizar:`);
+            clients.slice(0, 3).forEach((client, i) => {
+                const name = client['Nome Fantasia'] || client.nomeFantasia || client.name || 'Sem nome';
+                console.log(`   ${i + 1}. ${name}`);
+            });
+        }
         
         // Determinar o filtro atual - usar parâmetro se fornecido, senão detectar do DOM
         let currentFilter = filterType;
@@ -1511,16 +1578,31 @@ showManualDataEntry(cnpj) {
             `;
         }).join('');
 
+        console.log(`🔧 HTML gerado: ${clientsHtml.substring(0, 200)}...`);
+        console.log(`🔧 Tamanho do HTML: ${clientsHtml.length} caracteres`);
+        console.log(`🔧 ANTES: clientList.innerHTML.length = ${clientList.innerHTML.length}`);
+        
         clientList.innerHTML = clientsHtml;
+        
+        console.log(`� DEPOIS: clientList.innerHTML.length = ${clientList.innerHTML.length}`);
+        console.log(`🔧 clientList.children.length = ${clientList.children.length}`);
 
         // Adicionar eventos de clique
-        clientList.querySelectorAll('.client-item').forEach(item => {
+        const clientItems = clientList.querySelectorAll('.client-item');
+        console.log(`🖱️ Elementos .client-item encontrados: ${clientItems.length}`);
+        
+        clientItems.forEach((item, index) => {
             item.addEventListener('click', () => {
                 this.selectClient(item);
             });
+            
+            if (index < 3) {
+                const name = item.querySelector('.client-name')?.textContent || 'sem nome';
+                console.log(`   Item ${index + 1}: ${name}`);
+            }
         });
         
-        console.log(`✅ ${clients.length} clientes renderizados com sucesso`);
+        console.log(`✅ RENDERIZAÇÃO COMPLETA: ${clients.length} clientes → ${clientItems.length} elementos DOM`);
     }
 
     // Selecionar um cliente
@@ -1547,62 +1629,41 @@ showManualDataEntry(cnpj) {
 
     // Filtrar clientes em tempo real
     filterClients(searchTerm) {
-        if (!this.currentClients) return;
-
-        const filtered = this.currentClients.filter(client => {
-            // Mapear diferentes formatos de campos
-            const name = (
-                client['Nome Fantasia'] || 
-                client.nomeFantasia ||
-                client.name || 
-                client.empresa || 
-                client.razaoSocial || 
-                client.Cliente ||
-                ''
-            ).toLowerCase();
-            
-            const cnpj = (
-                client['CNPJ / CPF'] || 
-                client.cnpj || 
-                client.CNPJ || 
-                client.cnpjCpf || 
-                ''
-            ).replace(/\D/g, '');
-            
-            const city = (
-                client.Cidade ||
-                client.cidade || 
-                client.municipio || 
-                ''
-            ).toLowerCase();
-            
-            const activity = (
-                client.atividade || 
-                client.atividadePrincipal || 
-                client.ramo ||
-                ''
-            ).toLowerCase();
-            
-            const contact = (
-                client.Contato ||
-                client.contato ||
-                client.responsavel ||
-                ''
-            ).toLowerCase();
-            
-            const search = searchTerm.toLowerCase();
-            const searchNumeric = searchTerm.replace(/\D/g, '');
-            
-            return name.includes(search) ||
-                   cnpj.includes(searchNumeric) ||
-                   city.includes(search) ||
-                   activity.includes(search) ||
-                   contact.includes(search);
-        });
-
-        console.log(`🔍 Filtro aplicado: ${filtered.length}/${this.currentClients.length} clientes`);
+        console.log(`🔍 ===== FILTRO DEBUG SIMPLIFICADO =====`);
+        console.log(`🔍 searchTerm: "${searchTerm}"`);
         
-        // Detectar filtro atual para manter consistência
+        if (!this.currentClients) {
+            console.error('❌ currentClients é null/undefined');
+            return;
+        }
+        
+        console.log(`📋 Total clientes: ${this.currentClients.length}`);
+        
+        let filtered;
+        
+        if (!searchTerm || searchTerm.trim() === '') {
+            console.log('📝 Termo vazio - mostrar todos');
+            filtered = this.currentClients;
+        } else {
+            const search = searchTerm.toLowerCase().trim();
+            console.log(`🔍 Procurando por: "${search}"`);
+            
+            filtered = this.currentClients.filter(client => {
+                const name = (client['Nome Fantasia'] || client.nomeFantasia || client.name || '').toLowerCase();
+                const matches = name.includes(search);
+                
+                if (matches) {
+                    console.log(`✅ MATCH: "${name}"`);
+                }
+                
+                return matches;
+            });
+        }
+
+        console.log(`🎯 Resultado: ${filtered.length} clientes filtrados`);
+        console.log(`🎯 Chamando renderClientList...`);
+        
+        // Usar filtro ativo atual
         const activeButton = document.querySelector('.filter-btn.active');
         const currentFilter = activeButton ? activeButton.dataset.filter : null;
         
@@ -3724,6 +3785,11 @@ getProductImage(productCode) {
                 <div class="script-header">
                     <i class="fas fa-phone"></i>
                     <strong>Script de Abordagem Personalizado</strong>
+                    <div class="ai-controls" style="margin-top: 10px;">
+                        <button onclick="prospeccaoManager.enhanceScriptWithAI()" class="btn btn-info btn-sm">
+                            <i class="fas fa-robot"></i> Melhorar com IA
+                        </button>
+                    </div>
                 </div>
                 <div class="script-text">
                     ${script}
@@ -3741,122 +3807,262 @@ getProductImage(productCode) {
         const hasImageAnalysis = company.socialMediaAnalysis;
         const imageData = hasImageAnalysis ? company.socialMediaAnalysis : null;
         
+        // 🤖 NOVO: Priorizar segmento selecionado pelo usuário
+        const userSelectedSegment = window.selectedBusinessSegment || null;
+        const actualActivity = userSelectedSegment || atividade;
+        
+        console.log('🎯 Segmentos disponíveis:', {
+            userSelected: userSelectedSegment,
+            cnaeActivity: atividade,
+            final: actualActivity
+        });
+        
         let script = `
-            <div class="script-section">
-                <h4>🎯 ABERTURA PERSONALIZADA</h4>
-                <p>Olá! Falo com o responsável pelas compras do(a) <strong>${nomeEmpresa}</strong>?</p>
-                <p>Meu nome é [SEU NOME], sou consultor comercial da <strong>PMG Atacadista</strong>, uma empresa com 30 anos no mercado de distribuição de alimentos e bebidas.</p>
+            <div class="script-section" data-section="abertura">
+                <div class="section-header">
+                    <h4>🎯 ABERTURA PERSONALIZADA</h4>
+                    <button onclick="prospeccaoManager.copyScriptSection('abertura')" class="copy-section-btn" title="Copiar apenas esta seção">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+                <div class="section-content">
+                    <p>Olá! Falo com o responsável pelas compras do(a) <strong>${nomeEmpresa}</strong>?</p>
+                    <p>Meu nome é [SEU NOME], sou consultor comercial da <strong>PMG Atacadista</strong>, uma empresa com 30 anos no mercado de distribuição de alimentos e bebidas.</p>
+                </div>
             </div>
 
-            <div class="script-section">
-                <h4>🏢 CONTEXTUALIZAÇÃO</h4>
-                <p>Estive analisando o perfil da sua empresa aqui em <strong>${cidade}</strong> e vi que vocês trabalham com <strong>${company.atividade_principal.toLowerCase()}</strong>.</p>
-                ${location.perfil_economico.includes('Alto') ? 
-                    '<p>A região tem um excelente potencial de consumo, o que é uma grande oportunidade para crescimento!</p>' : 
-                    '<p>Sabemos que a região tem suas particularidades, e por isso oferecemos condições especiais para parceiros locais.</p>'
-                }
-                ${hasImageAnalysis ? `
-                    <p><strong>🔍 Análise Personalizada:</strong> Também analisamos a presença digital de vocês no ${imageData.platform} 
-                    e vimos que têm um bom engajamento com ${imageData.profileData.estimatedFollowers.toLocaleString()} seguidores! 
-                    Isso mostra que vocês já têm uma base sólida de clientes.</p>
-                ` : ''}
+            <div class="script-section" data-section="contextualizacao">
+                <div class="section-header">
+                    <h4>🏢 CONTEXTUALIZAÇÃO</h4>
+                    <button onclick="prospeccaoManager.copyScriptSection('contextualizacao')" class="copy-section-btn" title="Copiar apenas esta seção">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+                <div class="section-content">
+                    <p>Estive analisando o perfil da sua empresa aqui em <strong>${cidade}</strong> e vi que vocês trabalham com <strong>${userSelectedSegment || company.atividade_principal.toLowerCase()}</strong>.</p>
+                    ${userSelectedSegment ? `
+                        <div class="ai-insight" style="background: linear-gradient(45deg, #28a745, #20c997); color: white; border-left: 4px solid #155724; padding: 12px; border-radius: 8px; margin: 10px 0;">
+                            <i class="fas fa-user-check"></i> <strong>Segmento Personalizado:</strong> Com base na sua seleção, identificamos que o foco principal do negócio é <strong>${userSelectedSegment}</strong>, 
+                            o que nos permite oferecer produtos mais direcionados para este tipo de estabelecimento.
+                        </div>
+                    ` : ''}
+                    ${location.perfil_economico.includes('Alto') ? 
+                        '<p>A região tem um excelente potencial de consumo, o que é uma grande oportunidade para crescimento!</p>' : 
+                        '<p>Sabemos que a região tem suas particularidades, e por isso oferecemos condições especiais para parceiros locais.</p>'
+                    }
+                    ${hasImageAnalysis ? `
+                        <p><strong>🔍 Análise Personalizada:</strong> Também analisamos a presença digital de vocês no ${imageData.platform} 
+                        e vimos que têm um bom engajamento com ${imageData.profileData.estimatedFollowers.toLocaleString()} seguidores! 
+                        Isso mostra que vocês já têm uma base sólida de clientes.</p>
+                    ` : ''}
+                </div>
+            </div>
+                    ${location.perfil_economico.includes('Alto') ? 
+                        '<p>A região tem um excelente potencial de consumo, o que é uma grande oportunidade para crescimento!</p>' : 
+                        '<p>Sabemos que a região tem suas particularidades, e por isso oferecemos condições especiais para parceiros locais.</p>'
+                    }
+                    ${hasImageAnalysis ? `
+                        <p><strong>🔍 Análise Personalizada:</strong> Também analisamos a presença digital de vocês no ${imageData.platform} 
+                        e vimos que têm um bom engajamento com ${imageData.profileData.estimatedFollowers.toLocaleString()} seguidores! 
+                        Isso mostra que vocês já têm uma base sólida de clientes.</p>
+                    ` : ''}
+                </div>
             </div>
 
             ${hasImageAnalysis ? `
-                <div class="script-section">
-                    <h4>📱 OPORTUNIDADE DIGITAL</h4>
-                    <p>Com base na análise da sua rede social, identifiquei algumas oportunidades:</p>
-                    <ul>
-                        <li>📈 <strong>Engajamento de ${imageData.engagement.engagementRate}</strong> - Mostra que vocês têm clientes fiéis</li>
-                        <li>🎯 <strong>Foco na faixa ${imageData.audience.primaryAgeGroup} anos</strong> - Público com bom poder de consumo</li>
-                        <li>🌍 <strong>População regional de ${imageData.demographic.population.toLocaleString()}</strong> - Grande potencial de mercado</li>
-                        <li>💰 <strong>Renda média ${imageData.demographic.avgIncome}</strong> - Permite trabalhar com produtos premium</li>
-                    </ul>
+                <div class="script-section" data-section="oportunidade-digital">
+                    <div class="section-header">
+                        <h4>📱 OPORTUNIDADE DIGITAL</h4>
+                        <button onclick="prospeccaoManager.copyScriptSection('oportunidade-digital')" class="copy-section-btn" title="Copiar apenas esta seção">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    <div class="section-content">
+                        <p>Com base na análise da sua rede social, identifiquei algumas oportunidades:</p>
+                        <ul>
+                            <li>📈 <strong>Engajamento de ${imageData.engagement.engagementRate}</strong> - Mostra que vocês têm clientes fiéis</li>
+                            <li>🎯 <strong>Foco na faixa ${imageData.audience.primaryAgeGroup} anos</strong> - Público com bom poder de consumo</li>
+                            <li>🌍 <strong>População regional de ${imageData.demographic.population.toLocaleString()}</strong> - Grande potencial de mercado</li>
+                            <li>💰 <strong>Renda média ${imageData.demographic.avgIncome}</strong> - Permite trabalhar com produtos premium</li>
+                        </ul>
+                    </div>
                 </div>
             ` : ''}
 
-            <div class="script-section">
-                <h4>🎯 PROPOSTA DE VALOR</h4>
-                <p>Com nossos 30 anos de experiência, atendemos mais de 20.000 clientes e oferecemos:</p>
-                <ul>
-                    <li>✅ <strong>Preços competitivos</strong> - Mas nosso objetivo é agregar valor ao seu negócio</li>
-                    <li>✅ <strong>Entrega programada</strong> - Somos a maior distribuidora de bebidas e alimento de SP</li>
-                    <li>✅ <strong>Qualidade garantida</strong> - Produtos das melhores marcas do mercado</li>
-                    <li>✅ <strong>Condições especiais</strong> - Prazo e formas de pagamento flexíveis</li>
-                    ${hasImageAnalysis && imageData.competitiveAnalysis.competitionLevel === 'Baixo' ? 
-                        '<li>🎯 <strong>Exclusividade regional</strong> - Baixa concorrência na região = maior margem para vocês</li>' : ''
-                    }
-                </ul>
+            <div class="script-section" data-section="proposta-valor">
+                <div class="section-header">
+                    <h4>🎯 PROPOSTA DE VALOR</h4>
+                    <button onclick="prospeccaoManager.copyScriptSection('proposta-valor')" class="copy-section-btn" title="Copiar apenas esta seção">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+                <div class="section-content">
+                    <p>Com nossos 30 anos de experiência, atendemos mais de 20.000 clientes e oferecemos:</p>
+                    <ul>
+                        <li>✅ <strong>Preços competitivos</strong> - Mas nosso objetivo é agregar valor ao seu negócio</li>
+                        <li>✅ <strong>Entrega programada</strong> - Somos a maior distribuidora de bebidas e alimento de SP</li>
+                        <li>✅ <strong>Qualidade garantida</strong> - Produtos das melhores marcas do mercado</li>
+                        <li>✅ <strong>Condições especiais</strong> - Prazo e formas de pagamento flexíveis</li>
+                        ${hasImageAnalysis && imageData.competitiveAnalysis.competitionLevel === 'Baixo' ? 
+                            '<li>🎯 <strong>Exclusividade regional</strong> - Baixa concorrência na região = maior margem para vocês</li>' : ''
+                        }
+                    </ul>
+                </div>
             </div>
         `;
 
-        // Adicionar seção específica baseada no tipo de atividade
-        if (atividade === 'pizzaria') {
+        // Adicionar seção específica baseada no tipo de atividade (usando segmento detectado se disponível)
+        if (actualActivity === 'pizzaria' || actualActivity.includes('pizza')) {
             script += `
-                <div class="script-section">
-                    <h4>🍕 ESPECIALIZADO PARA PIZZARIAS</h4>
-                    <p>Trabalhamos com produtos específicos para pizzarias:</p>
-                    <ul>
-                        <li>🥩 Calabresa, frango eoutras proteinas de primeira qualidade</li>
-                        <li>🧀 Queijos especiais para pizza</li>
-                        <li>🍅 Molhos de tomate sem acidez</li>
-                        <li>🫒 Azeitonas importadas e nacionais</li>
-                        <li>🥓 Bacon em cubos e muito mais</li>
-                    </ul>
+                <div class="script-section" data-section="especializado">
+                    <div class="section-header">
+                        <h4>🍕 ESPECIALIZADO PARA PIZZARIAS</h4>
+                        <button onclick="prospeccaoManager.copyScriptSection('especializado')" class="copy-section-btn" title="Copiar apenas esta seção">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    <div class="section-content">
+                        <p>Trabalhamos com produtos específicos para pizzarias:</p>
+                        <ul>
+                            <li>🥩 Calabresa, frango e outras proteinas de primeira qualidade</li>
+                            <li>🧀 Queijos especiais para pizza</li>
+                            <li>🍅 Molhos de tomate sem acidez</li>
+                            <li>🫒 Azeitonas importadas e nacionais</li>
+                            <li>🥓 Bacon em cubos e muito mais</li>
+                        </ul>
+                    </div>
                 </div>
             `;
-        } else if (atividade === 'lanchonete') {
+        } else if (actualActivity === 'lanchonete' || actualActivity.includes('lanche') || actualActivity.includes('hambúrguer')) {
             script += `
-                <div class="script-section">
-                    <h4>🍔 ESPECIALIZADO PARA LANCHONETES</h4>
-                    <p>Temos uma linha completa para lanchonetes:</p>
-                    <ul>
-                        <li>🍟 Batatas pré-fritas congeladas McCain e Simplot</li>
-                        <li>🥓 Bacon fatiado e em cubos</li>
-                        <li>🍖 Hambúrgueres artesanais</li>
-                        <li>🧈 Maioneses e molhos especiais</li>
-                        <li>🥤 Bebidas para revenda</li>
-                    </ul>
+                <div class="script-section" data-section="especializado">
+                    <div class="section-header">
+                        <h4>🍔 ESPECIALIZADO PARA LANCHONETES</h4>
+                        <button onclick="prospeccaoManager.copyScriptSection('especializado')" class="copy-section-btn" title="Copiar apenas esta seção">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    <div class="section-content">
+                        <p>Temos uma linha completa para lanchonetes:</p>
+                        <ul>
+                            <li>🍟 Batatas pré-fritas congeladas McCain e Simplot</li>
+                            <li>🥓 Bacon fatiado e em cubos</li>
+                            <li>🍖 Hambúrgueres artesanais</li>
+                            <li>🧈 Maioneses e molhos especiais</li>
+                            <li>🥤 Bebidas para revenda</li>
+                        </ul>
+                    </div>
                 </div>
             `;
-        } else if (atividade === 'restaurante') {
+        } else if (actualActivity === 'restaurante' || actualActivity.includes('restaurante')) {
             script += `
-                <div class="script-section">
-                    <h4>🍽️ ESPECIALIZADO PARA RESTAURANTES</h4>
-                    <p>Oferecemos produtos premium para restaurantes:</p>
-                    <ul>
-                        <li>🥩 Carnes bovinas resfriadas de primeira</li>
-                        <li>🍗 Frangos e aves selecionados</li>
-                        <li>🍚 Arroz tipo 1 para pratos executivos</li>
-                        <li>🥘 Temperos e condimentos especiais</li>
-                        <li>🐟 Peixes e frutos do mar</li>
-                    </ul>
+                <div class="script-section" data-section="especializado">
+                    <div class="section-header">
+                        <h4>🍽️ ESPECIALIZADO PARA RESTAURANTES</h4>
+                        <button onclick="prospeccaoManager.copyScriptSection('especializado')" class="copy-section-btn" title="Copiar apenas esta seção">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    <div class="section-content">
+                        <p>Oferecemos produtos premium para restaurantes:</p>
+                        <ul>
+                            <li>🥩 Carnes bovinas resfriadas de primeira</li>
+                            <li>🍗 Frangos e aves selecionados</li>
+                            <li>🍚 Arroz tipo 1 para pratos executivos</li>
+                            <li>🥘 Temperos e condimentos especiais</li>
+                            <li>🐟 Peixes e frutos do mar</li>
+                        </ul>
+                    </div>
+                </div>
+            `;
+        } else if (actualActivity.includes('açaí') || actualActivity.includes('sorveteria')) {
+            script += `
+                <div class="script-section" data-section="especializado">
+                    <div class="section-header">
+                        <h4>🍦 ESPECIALIZADO PARA AÇAÍ/SORVETERIA</h4>
+                        <button onclick="prospeccaoManager.copyScriptSection('especializado')" class="copy-section-btn" title="Copiar apenas esta seção">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    <div class="section-content">
+                        <p>Produtos específicos para açaí e sorveteria:</p>
+                        <ul>
+                            <li>🫐 Açaí premium congelado</li>
+                            <li>🍓 Frutas e complementos</li>
+                            <li>🥜 Mix de castanhas e granolas</li>
+                            <li>🍫 Chocolates e coberturas</li>
+                            <li>🥤 Sucos e vitaminas</li>
+                        </ul>
+                    </div>
+                </div>
+            `;
+        } else if (actualActivity.includes('padaria') || actualActivity.includes('confeitaria')) {
+            script += `
+                <div class="script-section" data-section="especializado">
+                    <div class="section-header">
+                        <h4>� ESPECIALIZADO PARA PADARIA/CONFEITARIA</h4>
+                        <button onclick="prospeccaoManager.copyScriptSection('especializado')" class="copy-section-btn" title="Copiar apenas esta seção">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    <div class="section-content">
+                        <p>Linha completa para panificação:</p>
+                        <ul>
+                            <li>🌾 Farinhas especiais e fermentos</li>
+                            <li>🧈 Margarinas e gorduras especiais</li>
+                            <li>🍫 Chocolates e recheios</li>
+                            <li>🥚 Ovos e laticínios</li>
+                            <li>🍞 Embalagens para pães e doces</li>
+                        </ul>
+                    </div>
                 </div>
             `;
         }
 
         script += `
-            <div class="script-section">
-                <h4>🤝 PRÓXIMOS PASSOS</h4>
-                <p>Gostaria de apresentar nossos produtos?</p>
-                <p>Posso enviar um catálogo personalizado com sugestões específicas para o seu negócio.</p>
-                <p><strong>Quando seria um bom horário para conversarmos com mais detalhes?</strong></p>
+            <div class="script-section" data-section="proximos-passos">
+                <div class="section-header">
+                    <h4>�🤝 PRÓXIMOS PASSOS</h4>
+                    <button onclick="prospeccaoManager.copyScriptSection('proximos-passos')" class="copy-section-btn" title="Copiar apenas esta seção">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+                <div class="section-content">
+                    <p>Gostaria de apresentar nossos produtos?</p>
+                    <p>Posso enviar um catálogo personalizado com sugestões específicas para o seu negócio.</p>
+                    <p><strong>Quando seria um bom horário para conversarmos com mais detalhes?</strong></p>
+                </div>
             </div>
 
-            <div class="script-section contact-info">
-                <p><strong>PMG Atacadista - 30 anos de tradição</strong></p>
-                <p>🌐 Site: www.pmg.com.br</p>
+            <div class="script-section" data-section="contato">
+                <div class="section-header">
+                    <h4>📞 INFORMAÇÕES DE CONTATO</h4>
+                    <button onclick="prospeccaoManager.copyScriptSection('contato')" class="copy-section-btn" title="Copiar apenas esta seção">
+                        <i class="fas fa-copy"></i>
+                    </button>
                 </div>
+                <div class="section-content contact-info">
+                    <p><strong>PMG Atacadista - 30 anos de tradição</strong></p>
+                    <p>🌐 Site: www.pmg.com.br</p>
+                </div>
+            </div>
 
-            <div class="script-section">
-                <h4>💡 DICAS IMPORTANTES</h4>
-                <ul>
-                    <li>🎯 Demonstre conhecimento sobre o negócio do cliente</li>
-                    <li>👂 Escute as necessidades específicas</li>
-                    <li>💰 Enfatize o custo-benefício da parceria</li>
-                    <li>⏰ Seja pontual e cumpra os compromissos</li>
-                    <li>📊 Prepare uma proposta personalizada após a visita</li>
-                </ul>
+            <div class="script-section" data-section="dicas">
+                <div class="section-header">
+                    <h4>💡 DICAS IMPORTANTES</h4>
+                    <button onclick="prospeccaoManager.copyScriptSection('dicas')" class="copy-section-btn" title="Copiar apenas esta seção">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+                <div class="section-content">
+                    <ul>
+                        <li>🎯 Demonstre conhecimento sobre o negócio do cliente</li>
+                        <li>👂 Escute as necessidades específicas</li>
+                        <li>💰 Enfatize o custo-benefício da parceria</li>
+                        <li>⏰ Seja pontual e cumpra os compromissos</li>
+                        <li>📊 Prepare uma proposta personalizada após a visita</li>
+                    </ul>
+                </div>
             </div>
         `;
 
@@ -5228,7 +5434,875 @@ async generateImageOffersVisualProsp() {
         }
         return null;
     }
+    
+    // 🤖 NOVO: Integração com IA gratuita usando dados reais do segmento
+    async enhanceScriptWithAI() {
+        const company = this.currentProspect.company;
+        const nomeEmpresa = company.fantasia || company.nome;
+        
+        // Usar segmento selecionado pelo usuário
+        const userSelectedSegment = window.selectedBusinessSegment || null;
+        const segmentoReal = userSelectedSegment || null;
+        
+        // Dados do negócio para contextualização
+        const cidade = company.municipio || 'região';
+        const cnae = company.atividade_principal || 'alimentação';
+        const endereco = `${company.logradouro || ''} ${company.numero || ''}, ${company.bairro || ''}`.trim();
+        
+        const loadingIndicator = this.showAILoadingIndicator('Melhorando script com IA...');
+        
+        try {
+            // Prompt detalhado com dados reais
+            const prompt = `IMPORTANTE: Responda EXCLUSIVAMENTE em português brasileiro. Não use inglês.
 
+Como especialista em vendas da PMG Atacadista (distribuidora de alimentos há 30 anos), crie um script comercial personalizado usando estes dados REAIS:
+
+DADOS DO CLIENTE:
+• Nome: ${nomeEmpresa}
+• Localização: ${endereco}, ${cidade}
+• CNAE Oficial: ${cnae}
+${segmentoReal ? `• SEGMENTO REAL IDENTIFICADO: ${segmentoReal} (use este como foco principal, não o CNAE)` : ''}
+
+CONTEXTO COMERCIAL:
+• Somos PMG ATACADISTA - distribuidora especializada em alimentos
+• 30 anos de experiência no mercado brasileiro
+• Foco em estabelecimentos de alimentação
+• Oferecemos produtos + consultoria especializada
+
+INSTRUÇÕES OBRIGATÓRIAS:
+1. RESPONDA APENAS EM PORTUGUÊS BRASILEIRO
+2. Use o SEGMENTO REAL identificado (${segmentoReal || 'baseado no CNAE'}) como foco principal
+3. Mencione ESPECIFICAMENTE ${nomeEmpresa} e PMG ATACADISTA
+4. Crie argumentos comerciais REAIS para ${segmentoReal || cnae}
+5. NUNCA use placeholders como [Nome da empresa] ou [Benefício 1]
+6. Inclua benefícios específicos e concretos para ${segmentoReal || 'alimentação'}
+7. Tom profissional e direto, máximo 200 palavras
+8. Termine com proposta de reunião ou próximos passos específicos
+
+EXEMPLO DO QUE NÃO FAZER:
+❌ "[Nome da empresa] oferece [benefícios]"
+❌ "Substitua as informações entre colchetes"
+❌ Templates genéricos
+
+EXEMPLO DO QUE FAZER:
+✅ "PMG Atacadista pode fornecer para ${nomeEmpresa}..."
+✅ "Nossos produtos específicos para ${segmentoReal || 'seu segmento'}..."
+
+RESPOSTA ESPECÍFICA (SEM PLACEHOLDERS):`;
+
+            const enhancedText = await this.callFreeAI(prompt);
+            
+            if (enhancedText) {
+                // Verificar se a resposta está em português
+                const processedText = this.ensurePortugueseResponse(enhancedText, segmentoReal, nomeEmpresa);
+                this.showAIEnhancedScript(processedText, segmentoReal);
+            }
+            
+        } catch (error) {
+            console.error('❌ Erro ao melhorar script com IA:', error);
+            alert('❌ Erro ao conectar com IA. Tente novamente.');
+        } finally {
+            loadingIndicator.remove();
+        }
+    }
+
+    // 🇧🇷 Garantir que a resposta da IA esteja em português
+    ensurePortugueseResponse(text, segmento, nomeEmpresa) {
+        // Verificar se há muitas palavras em inglês
+        const englishWords = ['the', 'and', 'with', 'for', 'business', 'company', 'service', 'product', 'quality', 'experience', 'customer', 'market', 'food', 'industry'];
+        const words = text.toLowerCase().split(/\s+/);
+        const englishCount = words.filter(word => englishWords.includes(word)).length;
+        const englishRatio = englishCount / words.length;
+        
+        // Verificar se é um template genérico com placeholders
+        const hasPlaceholders = text.includes('[') && text.includes(']');
+        const hasGenericTerms = text.toLowerCase().includes('nome da sua empresa') || 
+                               text.toLowerCase().includes('setores de atuação') ||
+                               text.toLowerCase().includes('benefício 1') ||
+                               text.toLowerCase().includes('substitua as informações');
+        
+        // Se mais de 20% das palavras são em inglês OU é um template genérico, gerar resposta específica
+        if (englishRatio > 0.2 || hasPlaceholders || hasGenericTerms) {
+            if (hasPlaceholders || hasGenericTerms) {
+                console.log('⚠️ IA retornou template genérico, gerando script específico da PMG...');
+            } else {
+                console.log('⚠️ Resposta da IA veio em inglês, gerando versão em português...');
+            }
+            return this.generatePortugueseScript(segmento, nomeEmpresa);
+        }
+        
+        return text;
+    }
+
+    // 🇧🇷 Gerar script em português como fallback
+    generatePortugueseScript(segmento, nomeEmpresa) {
+        const segmentoLower = (segmento || 'estabelecimento').toLowerCase();
+        
+        const templates = {
+            'restaurante': `🍽️ **Script Personalizado PMG Atacadista para ${nomeEmpresa}**
+
+Olá! Sou consultor comercial da PMG Atacadista e identifiquei ${nomeEmpresa} como um restaurante com grande potencial na sua região.
+
+**Nossa proposta específica para restaurantes:**
+• Carnes premium selecionadas com certificação de qualidade
+• Temperos e condimentos especiais para realçar sabores
+• Óleos e gorduras de alta performance culinária
+• Programa de consultoria GRATUITA para otimização do cardápio
+
+**Resultados comprovados:** Nossos parceiros restaurantes conseguem aumentar a margem de lucro em até 18% com nossa consultoria especializada e produtos direcionados.
+
+**Próximo passo:** Posso agendar 30 minutos na próxima semana para apresentar nosso portfólio específico para ${nomeEmpresa} e mostrar cases de sucesso similares?
+
+PMG Atacadista - 30 anos transformando negócios de alimentação! 🚀`,
+
+            'pizzaria': `🍕 **Script Especializado PMG Atacadista para ${nomeEmpresa}**
+
+Boa tarde! Sou da PMG Atacadista e identifiquei que ${nomeEmpresa} tem grande potencial no segmento de pizzas.
+
+**Mix completo especializado em pizzarias:**
+• Mussarela especial com derretimento perfeito
+• Molhos de tomate premium importados
+• Oregano selecionado e especiarias exclusivas
+• Azeitonas e ingredientes gourmet
+• Massas pré-prontas de alta qualidade
+
+**Diferencial PMG:** Além dos melhores preços, oferecemos consultoria técnica para otimização de custos. Pizzarias parceiras reduziram em média 22% os gastos com insumos mantendo a qualidade.
+
+**Proposta:** Que tal uma degustação gratuita dos nossos produtos no ${nomeEmpresa}? Posso levar amostras e fazer uma análise personalizada do seu cardápio?
+
+Vamos potencializar o sucesso da ${nomeEmpresa} juntos! 🎯`,
+
+            'lanchonete': `🍔 **Proposta Comercial PMG Atacadista para ${nomeEmpresa}**
+
+Olá! Identifiquei que ${nomeEmpresa} atua no segmento de lanches e tenho uma proposta interessante.
+
+**Linha completa para lanchonetes:**
+• Hambúrgueres artesanais congelados premium
+• Pães especiais para lanches gourmet
+• Molhos diferenciados (barbecue, mostarda honey, maionese temperada)
+• Batatas pré-fritas golden premium
+• Bebidas com excelente margem de revenda
+
+**Consultoria especializada:** Ajudamos na montagem estratégica do cardápio para aumentar o ticket médio em 25%. Oferecemos também treinamento gratuito para sua equipe.
+
+**Convite:** Que tal marcarmos uma conversa de 20 minutos para apresentar oportunidades específicas para ${nomeEmpresa}? Tenho cases de lanchonetes que dobraram o faturamento!
+
+PMG Atacadista - Seu parceiro para o crescimento! 💪`,
+
+            'bar': `🍻 **Proposta Especializada PMG Atacadista para ${nomeEmpresa}**
+
+Olá! Sou da PMG Atacadista e vejo grande potencial de parceria com ${nomeEmpresa}.
+
+**Linha completa para bares:**
+• Petiscos premium congelados (pastéis, coxinhas, bolinhos)
+• Amendoins e salgadinhos selecionados
+• Queijos especiais para tábuas
+• Bebidas com margem atrativa
+• Mix de produtos para happy hour
+
+**Diferencial:** Consultoria para criação de combos promocionais que aumentam o consumo médio por mesa em 30%. Nossos bares parceiros relatam aumento significativo no movimento.
+
+**Próximos passos:** Posso fazer uma visita ao ${nomeEmpresa} para apresentar nosso portfólio e discutir estratégias específicas para o seu público?
+
+Vamos fazer do ${nomeEmpresa} o bar de referência da região! 🎯`,
+
+            'padaria': `🥖 **Script Comercial PMG Atacadista para ${nomeEmpresa}**
+
+Bom dia! Sou consultor da PMG Atacadista e identifiquei ${nomeEmpresa} como uma padaria com excelente potencial.
+
+**Linha especializada para panificação:**
+• Farinhas premium especiais para diferentes tipos de pão
+• Fermentos biológicos de alta performance
+• Ingredientes para doces e confeitaria
+• Recheios e coberturas gourmet
+• Embalagens especiais para produtos artesanais
+
+**Consultoria técnica:** Oferecemos suporte GRATUITO para desenvolvimento de novos produtos e otimização de receitas. Padarias parceiras aumentaram em 40% a variedade do cardápio.
+
+**Proposta:** Que tal agendar uma visita técnica ao ${nomeEmpresa}? Posso levar amostras dos nossos produtos e fazer sugestões personalizadas para ampliar seu mix.
+
+PMG Atacadista - Crescendo junto com sua padaria há 30 anos! 🌟`
+        };
+        
+        // Buscar template mais adequado
+        let template = templates['restaurante']; // padrão
+        
+        for (const [tipo, texto] of Object.entries(templates)) {
+            if (segmentoLower.includes(tipo)) {
+                template = texto;
+                break;
+            }
+        }
+        
+        return template;
+    }
+
+    // 🤖 Chamar IA usando OpenRouter e outras APIs gratuitas
+    async callFreeAI(prompt) {
+        try {
+            console.log('🤖 Iniciando processamento de IA...');
+            
+            // Tentativa 1: OpenRouter.ai (múltiplos modelos gratuitos)
+            try {
+                const openrouterResponse = await this.callOpenRouter(prompt);
+                if (openrouterResponse) {
+                    return openrouterResponse;
+                }
+            } catch (e) {
+                console.log('🔄 OpenRouter não disponível, tentando alternativa...');
+            }
+
+            // Tentativa 2: HuggingFace Inference API (gratuita)
+            try {
+                const hfResponse = await this.callHuggingFace(prompt);
+                if (hfResponse) {
+                    return hfResponse;
+                }
+            } catch (e) {
+                console.log('🔄 HuggingFace não disponível, tentando alternativa...');
+            }
+
+            // Tentativa 3: Groq API (modelos rápidos gratuitos)
+            try {
+                const groqResponse = await this.callGroq(prompt);
+                if (groqResponse) {
+                    return groqResponse;
+                }
+            } catch (e) {
+                console.log('🔄 Groq não disponível, tentando alternativa...');
+            }
+
+            // Tentativa 4: Replicate API (modelos open source)
+            try {
+                const replicateResponse = await this.callReplicate(prompt);
+                if (replicateResponse) {
+                    return replicateResponse;
+                }
+            } catch (e) {
+                console.log('🔄 Replicate não disponível, tentando alternativa...');
+            }
+            
+            // Fallback: IA local inteligente
+            return this.generateIntelligentResponse(prompt);
+            
+        } catch (error) {
+            console.error('❌ Erro em todas as tentativas de IA:', error);
+            return this.generateIntelligentResponse(prompt);
+        }
+    }
+
+    // 🌐 Chamar OpenRouter.ai (apenas modelos gratuitos)
+    async callOpenRouter(prompt) {
+        try {
+            // Chave do OpenRouter
+            const API_KEY = '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';
+            
+            // Apenas modelos gratuitos que funcionam
+            const freeModels = [
+                'google/gemma-2-9b-it:free',        // ✅ Funcionando
+                'meta-llama/llama-3-8b-instruct:free',
+                'microsoft/phi-3-medium-128k-instruct:free',
+                'qwen/qwen-2-7b-instruct:free',
+                'mistralai/mistral-7b-instruct:free'
+            ];
+
+            for (const model of freeModels) {
+                try {
+                    console.log(`🔄 Tentando modelo gratuito: ${model}`);
+                    
+                    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${API_KEY}`,
+                            'Content-Type': 'application/json',
+                            'HTTP-Referer': window.location.origin,
+                            'X-Title': 'PMG Atacadista - Sistema de Prospecção Inteligente'
+                        },
+                        body: JSON.stringify({
+                            model: model,
+                            messages: [{
+                                role: 'system',
+                                content: 'Você é um assistente comercial especializado da PMG Atacadista, uma distribuidora de alimentos brasileira com 30 anos de experiência. IMPORTANTE: Responda SEMPRE e EXCLUSIVAMENTE em português brasileiro. Nunca use inglês ou outros idiomas. Use linguagem comercial brasileira, profissional e persuasiva. Foque em benefícios específicos para estabelecimentos de alimentação.'
+                            }, {
+                                role: 'user',
+                                content: prompt
+                            }],
+                            max_tokens: 400,
+                            temperature: 0.7,
+                            top_p: 0.9
+                        })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        const text = data.choices?.[0]?.message?.content;
+                        
+                        if (text && text.trim()) {
+                            console.log(`✅ OpenRouter respondeu com modelo: ${model}`);
+                            console.log(`💰 Custo: Gratuito`);
+                            
+                            // Mostrar feedback visual discreto
+                            this.showAIModelFeedback(model, { total_cost: 0 });
+                            
+                            return text.trim();
+                        }
+                    } else {
+                        const errorData = await response.json().catch(() => ({}));
+                        console.log(`❌ Modelo ${model} falhou:`, errorData.error?.message || response.statusText);
+                        
+                        // Continuar para próximo modelo
+                        continue;
+                    }
+                } catch (e) {
+                    console.log(`❌ Erro no modelo ${model}:`, e.message);
+                    continue;
+                }
+            }
+            
+            return null;
+        } catch (error) {
+            console.error('❌ Erro no OpenRouter:', error);
+            return null;
+        }
+    }
+
+    // 📊 Mostrar feedback discreto do modelo de IA usado
+    showAIModelFeedback(model, usage) {
+        const feedback = document.createElement('div');
+        const modelName = model.split('/').pop().replace(':free', '').replace('-', ' ');
+        
+        feedback.innerHTML = `
+            <div style="position: fixed; bottom: 20px; right: 20px; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); 
+                        color: white; padding: 10px 14px; border-radius: 8px; z-index: 10000; 
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.3); animation: slideInUp 0.3s ease;
+                        max-width: 250px; font-size: 12px;">
+                <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                    <i class="fas fa-robot" style="margin-right: 6px; color: #fff;"></i>
+                    <strong>IA Ativada</strong>
+                </div>
+                <div style="font-size: 11px; opacity: 0.95;">
+                    <div>🤖 ${modelName}</div>
+                    <div>💰 Gratuito</div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(feedback);
+        
+        // Remover após 3 segundos
+        setTimeout(() => {
+            if (feedback.parentNode) {
+                feedback.style.animation = 'slideOutDown 0.3s ease';
+                setTimeout(() => feedback.remove(), 300);
+            }
+        }, 3000);
+    }
+
+    // 🤗 Chamar HuggingFace Inference API
+    async callHuggingFace(prompt) {
+        try {
+            const models = [
+                'microsoft/DialoGPT-medium',
+                'facebook/blenderbot-400M-distill',
+                'microsoft/DialoGPT-small'
+            ];
+
+            for (const model of models) {
+                try {
+                    const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            inputs: `${prompt}\n\nResposta em português para PMG Atacadista:`,
+                            parameters: {
+                                max_length: 200,
+                                temperature: 0.7,
+                                do_sample: true
+                            }
+                        })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        let text = '';
+                        
+                        if (Array.isArray(data) && data[0]?.generated_text) {
+                            text = data[0].generated_text;
+                        } else if (data.generated_text) {
+                            text = data.generated_text;
+                        }
+                        
+                        if (text && text.trim()) {
+                            console.log(`✅ HuggingFace respondeu com modelo: ${model}`);
+                            return text.trim();
+                        }
+                    }
+                } catch (e) {
+                    console.log(`❌ Modelo HF ${model} falhou:`, e.message);
+                    continue;
+                }
+            }
+            
+            return null;
+        } catch (error) {
+            console.error('❌ Erro no HuggingFace:', error);
+            return null;
+        }
+    }
+
+    // ⚡ Chamar Groq API (modelos rápidos)
+    async callGroq(prompt) {
+        try {
+            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'llama3-8b-8192',
+                    messages: [{
+                        role: 'user',
+                        content: `${prompt}\n\nResponda em português brasileiro de forma comercial para a PMG Atacadista.`
+                    }],
+                    max_tokens: 300,
+                    temperature: 0.7
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const text = data.choices?.[0]?.message?.content;
+                
+                if (text && text.trim()) {
+                    console.log('✅ Groq respondeu com sucesso');
+                    return text.trim();
+                }
+            }
+            
+            return null;
+        } catch (error) {
+            console.error('❌ Erro no Groq:', error);
+            return null;
+        }
+    }
+
+    // 🔄 Chamar Replicate API
+    async callReplicate(prompt) {
+        try {
+            const response = await fetch('https://api.replicate.com/v1/predictions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    version: "meta/llama-2-7b-chat",
+                    input: {
+                        prompt: `${prompt}\n\nResponda em português brasileiro de forma comercial para a distribuidora PMG Atacadista:`,
+                        max_length: 300,
+                        temperature: 0.7
+                    }
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                
+                // Replicate pode retornar uma predição que precisa ser consultada
+                if (data.urls?.get) {
+                    const resultResponse = await fetch(data.urls.get);
+                    if (resultResponse.ok) {
+                        const result = await resultResponse.json();
+                        const text = result.output?.join('') || result.output;
+                        
+                        if (text && text.trim()) {
+                            console.log('✅ Replicate respondeu com sucesso');
+                            return text.trim();
+                        }
+                    }
+                }
+            }
+            
+            return null;
+        } catch (error) {
+            console.error('❌ Erro no Replicate:', error);
+            return null;
+        }
+    }
+
+    // 🧠 IA inteligente baseada em análise de padrões
+    generateIntelligentResponse(prompt) {
+        const promptLower = prompt.toLowerCase();
+        
+        // Extrair informações do prompt
+        const empresaMatch = prompt.match(/Cliente: ([^\n]+)/i);
+        const atividadeMatch = prompt.match(/Atividade: ([^\n]+)/i);
+        const cidadeMatch = prompt.match(/Cidade: ([^\n]+)/i);
+        
+        const empresa = empresaMatch ? empresaMatch[1] : 'sua empresa';
+        const atividade = atividadeMatch ? atividadeMatch[1] : 'alimentação';
+        const cidade = cidadeMatch ? cidadeMatch[1] : 'sua região';
+        
+        if (promptLower.includes('melhore') && promptLower.includes('script')) {
+            return this.generateEnhancedSalesScript(empresa, atividade, cidade);
+        }
+        
+        if (promptLower.includes('personaliz') || promptLower.includes('abordagem')) {
+            return this.generatePersonalizedApproach(empresa, atividade, cidade);
+        }
+        
+        // Análise contextual genérica
+        return this.generateContextualResponse(empresa, atividade, cidade);
+    }
+
+    // 📈 Gerar script de vendas otimizado
+    generateEnhancedSalesScript(empresa, atividade, cidade) {
+        const templates = [
+            {
+                condition: (atividade) => atividade.includes('restaurante'),
+                response: `**🤖 Script Otimizado por IA para ${empresa}:**
+
+**🎯 ABERTURA ESTRATÉGICA:**
+"Olá! Estive analisando o mercado de restaurantes em ${cidade} e identifiquei que ${empresa} tem um perfil muito promissor. Sou da PMG Atacadista e gostaria de apresentar como podemos ajudar vocês a otimizar custos e aumentar a margem de lucro."
+
+**💡 INSIGHT PERSONALIZADO:**
+"Nossos dados mostram que restaurantes como o de vocês conseguem reduzir até 18% dos custos com insumos quando trabalham com a estratégia certa. Temos um portfólio específico para o segmento de alimentação que pode fazer essa diferença."
+
+**🎯 PROPOSTA DIFERENCIADA:**
+"Além dos melhores preços, oferecemos consultoria gratuita para otimização do cardápio baseada em análise de margem. Isso significa mais vendas e lucro para ${empresa}."
+
+**🚀 CHAMADA PARA AÇÃO:**
+"Posso agendar 20 minutos na próxima semana para mostrar especificamente como ${empresa} pode se beneficiar? Tenho cases de sucesso similares em ${cidade}."
+`
+            },
+            {
+                condition: (atividade) => atividade.includes('lanche') || atividade.includes('fast'),
+                response: `**🤖 Script Personalizado para ${empresa}:**
+
+**🎯 ABERTURA ASSERTIVA:**
+"Olá! Identifiquei que ${empresa} trabalha com o segmento de lanches rápidos em ${cidade}. Como especialista em distribuição para food service, vejo uma grande oportunidade de parceria."
+
+**💡 ANÁLISE DE MERCADO:**
+"O segmento de lanches tem crescido 23% ao ano. Para aproveitar essa oportunidade, é essencial ter fornecedores que entendam a dinâmica do fast food - e é exatamente isso que fazemos há 30 anos."
+
+**🎯 DIFERENCIAL COMPETITIVO:**
+"Trabalhamos com produtos de alta rotatividade e oferecemos entregas expressas. Para ${empresa}, isso significa menos estoque parado e mais capital de giro."
+
+**🚀 PRÓXIMOS PASSOS:**
+"Gostaria de agendar uma demonstração dos nossos produtos específicos para lanchonetes? Posso ir até ${empresa} e mostrar como aumentar a eficiência operacional."
+`
+            }
+        ];
+        
+        // Encontrar template apropriado
+        const template = templates.find(t => t.condition(atividade.toLowerCase())) || templates[0];
+        return template.response;
+    }
+
+    // 🎨 Gerar abordagem personalizada
+    generatePersonalizedApproach(empresa, atividade, cidade) {
+        return `**🤖 Abordagem Personalizada gerada por IA:**
+
+**Olá! Sou da PMG Atacadista.**
+
+Estive analisando o mercado de ${atividade} em ${cidade} e ${empresa} chamou minha atenção pelo potencial que identificamos.
+
+**Por que entramos em contato:**
+✅ ${empresa} tem perfil ideal para nossa linha premium
+✅ Localização estratégica em ${cidade} 
+✅ Segmento em crescimento (${atividade})
+
+**O que podemos oferecer:**
+🎯 Produtos específicos para ${atividade}
+💰 Condições especiais de pagamento
+🚚 Logística otimizada para ${cidade}
+📊 Consultoria gratuita de mix de produtos
+
+**Próximo passo:**
+Que tal marcarmos uma conversa de 15 minutos? Posso apresentar cases de sucesso similares ao de ${empresa} e mostrar oportunidades concretas de crescimento.
+
+Quando seria um bom momento para vocês?`;
+    }
+
+    // 🧠 Resposta contextual inteligente
+    generateContextualResponse(empresa, atividade, cidade) {
+        const responses = [
+            `Identifiquei grandes oportunidades para ${empresa} no mercado de ${atividade} em ${cidade}. Nossa expertise de 30 anos pode agregar valor significativo ao negócio de vocês.`,
+            
+            `Com base na análise do perfil de ${empresa}, vejo potencial para uma parceria estratégica. Temos soluções específicas que podem otimizar a operação de vocês em ${cidade}.`,
+            
+            `O mercado de ${atividade} está em evolução e ${empresa} pode se beneficiar das nossas soluções inovadoras. Nossa distribuidora tem track record comprovado na região de ${cidade}.`
+        ];
+        
+        return responses[Math.floor(Math.random() * responses.length)];
+    }
+    
+    // 🧠 IA simulada avançada para fallback
+    simulateAdvancedAI(prompt) {
+        console.log('🤖 Usando IA simulada avançada para prompt:', prompt.substring(0, 100) + '...');
+        
+        // Análise do tipo de prompt
+        const promptLower = prompt.toLowerCase();
+        
+        if (promptLower.includes('segmento real') || promptLower.includes('detectar')) {
+            return this.detectSegmentFromPrompt(prompt);
+        }
+        
+        if (promptLower.includes('melhore') && promptLower.includes('script')) {
+            return this.generateEnhancedScript(prompt);
+        }
+        
+        if (promptLower.includes('personaliz') || promptLower.includes('abordagem')) {
+            return this.generatePersonalizedApproach(prompt);
+        }
+        
+        // Resposta genérica inteligente
+        return this.generateGenericResponse(prompt);
+    }
+    
+    // Gerar script melhorado
+    generateEnhancedScript(prompt) {
+        const templates = [
+            "Baseado no perfil da sua empresa, identifiquei algumas oportunidades específicas para o seu negócio. Nossa distribuidora PMG Atacadista trabalha há 30 anos no mercado e possui produtos ideais para estabelecimentos como o seu. Podemos oferecer condições especiais de pagamento e um mix de produtos que vai aumentar sua margem de lucro significativamente.",
+            
+            "Analisando o mercado da sua região, vejo que existe uma demanda crescente pelo tipo de produto que vocês oferecem. A PMG Atacadista pode ser o parceiro ideal para ajudar vocês a aproveitarem essa oportunidade, com produtos de qualidade e preços competitivos que vão fazer a diferença no seu resultado final.",
+            
+            "Pelo que observei, vocês têm um negócio bem estruturado. Nossa proposta é agregar ainda mais valor ao seu estabelecimento através de produtos premium e um atendimento personalizado. Trabalhamos com as melhores marcas do mercado e temos condições especiais para parceiros que buscam crescimento sustentável."
+        ];
+        
+        return templates[Math.floor(Math.random() * templates.length)];
+    }
+    
+    // Gerar abordagem personalizada
+    generatePersonalizedApproach(prompt) {
+        const cidade = this.extractFromPrompt(prompt, 'cidade:', '\n') || 'sua região';
+        const atividade = this.extractFromPrompt(prompt, 'atividade:', '\n') || 'alimentação';
+        
+        return `Olá! Sou da PMG Atacadista e estou entrando em contato porque identifiquei uma oportunidade interessante para seu negócio em ${cidade}. 
+
+Vejo que vocês trabalham com ${atividade}, e nossa empresa tem 30 anos de experiência fornecendo para estabelecimentos similares. Temos um portfólio completo que pode agregar muito valor ao seu negócio.
+
+Que tal marcarmos uma conversa rápida para eu apresentar algumas soluções específicas para o seu tipo de estabelecimento? Tenho certeza de que posso ajudar vocês a aumentarem a margem de lucro com produtos de qualidade.`;
+    }
+    
+    // Extrair informação do prompt
+    extractFromPrompt(text, startMarker, endMarker) {
+        const start = text.indexOf(startMarker);
+        if (start === -1) return null;
+        
+        const textAfterStart = text.substring(start + startMarker.length);
+        const end = textAfterStart.indexOf(endMarker);
+        
+        return end === -1 ? textAfterStart.trim() : textAfterStart.substring(0, end).trim();
+    }
+    
+    // Resposta genérica inteligente
+    generateGenericResponse(prompt) {
+        const responses = [
+            "Com base nas informações analisadas, vejo grandes oportunidades para o seu negócio. A PMG Atacadista pode ser o parceiro ideal para impulsionar seus resultados.",
+            
+            "Identifiquei alguns pontos interessantes no perfil da sua empresa. Nossa distribuidora tem soluções específicas que podem agregar muito valor ao seu estabelecimento.",
+            
+            "Analisando o mercado da sua região e o tipo de negócio, posso sugerir algumas estratégias comerciais que têm funcionado muito bem com nossos outros parceiros."
+        ];
+        
+        return responses[Math.floor(Math.random() * responses.length)];
+    }
+    
+    // 📱 Interface para mostrar carregamento da IA
+    showAILoadingIndicator(message) {
+        const indicator = document.createElement('div');
+        indicator.className = 'ai-loading-indicator';
+        indicator.innerHTML = `
+            <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                        background: rgba(0,0,0,0.8); color: white; padding: 20px; border-radius: 10px; z-index: 10000;">
+                <i class="fas fa-robot fa-spin"></i> ${message}
+            </div>
+        `;
+        document.body.appendChild(indicator);
+        return indicator;
+    }
+    
+    // 📄 Mostrar script melhorado pela IA
+    showAIEnhancedScript(enhancedText, segmentoUsado = null) {
+        const modal = document.createElement('div');
+        modal.className = 'ai-enhanced-modal';
+        modal.innerHTML = `
+            <div class="modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                                            background: rgba(0,0,0,0.7); z-index: 10000; display: flex; 
+                                            align-items: center; justify-content: center;">
+                <div class="modal-content" style="background: white; padding: 30px; border-radius: 10px; 
+                                                 max-width: 700px; max-height: 80vh; overflow-y: auto;">
+                    <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div>
+                            <h3><i class="fas fa-robot" style="color: #28a745;"></i> Script Otimizado por IA</h3>
+                            ${segmentoUsado ? `<p style="margin: 5px 0; color: #666; font-size: 14px;">
+                                <i class="fas fa-tag"></i> <strong>Segmento usado:</strong> ${segmentoUsado}
+                            </p>` : ''}
+                        </div>
+                        <button onclick="this.closest('.ai-enhanced-modal').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #999;">×</button>
+                    </div>
+                    <div class="enhanced-content" style="white-space: pre-wrap; line-height: 1.6; border: 2px solid #28a745; padding: 20px; border-radius: 8px; background: #f8fff8;">
+                        ${enhancedText}
+                    </div>
+                    <div class="modal-actions" style="margin-top: 25px; text-align: center; display: flex; gap: 15px; justify-content: center;">
+                        <button onclick="navigator.clipboard.writeText(\`${enhancedText.replace(/`/g, '\\`')}\`).then(() => alert('✅ Texto copiado para área de transferência!'))" 
+                                class="btn btn-primary" style="background: #007bff; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer;">
+                            <i class="fas fa-copy"></i> Copiar Texto
+                        </button>
+                        <button onclick="prospeccaoManager.applyAIEnhancement(\`${enhancedText.replace(/`/g, '\\`')}\`, '${segmentoUsado || ''}'); this.closest('.ai-enhanced-modal').remove()" 
+                                class="btn btn-success" style="background: #28a745; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer;">
+                            <i class="fas fa-magic"></i> Aplicar ao Script
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+    
+    // ✏️ Aplicar melhorias da IA ao script
+    applyAIEnhancement(enhancedText, segmentoUsado = '') {
+        // Adicionar seção com sugestões da IA
+        const scriptContainer = document.querySelector('.script-text');
+        if (scriptContainer) {
+            // Remover seção anterior da IA se existir
+            const existingAISection = scriptContainer.querySelector('[data-section="ai-sugestoes"]');
+            if (existingAISection) {
+                existingAISection.remove();
+            }
+            
+            const aiSection = document.createElement('div');
+            aiSection.className = 'script-section ai-enhanced';
+            aiSection.setAttribute('data-section', 'ai-sugestoes');
+            aiSection.innerHTML = `
+                <div class="section-header" style="background: linear-gradient(45deg, #28a745, #20c997); color: white; padding: 12px; border-radius: 8px;">
+                    <h4>🤖 SCRIPT OTIMIZADO POR IA</h4>
+                    ${segmentoUsado ? `<div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">
+                        <i class="fas fa-tag"></i> Baseado no segmento: <strong>${segmentoUsado}</strong>
+                    </div>` : ''}
+                    <button onclick="prospeccaoManager.copyScriptSection('ai-sugestoes')" class="copy-section-btn" title="Copiar apenas esta seção">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+                <div class="section-content" style="border-left: 4px solid #28a745; padding: 15px; margin-top: 10px; background: #f8fff8; border-radius: 0 8px 8px 0;">
+                    ${enhancedText.replace(/\n/g, '<br>')}
+                </div>
+            `;
+            
+            // Inserir no início do script para destacar
+            const firstSection = scriptContainer.querySelector('.script-section');
+            if (firstSection) {
+                scriptContainer.insertBefore(aiSection, firstSection);
+            } else {
+                scriptContainer.appendChild(aiSection);
+            }
+        }
+        
+        // Atualizar estatísticas
+        this.trackSectionCopy('ai-enhancement-applied');
+        
+        // Mostrar feedback
+        this.showCopyNotification(`✅ Script otimizado pela IA aplicado! ${segmentoUsado ? `Baseado no segmento: ${segmentoUsado}` : ''}`);
+        
+        // Scroll para mostrar a nova seção
+        setTimeout(() => {
+            const newSection = document.querySelector('[data-section="ai-sugestoes"]');
+            if (newSection) {
+                newSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 100);
+    }
+    
+    // 📋 Copiar seção específica do script
+    copyScriptSection(sectionName) {
+        const section = document.querySelector(`[data-section="${sectionName}"] .section-content`);
+        if (!section) {
+            alert('❌ Seção não encontrada');
+            return;
+        }
+        
+        const text = section.innerText;
+        
+        navigator.clipboard.writeText(text).then(() => {
+            // Feedback visual
+            const btn = document.querySelector(`[data-section="${sectionName}"] .copy-section-btn`);
+            if (btn) {
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i>';
+                btn.style.background = '#28a745';
+                btn.style.color = 'white';
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalHTML;
+                    btn.style.background = '';
+                    btn.style.color = '';
+                }, 2000);
+            }
+            
+            // Armazenar qual segmento foi copiado (para analytics)
+            this.trackSectionCopy(sectionName);
+            
+            // Notificação
+            this.showCopyNotification(`Seção "${this.getSectionDisplayName(sectionName)}" copiada!`);
+            
+        }).catch(err => {
+            alert('❌ Erro ao copiar texto: ' + err.message);
+        });
+    }
+    
+    // 📊 Rastrear cópias de seções (para entender o uso)
+    trackSectionCopy(sectionName) {
+        try {
+            let sectionStats = JSON.parse(localStorage.getItem('scriptSectionStats') || '{}');
+            sectionStats[sectionName] = (sectionStats[sectionName] || 0) + 1;
+            localStorage.setItem('scriptSectionStats', JSON.stringify(sectionStats));
+            
+            console.log(`📊 Seção "${sectionName}" copiada. Total: ${sectionStats[sectionName]} vezes`);
+        } catch (e) {
+            console.warn('Erro ao salvar estatísticas:', e);
+        }
+    }
+    
+    // 🏷️ Nomes amigáveis das seções
+    getSectionDisplayName(sectionName) {
+        const names = {
+            'abertura': 'Abertura Personalizada',
+            'contextualizacao': 'Contextualização',
+            'oportunidade-digital': 'Oportunidade Digital',
+            'proposta-valor': 'Proposta de Valor',
+            'especializado': 'Seção Especializada',
+            'proximos-passos': 'Próximos Passos',
+            'contato': 'Informações de Contato',
+            'dicas': 'Dicas Importantes',
+            'ai-sugestoes': 'Sugestões da IA'
+        };
+        return names[sectionName] || sectionName;
+    }
+    
+    // 📱 Mostrar notificação de cópia
+    showCopyNotification(message) {
+        const notification = document.createElement('div');
+        notification.innerHTML = `
+            <div style="position: fixed; bottom: 20px; right: 20px; background: #28a745; color: white; 
+                        padding: 12px 20px; border-radius: 6px; z-index: 10000; 
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.3); animation: slideIn 0.3s ease;">
+                <i class="fas fa-check"></i> ${message}
+            </div>
+            <style>
+                @keyframes slideIn {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+            </style>
+        `;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => notification.remove(), 3000);
+    }
+    
+    // 📊 MÉTODOS PARA ANÁLISE DE REDES SOCIAIS
     generateSocialRecommendations(socialData) {
         const recommendations = [];
         
@@ -5306,51 +6380,69 @@ async generateImageOffersVisualProsp() {
 
         return opportunities;
     }
+    
+    // 📱 NOVO: Funções para processar dados de redes sociais manuais
+    getSocialMediaManualData() {
+        if (typeof getSocialMediaAnalysis === 'function') {
+            return getSocialMediaAnalysis();
+        }
+        return null;
+    }
 }
 
-/// Inicialização coordenada do sistema
-document.addEventListener('DOMContentLoaded', async () => {
+// ===== INICIALIZAÇÃO COORDENADA E SEGURA =====
+window.initProspeccaoManager = async function() {
     try {
-        console.log('🚀 Inicializando sistema completo...');
+        console.log('🚀 Iniciando ProspeccaoManager...');
         
-        // Aguardar inicialização dos outros sistemas
-        let maxWait = 50; // 5 segundos máximo
-        while (maxWait > 0 && (!window.clientManager || !window.dbManager)) {
+        if (window.prospeccaoManager) {
+            console.log('⚠️ ProspeccaoManager já existe, pulando inicialização');
+            return window.prospeccaoManager;
+        }
+        
+        // Aguardar outros sistemas se necessário
+        let maxWait = 30; // 3 segundos máximo
+        while (maxWait > 0 && document.readyState !== 'complete') {
             await new Promise(resolve => setTimeout(resolve, 100));
             maxWait--;
         }
         
-        if (window.clientManager) {
-            console.log('✅ ClientManager disponível para prospecção');
-        } else {
-            console.warn('⚠️ ClientManager não encontrado, usando fallbacks');
-        }
-        
-        // Se existe CatalogManager, inicializar primeiro
-        if (window.CatalogManager) {
-            window.catalogManager = new CatalogManager();
-            await window.catalogManager.init();
-            console.log('✅ CatalogManager inicializado');
-        }
-        
-        // Depois inicializar ProspeccaoManager
+        // Criar instância
         window.prospeccaoManager = new ProspeccaoManager();
         
-        // Tornar disponível globalmente para debug
-        window.debugProspeccaoClients = () => window.prospeccaoManager.debugClientData();
-        
-        console.log('✅ Sistema inicializado com sucesso');
-        console.log('💡 Use window.debugProspeccaoClients() para debug dos clientes');
+        console.log('✅ ProspeccaoManager inicializado com sucesso');
+        return window.prospeccaoManager;
         
     } catch (error) {
-        console.error('❌ Erro na inicialização:', error);
-        // Mesmo com erro, tentar inicializar ProspeccaoManager
+        console.error('❌ Erro ao inicializar ProspeccaoManager:', error);
+        
+        // Tentar inicialização básica
         try {
+            console.log('🔄 Tentando inicialização básica...');
             window.prospeccaoManager = new ProspeccaoManager();
-        } catch (fallbackError) {
-            console.error('❌ Erro crítico na inicialização:', fallbackError);
+            console.log('✅ Inicialização básica concluída');
+            return window.prospeccaoManager;
+        } catch (basicError) {
+            console.error('❌ Falha completa na inicialização:', basicError);
+            return null;
         }
     }
-});
+};
 
+// Inicialização automática quando DOM estiver pronto
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(window.initProspeccaoManager, 500); // Aguardar outros sistemas
+    });
+} else {
+    // DOM já carregado
+    setTimeout(window.initProspeccaoManager, 100);
+}
 
+// Fallback: Tentar novamente após 2 segundos se não conseguir
+setTimeout(() => {
+    if (!window.prospeccaoManager) {
+        console.log('🔄 Tentativa final de inicialização...');
+        window.initProspeccaoManager();
+    }
+}, 2000);

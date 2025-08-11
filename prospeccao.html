@@ -4,11 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PMG - Prospecção Inteligente</title>
-    <link rel="stylesheet" href="prospeccao.css?v=1.0.0.0">
-    <link rel="stylesheet" href="social-media-styles.css?v=1.0.0.0">
+    <link rel="stylesheet" href="prospeccao.css?v=1.1.3.0">
+    <link rel="stylesheet" href="social-media-styles.css?v=1.1.3.0">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- IA Local no Navegador - Transformers.js -->
+    <script type="module">
+        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1';
+        
+        // Configurar para usar local (sem downloads externos)
+        env.allowRemoteModels = false;
+        env.allowLocalModels = true;
+        
+        window.transformers = { pipeline, env };
+        console.log('🤖 Transformers.js carregado com sucesso!');
+    </script>
+    <!-- IA Alternativa: Brain.js para processamento local -->
+    <script src="https://cdn.jsdelivr.net/npm/brain.js@2.0.0-beta.23/dist/brain-browser.min.js"></script>
 </head>
 <body>
     <div class="header">
@@ -73,30 +86,30 @@
                         <small>Digite palavras-chave que descrevem o cardápio do cliente para sugestões mais precisas</small>
                         <div style="margin-top: 10px;">
                             <strong>💡 Clique nos segmentos para adicionar insumos automaticamente:</strong>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 6px; margin-top: 8px;">
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'pizza, mussarela, molho de tomate, farinha, fermento, oregano, azeitona, calabresa, presunto, queijo'">🍕 Pizzaria</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'carne bovina, frango, peixe, arroz, feijão, óleo, temperos, legumes, verduras, batata, cebola'">🍽️ Restaurante</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'pão hambúrguer, carne, frango, batata frita, refrigerante, maionese, ketchup, mostarda, alface, tomate'">🍔 Lanchonete</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'farinha trigo, fermento, açúcar, ovos, leite, manteiga, sal, chocolate, frutas, recheios'">🥖 Padaria</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'carnes, frios, laticínios, bebidas, enlatados, congelados, higiene, limpeza, hortifruti, cereais'">🛒 Supermercado</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'massa pastel, óleo fritura, queijo, presunto, carne moída, palmito, catupiry, molhos'">🥟 Pastelaria</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'cerveja, bebidas alcoólicas, refrigerantes, petiscos, amendoim, azeitona, queijos, carnes frias'">🍺 Bar/Choperia</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'arroz, feijão, açúcar, óleo, enlatados, massas, temperos, produtos limpeza, bebidas'">🏪 Mercearia</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'carnes, aves, peixes, frutos mar, temperos, sal grosso, embalagens, papel filme, luvas'">🏨 Hotel/Pousada</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'massa esfiha, carne, cebola, tomate, temperos árabes, queijo, ricota, espinafre'">🥙 Esfiharia</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'shoyu, missô, nori, wasabi, gengibre, sake, arroz sushi, salmão, atum, pepino japonês'">🍱 Cozinha Oriental</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'ingredientes grande escala, carnes, verduras, temperos, óleo, arroz, feijão, massas, conservas'">🏭 Cozinha Industrial</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'carne bovina, linguiça, frango, sal grosso, carvão, farofa, vinagrete, pão alho'">🔥 Churrascaria</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'farinha trigo, ovos, semolina, massa fresca, molhos, queijos, azeite, ervas'">🍝 Fábrica Massas</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'açúcar, chocolate, farinha, ovos, leite, creme leite, frutas, essências, corantes, confeitos'">🧁 Confeitaria</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'leite, queijos, iogurte, manteiga, creme leite, requeijão, embalagens, conservantes'">🧀 Laticínios</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'refrigerantes, sucos, água, snacks, salgadinhos, doces, cigarros, produtos conveniência'">🏪 Loja Conveniência</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'carnes bovinas, suínas, aves, peixes, temperos, sal, embalagens, papel, luvas descartáveis'">🥩 Açougue</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'frango assado, temperos, óleo, batata, polenta, farofa, molhos, embalagens'">🍗 Rotisserie</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'vinhos, espumantes, cervejas especiais, queijos, embutidos, petiscos gourmet, taças'">🍷 Adega</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'ingredientes eventos, carnes, saladas, bebidas, descartáveis, decoração comestível'">🏛️ Clube/Associação</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'pratos prontos, saladas, carnes, acompanhamentos, sobremesas, bebidas, descartáveis'">🍽️ Buffet</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'pão hambúrguer, carne, bacon, queijo, alface, tomate, batata, molhos, refrigerantes'">🍔 Hamburgueria</span>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin-top: 12px; align-items: center;">
+                                <span class="keyword-example" onclick="selectBusinessSegment('pizzaria', 'pizza, mussarela, molho de tomate, farinha, fermento, oregano, azeitona, calabresa, presunto, queijo')">🍕 Pizzaria</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('restaurante', 'carne bovina, frango, peixe, arroz, feijão, óleo, temperos, legumes, verduras, batata, cebola')">🍽️ Restaurante</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('lanchonete', 'pão hambúrguer, carne, frango, batata frita, refrigerante, maionese, ketchup, mostarda, alface, tomate')">🍔 Lanchonete</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('padaria', 'farinha trigo, fermento, açúcar, ovos, leite, manteiga, sal, chocolate, frutas, recheios')">🥖 Padaria</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('supermercado', 'carnes, frios, laticínios, bebidas, enlatados, congelados, higiene, limpeza, hortifruti, cereais')">🛒 Supermercado</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('pastelaria', 'massa pastel, óleo fritura, queijo, presunto, carne moída, palmito, catupiry, molhos')">🥟 Pastelaria</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('bar', 'cerveja, bebidas alcoólicas, refrigerantes, petiscos, amendoim, azeitona, queijos, carnes frias')">🍺 Bar/Choperia</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('mercearia', 'arroz, feijão, açúcar, óleo, enlatados, massas, temperos, produtos limpeza, bebidas')">🏪 Mercearia</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('hotel', 'carnes, aves, peixes, frutos mar, temperos, sal grosso, embalagens, papel filme, luvas')">🏨 Hotel/Pousada</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('esfiharia', 'massa esfiha, carne, cebola, tomate, temperos árabes, queijo, ricota, espinafre')">🥙 Esfiharia</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('oriental', 'shoyu, missô, nori, wasabi, gengibre, sake, arroz sushi, salmão, atum, pepino japonês')">🍱 Cozinha Oriental</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('industrial', 'ingredientes grande escala, carnes, verduras, temperos, óleo, arroz, feijão, massas, conservas')">🏭 Cozinha Industrial</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('churrascaria', 'carne bovina, linguiça, frango, sal grosso, carvão, farofa, vinagrete, pão alho')">🔥 Churrascaria</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('massas', 'farinha trigo, ovos, semolina, massa fresca, molhos, queijos, azeite, ervas')">🍝 Fábrica Massas</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('confeitaria', 'açúcar, chocolate, farinha, ovos, leite, creme leite, frutas, essências, corantes, confeitos')">🧁 Confeitaria</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('laticínios', 'leite, queijos, iogurte, manteiga, creme leite, requeijão, embalagens, conservantes')">🧀 Laticínios</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('conveniência', 'refrigerantes, sucos, água, snacks, salgadinhos, doces, cigarros, produtos conveniência')">🏪 Loja Conveniência</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('açougue', 'carnes bovinas, suínas, aves, peixes, temperos, sal, embalagens, papel, luvas descartáveis')">🥩 Açougue</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('rotisserie', 'frango assado, temperos, óleo, batata, polenta, farofa, molhos, embalagens')">🍗 Rotisserie</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('adega', 'vinhos, espumantes, cervejas especiais, queijos, embutidos, petiscos gourmet, taças')">🍷 Adega</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('clube', 'ingredientes eventos, carnes, saladas, bebidas, descartáveis, decoração comestível')">🏛️ Clube/Associação</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('buffet', 'pratos prontos, saladas, carnes, acompanhamentos, sobremesas, bebidas, descartáveis')">🍽️ Buffet</span>
+                                <span class="keyword-example" onclick="selectBusinessSegment('hamburgueria', 'pão hambúrguer, carne, bacon, queijo, alface, tomate, batata, molhos, refrigerantes')">🍔 Hamburgueria</span>
                             </div>
                         </div>
                     </div>
@@ -265,9 +278,11 @@
 </div>
 </div>
 
-    <script src="prospeccao.js?v=1.0.0.0"></script>
-    <script src="cnpj-api.js?v=1.0.0.0"></script>
-    <script src="enriquecimento-dados.js?v=1.0.0.0"></script>
+    <script src="prospeccao.js?v=1.1.11.0"></script>
+    <script src="cnpj-api.js?v=1.1.2.0"></script>
+    <script src="enriquecimento-dados.js?v=1.1.2.0"></script>
+    <!-- Script de teste removido para produção -->
+    <!-- <script src="test-prospeccao.js"></script> -->
     <script>
         // Sistema de Redes Sociais Manuais
         window.socialMediaData = [];
@@ -397,6 +412,165 @@
                 if (sel) sel.value = band;
             } catch(e) {}
         })();
+        
+        // 🔧 FUNÇÃO DE DEBUG PARA VERIFICAR SISTEMA
+        window.debugProspeccaoSystem = function() {
+            console.log('🔧 DEBUG DO SISTEMA DE PROSPECÇÃO');
+            console.log('================================');
+            
+            console.log('1. ProspeccaoManager class:', typeof ProspeccaoManager);
+            console.log('2. Instância global:', !!window.prospeccaoManager);
+            console.log('3. Função de init:', typeof window.initProspeccaoManager);
+            
+            if (window.prospeccaoManager) {
+                const manager = window.prospeccaoManager;
+                console.log('4. Métodos disponíveis:');
+                console.log('   - generateSalesScript:', typeof manager.generateSalesScript);
+                console.log('   - generateSocialRecommendations:', typeof manager.generateSocialRecommendations);
+                console.log('   - generateMarketOpportunities:', typeof manager.generateMarketOpportunities);
+                console.log('   - copyScriptSection:', typeof manager.copyScriptSection);
+                console.log('   - enhanceScriptWithAI:', typeof manager.enhanceScriptWithAI);
+                console.log('   - detectBusinessSegment:', typeof manager.detectBusinessSegment);
+                
+                console.log('5. Estado interno:');
+                console.log('   - Catálogo carregado:', manager.catalog?.length || 0, 'produtos');
+                console.log('   - Imagens carregadas:', Object.keys(manager.imagesMap || {}).length);
+                console.log('   - Prospecção atual:', !!manager.currentProspect);
+            }
+            
+            console.log('================================');
+            console.log('💡 Use window.initProspeccaoManager() para tentar reinicializar');
+        };
+        
+        // 🎯 NOVA FUNÇÃO: Selecionar segmento de negócio
+        window.selectBusinessSegment = function(segment, keywords) {
+            console.log('🎯 Segmento selecionado:', segment);
+            
+            // Adicionar palavras-chave
+            const keywordsField = document.getElementById('keywords');
+            if (keywordsField) {
+                keywordsField.value += (keywordsField.value ? ', ' : '') + keywords;
+                
+                // Destacar visualmente que foi selecionado
+                keywordsField.style.borderColor = '#28a745';
+                keywordsField.style.borderWidth = '2px';
+                
+                setTimeout(() => {
+                    keywordsField.style.borderColor = '';
+                    keywordsField.style.borderWidth = '';
+                }, 2000);
+            }
+            
+            // Armazenar segmento selecionado globalmente
+            window.selectedBusinessSegment = segment;
+            
+            // Mostrar notificação
+            showSegmentNotification(segment);
+            
+            // Se já existe uma prospecção, aplicar o segmento
+            if (window.prospeccaoManager && window.prospeccaoManager.currentProspect) {
+                window.prospeccaoManager.currentProspect.detectedSegment = segment;
+                console.log('✅ Segmento aplicado à prospecção atual');
+            }
+        };
+        
+        // 📱 Mostrar notificação de segmento selecionado
+        function showSegmentNotification(segment) {
+            const notification = document.createElement('div');
+            notification.innerHTML = `
+                <div style="position: fixed; top: 20px; right: 20px; background: #17a2b8; color: white; 
+                            padding: 15px 20px; border-radius: 8px; z-index: 10000; 
+                            box-shadow: 0 4px 12px rgba(0,0,0,0.3); animation: slideInRight 0.3s ease;">
+                    <i class="fas fa-tag"></i> <strong>Segmento Selecionado:</strong> ${segment}
+                    <br><small>Palavras-chave adicionadas automaticamente</small>
+                </div>
+                <style>
+                    @keyframes slideInRight {
+                        from { transform: translateX(100%); opacity: 0; }
+                        to { transform: translateX(0); opacity: 1; }
+                    }
+                </style>
+            `;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.remove(), 4000);
+        }
+        
+        // 🤖 Auto-detectar segmento baseado em palavras-chave digitadas
+        document.addEventListener('DOMContentLoaded', function() {
+            const keywordsField = document.getElementById('keywords');
+            if (keywordsField) {
+                keywordsField.addEventListener('input', function() {
+                    const keywords = this.value.toLowerCase();
+                    const detectedSegment = autoDetectSegment(keywords);
+                    
+                    if (detectedSegment && detectedSegment !== window.lastDetectedSegment) {
+                        window.lastDetectedSegment = detectedSegment;
+                        window.selectedBusinessSegment = detectedSegment;
+                        
+                        console.log('🤖 Segmento auto-detectado:', detectedSegment);
+                        
+                        // Mostrar sugestão discreta
+                        showAutoDetectionSuggestion(detectedSegment);
+                    }
+                });
+            }
+        });
+        
+        // 🧠 Função para auto-detectar segmento
+        function autoDetectSegment(keywords) {
+            const segments = {
+                'pizzaria': ['pizza', 'mussarela', 'calabresa', 'molho de tomate', 'oregano'],
+                'hamburgueria': ['hambúrguer', 'batata frita', 'bacon', 'maionese', 'ketchup'],
+                'açaí': ['açaí', 'guarana', 'banana', 'granola', 'mel'],
+                'padaria': ['pão', 'farinha', 'fermento', 'doce', 'bolo'],
+                'churrascaria': ['carne', 'churrasco', 'sal grosso', 'farofa', 'vinagrete'],
+                'bar': ['cerveja', 'bebida', 'petisco', 'amendoim'],
+                'confeitaria': ['chocolate', 'brigadeiro', 'festa', 'aniversário']
+            };
+            
+            let maxScore = 0;
+            let detectedSegment = null;
+            
+            for (const [segment, segmentKeywords] of Object.entries(segments)) {
+                const score = segmentKeywords.filter(keyword => keywords.includes(keyword)).length;
+                if (score > maxScore && score >= 2) { // Precisa de pelo menos 2 matches
+                    maxScore = score;
+                    detectedSegment = segment;
+                }
+            }
+            
+            return detectedSegment;
+        }
+        
+        // 💡 Mostrar sugestão de auto-detecção
+        function showAutoDetectionSuggestion(segment) {
+            // Remover sugestão anterior se existir
+            const existing = document.querySelector('.auto-detection-suggestion');
+            if (existing) existing.remove();
+            
+            const suggestion = document.createElement('div');
+            suggestion.className = 'auto-detection-suggestion';
+            suggestion.innerHTML = `
+                <div style="position: fixed; bottom: 20px; left: 20px; background: #ffc107; color: #212529; 
+                            padding: 12px 16px; border-radius: 6px; z-index: 10000; 
+                            box-shadow: 0 4px 12px rgba(0,0,0,0.2); font-size: 14px;
+                            animation: bounceIn 0.5s ease;">
+                    <i class="fas fa-lightbulb"></i> <strong>Segmento detectado:</strong> ${segment}
+                    <button onclick="this.parentElement.parentElement.remove()" 
+                            style="background: none; border: none; margin-left: 10px; cursor: pointer; font-size: 16px;">×</button>
+                </div>
+            `;
+            document.body.appendChild(suggestion);
+            
+            setTimeout(() => {
+                if (suggestion.parentElement) suggestion.remove();
+            }, 6000);
+        }
+        
+        // Disponibilizar globalmente
+        window.debugProspeccaoSystem();
+        
     </script>
 </body>
 </html>

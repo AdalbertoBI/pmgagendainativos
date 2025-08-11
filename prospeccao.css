@@ -537,23 +537,125 @@ body {
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
-/* Exemplos de palavras-chave */
+/* Exemplos de palavras-chave - VERSÃO ÚNICA E OTIMIZADA */
 .keyword-example {
     display: inline-block;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 5px 10px;
-    border-radius: 15px;
-    font-size: 0.8rem;
+    color: white !important;
+    padding: 10px 16px;
+    border-radius: 25px;
+    font-size: 14px !important;
     cursor: pointer;
     transition: all 0.3s ease;
     user-select: none;
+    text-align: center;
+    border: 2px solid transparent;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: ellipsis;
+    min-width: 140px;
+    line-height: 1.2;
+    text-decoration: none;
+    margin: 2px;
 }
 
 .keyword-example:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
     background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    border-color: rgba(255,255,255,0.5);
+    color: white !important;
+}
+
+.keyword-example:active {
+    animation: highlightSelection 0.6s ease;
+    transform: scale(0.95);
+}
+
+/* Garantir que o texto seja sempre visível */
+.keyword-example span,
+.keyword-example::before,
+.keyword-example::after {
+    color: inherit !important;
+    font-size: inherit !important;
+    visibility: visible !important;
+    display: inline !important;
+}
+
+/* Responsividade melhorada para segmentos */
+@media (max-width: 768px) {
+    .keyword-example {
+        font-size: 13px !important;
+        padding: 8px 12px;
+        min-width: 120px;
+        margin: 3px 1px;
+    }
+    
+    /* Grid responsivo para mobile */
+    div[style*="grid-template-columns"] {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+        gap: 6px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .keyword-example {
+        font-size: 12px !important;
+        padding: 6px 10px;
+        min-width: 100px;
+    }
+    
+    div[style*="grid-template-columns"] {
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) !important;
+        gap: 4px !important;
+    }
+}
+
+/* Animações para feedback de IA */
+@keyframes slideInUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutDown {
+    from {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Forçar visibilidade do texto em todos os casos */
+.keyword-example {
+    text-indent: 0 !important;
+    letter-spacing: normal !important;
+    word-spacing: normal !important;
+}
+
+.keyword-example * {
+    color: inherit !important;
+    font-size: inherit !important;
 }
 
 /* Botões de filtro para clientes */
@@ -1660,4 +1762,353 @@ body {
 
 .notification i {
     margin-right: 8px;
+}
+
+/* ====== ESTILOS PARA IA E SCRIPT MELHORADO ====== */
+
+/* Controles de IA no cabeçalho do script */
+.ai-controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.ai-controls .btn {
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.ai-controls .btn-info {
+    background: linear-gradient(45deg, #17a2b8, #138496);
+    color: white;
+}
+
+.ai-controls .btn-info:hover {
+    background: linear-gradient(45deg, #138496, #117a8b);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.ai-controls .btn-warning {
+    background: linear-gradient(45deg, #ffc107, #e0a800);
+    color: #212529;
+}
+
+.ai-controls .btn-warning:hover {
+    background: linear-gradient(45deg, #e0a800, #d39e00);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+/* Seções do script com botões de cópia */
+.script-section {
+    margin-bottom: 20px;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.script-section:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    transform: translateY(-1px);
+}
+
+.section-header {
+    background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+    padding: 12px 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #dee2e6;
+    position: relative;
+}
+
+.section-header h4 {
+    margin: 0;
+    color: #495057;
+    font-size: 16px;
+}
+
+.copy-section-btn {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.3s ease;
+    opacity: 0.7;
+}
+
+.copy-section-btn:hover {
+    opacity: 1;
+    background: #0056b3;
+    transform: scale(1.05);
+}
+
+.copy-section-btn:active {
+    transform: scale(0.95);
+}
+
+.section-content {
+    background: white;
+    padding: 15px;
+    line-height: 1.6;
+}
+
+.section-content p {
+    margin-bottom: 10px;
+}
+
+.section-content ul {
+    margin-left: 20px;
+    margin-bottom: 10px;
+}
+
+.section-content li {
+    margin-bottom: 5px;
+}
+
+/* Seção especial da IA */
+.script-section.ai-enhanced {
+    border: 2px solid #007bff;
+    animation: aiGlow 2s infinite alternate;
+}
+
+@keyframes aiGlow {
+    from {
+        box-shadow: 0 2px 8px rgba(0,123,255,0.3);
+    }
+    to {
+        box-shadow: 0 4px 16px rgba(0,123,255,0.5);
+    }
+}
+
+.ai-enhanced .section-header {
+    background: linear-gradient(45deg, #007bff, #0056b3);
+    color: white;
+}
+
+.ai-enhanced .section-header h4 {
+    color: white;
+}
+
+.ai-enhanced .copy-section-btn {
+    background: rgba(255,255,255,0.2);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.3);
+}
+
+.ai-enhanced .copy-section-btn:hover {
+    background: rgba(255,255,255,0.3);
+}
+
+/* Insight da IA */
+.ai-insight {
+    background: linear-gradient(45deg, #e3f2fd, #bbdefb);
+    border-left: 4px solid #2196f3;
+    padding: 12px 15px;
+    margin: 10px 0;
+    border-radius: 0 8px 8px 0;
+    font-style: italic;
+}
+
+.ai-insight i {
+    color: #2196f3;
+    margin-right: 8px;
+}
+
+/* Insight de segmento selecionado pelo usuário */
+.ai-insight[style*="background: linear-gradient(45deg, #28a745, #20c997)"] {
+    border-left-color: #155724;
+}
+
+.ai-insight[style*="background: linear-gradient(45deg, #28a745, #20c997)"] i {
+    color: #fff;
+}
+
+/* Animação para highlight de seleção */
+@keyframes highlightSelection {
+    0% { background-color: transparent; }
+    50% { background-color: rgba(40, 167, 69, 0.2); }
+    100% { background-color: transparent; }
+}
+
+/* Notificações de auto-detecção */
+.auto-detection-suggestion {
+    animation: bounceIn 0.5s ease;
+}
+
+@keyframes bounceIn {
+    0% {
+        transform: scale(0.3) translateY(100%);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.05) translateY(0);
+    }
+    70% {
+        transform: scale(0.9) translateY(0);
+    }
+    100% {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Modal da IA */
+.ai-enhanced-modal .modal-overlay {
+    backdrop-filter: blur(5px);
+}
+
+.ai-enhanced-modal .modal-content {
+    animation: modalSlideIn 0.3s ease;
+    border: 3px solid #007bff;
+}
+
+@keyframes modalSlideIn {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.ai-enhanced-modal .modal-header {
+    border-bottom: 2px solid #007bff;
+    color: #007bff;
+}
+
+.enhanced-content {
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+}
+
+/* Indicador de carregamento da IA */
+.ai-loading-indicator {
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}
+
+/* Notificações de segmento detectado */
+.segment-notification {
+    animation: bounceIn 0.5s ease;
+}
+
+@keyframes bounceIn {
+    0% {
+        transform: scale(0.3);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    70% {
+        transform: scale(0.9);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Responsividade para dispositivos móveis */
+@media (max-width: 768px) {
+    .ai-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .ai-controls .btn {
+        margin-bottom: 5px;
+        font-size: 14px;
+        padding: 10px;
+    }
+    
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .copy-section-btn {
+        align-self: flex-end;
+        font-size: 11px;
+        padding: 4px 8px;
+    }
+    
+    .ai-enhanced-modal .modal-content {
+        margin: 10px;
+        max-width: calc(100% - 20px);
+        max-height: calc(100vh - 20px);
+    }
+}
+
+/* Animações para feedback de cópia */
+@keyframes copySuccess {
+    0% { background: #28a745; transform: scale(1); }
+    50% { background: #20c997; transform: scale(1.1); }
+    100% { background: #28a745; transform: scale(1); }
+}
+
+.copy-section-btn.copied {
+    animation: copySuccess 0.6s ease;
+}
+
+/* Hover effect para seções do script */
+.script-section:hover .copy-section-btn {
+    opacity: 1;
+    transform: translateX(-2px);
+}
+
+/* Gradientes especiais para diferentes tipos de seção */
+.script-section[data-section="abertura"] .section-header {
+    background: linear-gradient(45deg, #28a745, #20c997);
+}
+
+.script-section[data-section="contextualizacao"] .section-header {
+    background: linear-gradient(45deg, #17a2b8, #20c997);
+}
+
+.script-section[data-section="proposta-valor"] .section-header {
+    background: linear-gradient(45deg, #ffc107, #fd7e14);
+}
+
+.script-section[data-section="especializado"] .section-header {
+    background: linear-gradient(45deg, #e83e8c, #fd7e14);
+}
+
+.script-section[data-section="proximos-passos"] .section-header {
+    background: linear-gradient(45deg, #6f42c1, #e83e8c);
+}
+
+/* Cores das seções em modo escuro (opcional) */
+@media (prefers-color-scheme: dark) {
+    .section-header {
+        background: linear-gradient(45deg, #343a40, #495057);
+    }
+    
+    .section-header h4 {
+        color: #f8f9fa;
+    }
+    
+    .section-content {
+        background: #212529;
+        color: #f8f9fa;
+    }
 }

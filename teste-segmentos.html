@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Segmentos de Negócio</title>
+    <link rel="stylesheet" href="prospeccao.css?v=1.1.3.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196f3;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Teste de Segmentos de Negócio</h1>
+        
+        <div class="test-info">
+            <strong>📋 Instruções:</strong>
+            <ul>
+                <li>Verifique se todos os títulos dos segmentos estão visíveis</li>
+                <li>Clique em qualquer segmento para testar a funcionalidade</li>
+                <li>O texto deve aparecer completo (emoji + nome)</li>
+            </ul>
+        </div>
+
+        <div id="selected-info" style="background: #f0f8ff; padding: 10px; border-radius: 5px; margin-bottom: 20px; display: none;">
+            <strong>Segmento selecionado:</strong> <span id="selected-segment"></span>
+        </div>
+
+        <strong>💡 Clique nos segmentos para adicionar insumos automaticamente:</strong>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin-top: 12px; align-items: center;">
+            <span class="keyword-example" onclick="testSelection('pizzaria')">🍕 Pizzaria</span>
+            <span class="keyword-example" onclick="testSelection('restaurante')">🍽️ Restaurante</span>
+            <span class="keyword-example" onclick="testSelection('lanchonete')">🍔 Lanchonete</span>
+            <span class="keyword-example" onclick="testSelection('padaria')">🥖 Padaria</span>
+            <span class="keyword-example" onclick="testSelection('supermercado')">🛒 Supermercado</span>
+            <span class="keyword-example" onclick="testSelection('pastelaria')">🥟 Pastelaria</span>
+            <span class="keyword-example" onclick="testSelection('bar')">🍺 Bar/Choperia</span>
+            <span class="keyword-example" onclick="testSelection('mercearia')">🏪 Mercearia</span>
+            <span class="keyword-example" onclick="testSelection('hotel')">🏨 Hotel/Pousada</span>
+            <span class="keyword-example" onclick="testSelection('esfiharia')">🥙 Esfiharia</span>
+            <span class="keyword-example" onclick="testSelection('oriental')">🍱 Cozinha Oriental</span>
+            <span class="keyword-example" onclick="testSelection('industrial')">🏭 Cozinha Industrial</span>
+            <span class="keyword-example" onclick="testSelection('churrascaria')">🔥 Churrascaria</span>
+            <span class="keyword-example" onclick="testSelection('massas')">🍝 Fábrica Massas</span>
+            <span class="keyword-example" onclick="testSelection('confeitaria')">🧁 Confeitaria</span>
+            <span class="keyword-example" onclick="testSelection('laticínios')">🧀 Laticínios</span>
+            <span class="keyword-example" onclick="testSelection('conveniência')">🏪 Loja Conveniência</span>
+            <span class="keyword-example" onclick="testSelection('açougue')">🥩 Açougue</span>
+            <span class="keyword-example" onclick="testSelection('rotisserie')">🍗 Rotisserie</span>
+            <span class="keyword-example" onclick="testSelection('adega')">🍷 Adega</span>
+            <span class="keyword-example" onclick="testSelection('clube')">🏛️ Clube/Associação</span>
+            <span class="keyword-example" onclick="testSelection('buffet')">🍽️ Buffet</span>
+            <span class="keyword-example" onclick="testSelection('hamburgueria')">🍔 Hamburgueria</span>
+        </div>
+
+        <div style="margin-top: 30px; padding: 20px; background: #f9f9f9; border-radius: 8px;">
+            <h3>🔍 Diagnóstico Visual</h3>
+            <p><strong>Se você vê apenas emojis:</strong></p>
+            <ul>
+                <li>Verifique se o CSS está carregando corretamente</li>
+                <li>Teste em modo incógnito do navegador</li>
+                <li>Pressione Ctrl+F5 para forçar atualização</li>
+                <li>Verifique o console do navegador (F12)</li>
+            </ul>
+            
+            <p><strong>Deve aparecer:</strong> Emoji + Nome completo (ex: "🍕 Pizzaria")</p>
+        </div>
+    </div>
+
+    <script>
+        function testSelection(segment) {
+            const info = document.getElementById('selected-info');
+            const segmentSpan = document.getElementById('selected-segment');
+            
+            segmentSpan.textContent = segment;
+            info.style.display = 'block';
+            
+            console.log('✅ Segmento testado:', segment);
+            
+            // Destacar temporariamente
+            event.target.style.background = '#28a745';
+            setTimeout(() => {
+                event.target.style.background = '';
+            }, 1000);
+        }
+
+        // Teste automático ao carregar
+        window.addEventListener('load', () => {
+            console.log('🧪 Página de teste carregada');
+            
+            // Verificar quantos segmentos estão visíveis
+            const segments = document.querySelectorAll('.keyword-example');
+            console.log('📊 Total de segmentos encontrados:', segments.length);
+            
+            segments.forEach((segment, index) => {
+                const text = segment.textContent || segment.innerText;
+                console.log(`${index + 1}. "${text}" (${text.length} caracteres)`);
+            });
+        });
+    </script>
+</body>
+</html>
