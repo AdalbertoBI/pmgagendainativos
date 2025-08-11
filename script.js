@@ -1058,7 +1058,10 @@ function exportarDados(tipo) {
 // Navegação entre abas
 function openTab(tab) {
     try {
-        console.log(`📂 Abrindo aba: ${tab}`);
+        console.log(`📂 Tentando abrir aba: ${tab}`);
+        
+        // Sempre permitir navegação para a aba
+        console.log(`✅ Abrindo aba: ${tab}`);
         
         // Remover classe active de todas as abas
         document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -1070,6 +1073,18 @@ function openTab(tab) {
         
         if (tabContent) tabContent.classList.add('active');
         if (tabButton) tabButton.classList.add('active');
+
+        // Atualizar variável global da aba atual
+        currentTab = tab;
+
+        // Verificar se os termos foram aceitos para esta aba
+        if (window.tabTermsManager && !window.tabTermsManager.isTermsAccepted(tab)) {
+            console.log(`⚠️ Termos não aceitos para aba: ${tab} - criando indicador`);
+            // Criar indicador de termos se não existe
+            window.tabTermsManager.createTabTermsIndicator(tab);
+        } else {
+            console.log(`✅ Termos já aceitos para aba: ${tab}`);
+        }
 
         currentTab = tab;
         window.clientManager.currentTab = tab;

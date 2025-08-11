@@ -644,8 +644,8 @@ window.debugEnriquecimento = async function(cnpj) {
             nome: 'Empresa Teste',
             fantasia: 'Teste LTDA',
             cnpj: cnpj,
-            cep: '01310-100', // CEP da Av. Paulista para teste
-            cidade: 'São Paulo',
+            cep: '00000-000', // CEP genérico para teste
+            cidade: 'Cidade Teste',
             uf: 'SP',
             cnae: '5611-2'
         };
@@ -660,4 +660,4 @@ window.debugEnriquecimento = async function(cnpj) {
     }
 };
 
-console.log('💡 Use window.debugEnriquecimento("11.222.333/0001-81") para testar o sistema');
+console.log('💡 Use window.debugEnriquecimento("00.000.000/0001-00") para testar o sistema');

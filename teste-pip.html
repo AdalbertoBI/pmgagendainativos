@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Picture-in-Picture</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .test-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        input {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Teste do Picture-in-Picture Instagram</h1>
+        
+        <div class="status" id="statusDiv">
+            <span id="statusText">Carregando sistema...</span>
+        </div>
+        
+        <div class="input-group">
+            <input type="url" id="testUrl" placeholder="https://www.instagram.com/usuario" value="https://www.instagram.com/exemplo_empresa/">
+            <button onclick="testPictureInPicture()">📱 Testar PiP</button>
+        </div>
+        
+        <h3>📋 Log de Teste:</h3>
+        <div id="logArea" style="background: #f8f9fa; padding: 15px; border-radius: 5px; height: 200px; overflow-y: auto; font-family: monospace; font-size: 14px;"></div>
+    </div>
+
+    <script src="social-media-analyzer.js?v=2.4.1.0"></script>
+    <script>
+        const statusDiv = document.getElementById('statusDiv');
+        const statusText = document.getElementById('statusText');
+        const logArea = document.getElementById('logArea');
+        
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            logArea.innerHTML += `[${timestamp}] ${message}<br>`;
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+        
+        function updateStatus(message, isError = false) {
+            statusText.textContent = message;
+            statusDiv.className = isError ? 'status error' : 'status success';
+        }
+        
+        // Verificar carregamento
+        window.addEventListener('load', function() {
+            log('🔄 Página carregada, verificando sistema...');
+            
+            if (window.socialMediaAnalyzerPIP) {
+                log('✅ Social Media Analyzer Picture-in-Picture carregado com sucesso!');
+                updateStatus('✅ Sistema Picture-in-Picture pronto para uso!', false);
+            } else {
+                log('❌ Social Media Analyzer Picture-in-Picture não foi carregado');
+                updateStatus('❌ Erro: Sistema não carregado', true);
+            }
+            
+            // Listar todas as variáveis globais relacionadas
+            const globals = Object.keys(window).filter(key => 
+                key.toLowerCase().includes('social') || 
+                key.toLowerCase().includes('analyzer') ||
+                key.toLowerCase().includes('pip')
+            );
+            
+            if (globals.length > 0) {
+                log(`🔍 Variáveis relacionadas encontradas: ${globals.join(', ')}`);
+            } else {
+                log('🔍 Nenhuma variável relacionada encontrada no escopo global');
+            }
+        });
+        
+        function testPictureInPicture() {
+            const url = document.getElementById('testUrl').value;
+            
+            log(`🎯 Testando Picture-in-Picture com URL: ${url}`);
+            
+            if (!url) {
+                log('❌ URL vazia');
+                updateStatus('❌ Digite uma URL válida', true);
+                return;
+            }
+            
+            if (!window.socialMediaAnalyzerPIP) {
+                log('❌ Sistema não disponível');
+                updateStatus('❌ Sistema não carregado', true);
+                return;
+            }
+            
+            try {
+                log('🚀 Iniciando análise picture-in-picture...');
+                const result = window.socialMediaAnalyzerPIP.analyzeInstagram(url);
+                
+                if (result && result.success) {
+                    log('✅ Picture-in-Picture iniciado com sucesso!');
+                    updateStatus('✅ Picture-in-Picture ativo!', false);
+                } else {
+                    log(`❌ Erro na análise: ${result ? result.error : 'Resultado desconhecido'}`);
+                    updateStatus('❌ Erro na análise', true);
+                }
+            } catch (error) {
+                log(`❌ Exceção capturada: ${error.message}`);
+                updateStatus('❌ Erro de execução', true);
+            }
+        }
+        
+        // Capturar erros JavaScript
+        window.addEventListener('error', function(e) {
+            log(`💥 Erro JavaScript: ${e.message} (linha ${e.lineno})`);
+            updateStatus('❌ Erro no JavaScript', true);
+        });
+    </script>
+</body>
+</html>

@@ -2695,9 +2695,23 @@ function drawPlaceholder(ctx, x, y, size) {
 
 // === INICIALIZAÇÃO SEGURA DO CATALOG MANAGER ===
 
+// Função para verificar se estamos na página que precisa do catálogo
+function isInCatalogPage() {
+    // Verificar se existe a grid de produtos (só existe na página principal)
+    return document.getElementById('products-grid') !== null;
+}
+
 // Função para inicializar com segurança
 function initializeCatalogManager() {
     try {
+        console.log('🔄 Verificando necessidade de inicializar CatalogManager...');
+        
+        // Verificar se estamos na página correta PRIMEIRO
+        if (!isInCatalogPage()) {
+            console.log('ℹ️ Página não contém elementos de catálogo, pulando inicialização');
+            return true; // Não é erro, apenas página diferente
+        }
+        
         console.log('🔄 Tentando inicializar CatalogManager...');
         
         // Verificar se a classe existe
@@ -2756,6 +2770,12 @@ function initializeCatalogManager() {
 
 // Função para tentar inicialização com retry
 function tryInitializeWithRetry(maxAttempts = 5, delay = 500) {
+    // Verificar se estamos na página correta ANTES de tentar
+    if (!isInCatalogPage()) {
+        console.log('ℹ️ Não estamos na página do catálogo, cancelando retry');
+        return;
+    }
+    
     let attempts = 0;
     
     function attempt() {

@@ -12,6 +12,9 @@ class ProspeccaoManager {
         // Preferência de fundo dinâmico para prospecção
         this.dynamicBackground = localStorage.getItem('dynamicBgProsp') === 'true';
         
+        // 🖼️ NOVO: Dados da análise de imagem
+        this.socialMediaAnalysisData = null;
+        
         this.init();
     }
 
@@ -612,6 +615,13 @@ transformCachedProducts(cachedData) {
             this.formatCNPJ(e.target);
         });
         
+        // 🖼️ NOVO: Listener para análise de imagem concluída
+        document.addEventListener('socialMediaAnalysisComplete', (e) => {
+            console.log('🖼️ Análise de imagem concluída, integrando dados...');
+            this.socialMediaAnalysisData = e.detail;
+            this.integrateSocialMediaData(e.detail);
+        });
+        
 
        // Modal - CÓDIGO CORRIGIDO PARA FECHAR AO CLICAR FORA
         const modal = document.getElementById('offerModal');
@@ -677,9 +687,18 @@ transformCachedProducts(cachedData) {
                 localStorage.setItem('priceBandProsp', this.selectedPriceBand);
                 console.log('💰 Faixa de preço prospecção alterada para:', this.selectedPriceBand);
                 
-                // Atualizar produtos exibidos se houver
+                // Aplicar nova faixa ao catálogo interno
+                this.applyPriceBandToLocalCatalog(this.selectedPriceBand);
+                
+                // Atualizar produtos selecionados se houver
                 if (this.selectedProducts && this.selectedProducts.length > 0) {
                     this.updateSelectedProductsPrices();
+                }
+                
+                // Atualizar sugestões de produtos se houver uma análise ativa
+                if (this.currentProspect && this.currentProspect.suggestions && this.currentProspect.suggestions.length > 0) {
+                    console.log('🔄 Atualizando sugestões de produtos com nova faixa de preço');
+                    this.renderProductSuggestions();
                 }
             });
         }
@@ -873,19 +892,19 @@ showCompanyPreview(data) {
 
 getLocalCompanyData(cnpj) {
     const localDatabase = {
-        '11111111000101': {
+        '00000000000100': {
             nome: 'EXEMPLO ALIMENTAÇÃO E SERVIÇOS LTDA',
             fantasia: 'RESTAURANTE DEMO',
-            cnpj: '11.111.111/0001-01',
+            cnpj: '00.000.000/0001-00',
             atividade_principal: 'Restaurantes e similares',
             logradouro: 'RUA EXEMPLO',
             numero: '123',
             bairro: 'CENTRO DEMO',
-            municipio: 'SAO PAULO',
+            municipio: 'CIDADE EXEMPLO',
             uf: 'SP',
-            cep: '01000-000',
-            telefone: '(11) 9999-0001',
-            email: 'contato@restaurantedemo.com',
+            cep: '00000-000',
+            telefone: '(11) 0000-0000',
+            email: 'contato@exemplorestaurante.com',
             capital_social: '100000.00',
             abertura: '01/01/2020',
             situacao: 'ATIVA'
@@ -1347,32 +1366,32 @@ showManualDataEntry(cnpj) {
         const sampleClients = {
             'active': [
                 {
-                    name: 'Restaurante Bom Sabor',
-                    cnpj: '12.345.678/0001-90',
-                    cidade: 'São Paulo',
+                    name: 'Restaurante Exemplo 1',
+                    cnpj: '00.000.000/0001-01',
+                    cidade: 'Cidade A',
                     atividade: 'Restaurante',
                     status: 'active'
                 },
                 {
-                    name: 'Pizzaria La Bella',
-                    cnpj: '98.765.432/0001-10',
-                    cidade: 'Rio de Janeiro',
+                    name: 'Pizzaria Exemplo 2',
+                    cnpj: '00.000.000/0001-02',
+                    cidade: 'Cidade B',
                     atividade: 'Pizzaria',
                     status: 'active'
                 }
             ],
             'inactive': [
                 {
-                    name: 'Lanchonete Central',
-                    cnpj: '11.222.333/0001-44',
-                    cidade: 'Belo Horizonte',
+                    name: 'Lanchonete Exemplo 3',
+                    cnpj: '00.000.000/0001-03',
+                    cidade: 'Cidade C',
                     atividade: 'Lanchonete',
                     status: 'inactive'
                 },
                 {
-                    name: 'Bar do João',
-                    cnpj: '55.666.777/0001-88',
-                    cidade: 'Salvador',
+                    name: 'Bar Exemplo 4',
+                    cnpj: '00.000.000/0001-04',
+                    cidade: 'Cidade D',
                     atividade: 'Bar e Restaurante',
                     status: 'inactive'
                 }
@@ -1771,6 +1790,14 @@ showManualDataEntry(cnpj) {
             // Etapa 3: Processar cardápio (palavras-chave)
             await this.updateLoadingStep(3);
             const menuData = this.createMenuFromKeywords(keywords);
+
+            // 🖼️ NOVO: Incluir dados da análise de imagem se disponível
+            if (this.socialMediaAnalysisData) {
+                console.log('🖼️ Integrando análise de imagem na prospecção...');
+                // Adicionar informações da análise de imagem ao enrichedCompanyData
+                enrichedCompanyData.socialMediaAnalysis = this.socialMediaAnalysisData;
+                enrichedCompanyData.hasImageAnalysis = true;
+            }
 
             // Etapa 4: Sugerir produtos
             await this.updateLoadingStep(4);
@@ -2392,6 +2419,7 @@ async suggestProducts(companyData, menuData) {
     console.log('  - menuData:', !!menuData);
     console.log('  - this.catalog:', !!this.catalog);
     console.log('  - this.catalog.length:', this.catalog?.length || 0);
+    console.log('  - socialMediaAnalysisData:', !!this.socialMediaAnalysisData);
     
     try {
         // Garantir que o catálogo está carregado
@@ -2410,31 +2438,39 @@ async suggestProducts(companyData, menuData) {
         console.log(`📦 Analisando ${this.catalog.length} produtos do catálogo real`);
         console.log(`🍽️ Contra ${menuItems.length} itens do cardápio`);
 
+        // 🖼️ NOVO: Integrar dados da análise de imagem se disponível
+        if (this.socialMediaAnalysisData) {
+            console.log('🖼️ Integrando dados da análise de imagem na sugestão de produtos...');
+            const imageBasedSuggestions = this.generateSuggestionsFromImageAnalysis(this.socialMediaAnalysisData);
+            suggestions.push(...imageBasedSuggestions);
+        }
+
         if (menuItems.length === 0) {
             console.log('⚠️ Nenhum item no cardápio, usando análise por tipo de empresa');
-            return this.suggestByCompanyType(companyData);
+            const companyBasedSuggestions = this.suggestByCompanyType(companyData);
+            suggestions.push(...companyBasedSuggestions);
+        } else {
+            // Análise inteligente por similaridade de texto
+            const matches = this.findProductMatches(menuItems);
+            
+            // Converter matches para sugestões
+            const sortedMatches = matches
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 50);
+
+            for (const match of sortedMatches) {
+                suggestions.push({
+                    ...match.product,
+                    reason: match.reason,
+                    image: this.getProductImageSafe(match.product.code),
+                    priority: match.score,
+                    confidence: this.calculateConfidenceFromScore(match.score),
+                    matchedItems: match.matchedItems
+                });
+            }
         }
 
-        // Análise inteligente por similaridade de texto
-        const matches = this.findProductMatches(menuItems);
-        
-        // Converter matches para sugestões
-        const sortedMatches = matches
-            .sort((a, b) => b.score - a.score)
-            .slice(0, 50);
-
-        for (const match of sortedMatches) {
-            suggestions.push({
-                ...match.product,
-                reason: match.reason,
-                image: this.getProductImageSafe(match.product.code),
-                priority: match.score,
-                confidence: this.calculateConfidenceFromScore(match.score),
-                matchedItems: match.matchedItems
-            });
-        }
-
-        console.log(`✅ ${suggestions.length} produtos sugeridos baseados no catálogo real`);
+        console.log(`✅ ${suggestions.length} produtos sugeridos baseados no catálogo real e análise de imagem`);
         
         // TESTE DE DEBUG: Se não há sugestões, adicionar algumas de teste
         if (suggestions.length === 0) {
@@ -3373,6 +3409,165 @@ getProductImage(productCode) {
             html += `</div>`;
         }
 
+        // � NOVO: Seção de Redes Sociais Manuais (se disponível)
+        const socialData = this.getSocialMediaManualData();
+        if (socialData && socialData.platforms.length > 0) {
+            html += `
+                <div class="social-media-manual-section">
+                    <h4><i class="fab fa-instagram"></i> Análise de Redes Sociais</h4>
+                    
+                    <div class="social-analysis-summary">
+                        <div class="social-metric-cards">
+                            <div class="social-metric-card platform-card">
+                                <div class="metric-icon">
+                                    <i class="fas fa-share-alt"></i>
+                                </div>
+                                <div class="metric-content">
+                                    <h6>Plataformas</h6>
+                                    <p><strong>${socialData.platforms.join(', ')}</strong></p>
+                                    <small>Total de ${socialData.platforms.length} rede(s) social(is)</small>
+                                </div>
+                            </div>
+                            
+                            <div class="social-metric-card demographic-card">
+                                <div class="metric-icon">
+                                    <i class="fas fa-users"></i>
+                                </div>
+                                <div class="metric-content">
+                                    <h6>Alcance Total</h6>
+                                    <p><strong>${socialData.totalFollowers.toLocaleString()}</strong> seguidores</p>
+                                    <small>${socialData.totalPublications} publicações</small>
+                                </div>
+                            </div>
+                            
+                            <div class="social-metric-card opportunity-card">
+                                <div class="metric-icon">
+                                    <i class="fas fa-bullseye"></i>
+                                </div>
+                                <div class="metric-content">
+                                    <h6>Engajamento</h6>
+                                    <p><strong>${socialData.engagementLevel}</strong></p>
+                                    <small>Nível estimado de interação</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="social-platforms-detail" style="margin-top: 20px;">
+                            <h6><i class="fas fa-chart-bar"></i> Detalhamento por Plataforma</h6>
+                            <div class="platforms-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-top: 10px;">
+                                ${socialData.details.map(social => `
+                                    <div class="platform-detail-card" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px;">
+                                        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                                            <i class="fab fa-${social.platform.toLowerCase().replace(' ', '-')}" style="font-size: 20px; color: #007bff; margin-right: 10px;"></i>
+                                            <strong>${social.platform}</strong>
+                                        </div>
+                                        <div style="font-size: 14px; color: #6c757d;">
+                                            📄 ${social.publications} publicações<br>
+                                            👥 ${social.followers.toLocaleString()} seguidores<br>
+                                            ➡️ ${social.following.toLocaleString()} seguindo
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        
+                        <div class="social-insights" style="margin-top: 20px;">
+                            <div class="insight-section">
+                                <h6><i class="fas fa-lightbulb"></i> Recomendações Baseadas na Análise</h6>
+                                <ul class="insight-list">
+                                    ${this.generateSocialRecommendations(socialData).map(rec => `<li>${rec}</li>`).join('')}
+                                </ul>
+                            </div>
+                            
+                            <div class="insight-section">
+                                <h6><i class="fas fa-chart-line"></i> Oportunidades de Mercado Identificadas</h6>
+                                <ul class="insight-list">
+                                    ${this.generateMarketOpportunities(socialData).map(opp => `<li>${opp}</li>`).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="social-integration-note" style="background: #e8f5e8; border: 1px solid #28a745; border-radius: 5px; padding: 15px; margin-top: 15px;">
+                            <i class="fas fa-info-circle" style="color: #28a745;"></i>
+                            <strong>Integração Inteligente:</strong> 
+                            As sugestões de produtos abaixo foram aprimoradas com base na análise das redes sociais cadastradas, 
+                            combinando dados de engajamento, alcance e perfil da audiência.
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // �🖼️ NOVO: Seção de Análise de Imagem (se disponível)
+        if (company.socialMediaAnalysis) {
+            const analysis = company.socialMediaAnalysis;
+            html += `
+                <div class="social-media-analysis-section">
+                    <h4><i class="fab fa-instagram"></i> Análise de Redes Sociais</h4>
+                    
+                    <div class="social-analysis-summary">
+                        <div class="social-metric-cards">
+                            <div class="social-metric-card platform-card">
+                                <div class="metric-icon">
+                                    <i class="fab fa-${analysis.platform.toLowerCase()}"></i>
+                                </div>
+                                <div class="metric-content">
+                                    <h6>${analysis.platform}</h6>
+                                    <p><strong>~${analysis.profileData.estimatedFollowers.toLocaleString()}</strong> seguidores</p>
+                                    <small>Taxa de engajamento: ${analysis.engagement.engagementRate}</small>
+                                </div>
+                            </div>
+                            
+                            <div class="social-metric-card demographic-card">
+                                <div class="metric-icon">
+                                    <i class="fas fa-users"></i>
+                                </div>
+                                <div class="metric-content">
+                                    <h6>Demografia Combinada</h6>
+                                    <p><strong>${analysis.demographic.population.toLocaleString()}</strong> habitantes</p>
+                                    <small>Renda média: ${analysis.demographic.avgIncome}</small>
+                                </div>
+                            </div>
+                            
+                            <div class="social-metric-card opportunity-card">
+                                <div class="metric-icon">
+                                    <i class="fas fa-bullseye"></i>
+                                </div>
+                                <div class="metric-content">
+                                    <h6>Oportunidade</h6>
+                                    <p><strong>${analysis.competitiveAnalysis.competitionLevel}</strong> competição</p>
+                                    <small>Foco: ${analysis.audience.primaryAgeGroup} anos</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="social-insights">
+                            <div class="insight-section">
+                                <h6><i class="fas fa-lightbulb"></i> Recomendações Baseadas na Análise</h6>
+                                <ul class="insight-list">
+                                    ${analysis.recommendations.map(rec => `<li>${rec}</li>`).join('')}
+                                </ul>
+                            </div>
+                            
+                            <div class="insight-section">
+                                <h6><i class="fas fa-chart-line"></i> Oportunidades de Mercado Identificadas</h6>
+                                <ul class="insight-list">
+                                    ${analysis.marketOpportunities.map(opp => `<li>${opp}</li>`).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="social-integration-note">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Integração Inteligente:</strong> 
+                            As sugestões de produtos abaixo foram aprimoradas com base na análise da rede social, 
+                            combinando dados de engajamento, audiência e perfil demográfico da região.
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
         // Análise de localização original (se não há dados enriquecidos)
         if (!company.demografia && this.currentProspect.location) {
             html += `
@@ -3542,6 +3737,10 @@ getProductImage(productCode) {
         const cidade = company.municipio;
         const atividade = this.detectActivityType(company, menu);
         
+        // 🖼️ NOVO: Incluir dados da análise de imagem se disponível
+        const hasImageAnalysis = company.socialMediaAnalysis;
+        const imageData = hasImageAnalysis ? company.socialMediaAnalysis : null;
+        
         let script = `
             <div class="script-section">
                 <h4>🎯 ABERTURA PERSONALIZADA</h4>
@@ -3556,7 +3755,25 @@ getProductImage(productCode) {
                     '<p>A região tem um excelente potencial de consumo, o que é uma grande oportunidade para crescimento!</p>' : 
                     '<p>Sabemos que a região tem suas particularidades, e por isso oferecemos condições especiais para parceiros locais.</p>'
                 }
+                ${hasImageAnalysis ? `
+                    <p><strong>🔍 Análise Personalizada:</strong> Também analisamos a presença digital de vocês no ${imageData.platform} 
+                    e vimos que têm um bom engajamento com ${imageData.profileData.estimatedFollowers.toLocaleString()} seguidores! 
+                    Isso mostra que vocês já têm uma base sólida de clientes.</p>
+                ` : ''}
             </div>
+
+            ${hasImageAnalysis ? `
+                <div class="script-section">
+                    <h4>📱 OPORTUNIDADE DIGITAL</h4>
+                    <p>Com base na análise da sua rede social, identifiquei algumas oportunidades:</p>
+                    <ul>
+                        <li>📈 <strong>Engajamento de ${imageData.engagement.engagementRate}</strong> - Mostra que vocês têm clientes fiéis</li>
+                        <li>🎯 <strong>Foco na faixa ${imageData.audience.primaryAgeGroup} anos</strong> - Público com bom poder de consumo</li>
+                        <li>🌍 <strong>População regional de ${imageData.demographic.population.toLocaleString()}</strong> - Grande potencial de mercado</li>
+                        <li>💰 <strong>Renda média ${imageData.demographic.avgIncome}</strong> - Permite trabalhar com produtos premium</li>
+                    </ul>
+                </div>
+            ` : ''}
 
             <div class="script-section">
                 <h4>🎯 PROPOSTA DE VALOR</h4>
@@ -3566,6 +3783,9 @@ getProductImage(productCode) {
                     <li>✅ <strong>Entrega programada</strong> - Somos a maior distribuidora de bebidas e alimento de SP</li>
                     <li>✅ <strong>Qualidade garantida</strong> - Produtos das melhores marcas do mercado</li>
                     <li>✅ <strong>Condições especiais</strong> - Prazo e formas de pagamento flexíveis</li>
+                    ${hasImageAnalysis && imageData.competitiveAnalysis.competitionLevel === 'Baixo' ? 
+                        '<li>🎯 <strong>Exclusividade regional</strong> - Baixa concorrência na região = maior margem para vocês</li>' : ''
+                    }
                 </ul>
             </div>
         `;
@@ -4723,6 +4943,368 @@ async generateImageOffersVisualProsp() {
             enrichBtn.disabled = false;
             enrichBtn.innerHTML = originalText;
         }
+    }
+
+    // 🖼️ NOVAS FUNÇÕES PARA ANÁLISE DE IMAGEM
+
+    // Integrar dados da análise de imagem com o sistema
+    integrateSocialMediaData(analysisData) {
+        console.log('🖼️ Integrando dados da análise de imagem:', analysisData);
+        
+        // Atualizar keywords automaticamente baseado na análise
+        this.enhanceKeywordsFromImageAnalysis(analysisData);
+        
+        // Mostrar notificação de sucesso
+        this.showNotification('📱 Análise de rede social integrada com sucesso! As sugestões foram aprimoradas.', 'success');
+        
+        // Se já há dados de prospecção carregados, recalcular sugestões
+        if (this.currentProspect) {
+            console.log('🔄 Recalculando sugestões com dados da imagem...');
+            this.recalculateSuggestionsWithImageData();
+        }
+    }
+
+    // Melhorar keywords baseado na análise de imagem
+    enhanceKeywordsFromImageAnalysis(analysisData) {
+        const keywordsField = document.getElementById('keywords');
+        if (!keywordsField) return;
+
+        const currentKeywords = keywordsField.value.toLowerCase();
+        const newKeywords = [];
+
+        // Adicionar keywords baseadas no tipo de negócio detectado
+        if (analysisData.businessIndicators?.businessType) {
+            const businessType = analysisData.businessIndicators.businessType.toLowerCase();
+            const businessKeywords = this.getKeywordsByBusinessType(businessType);
+            newKeywords.push(...businessKeywords);
+        }
+
+        // Adicionar keywords baseadas no conteúdo detectado
+        if (analysisData.content?.mainContentTypes) {
+            analysisData.content.mainContentTypes.forEach(contentType => {
+                const contentKeywords = this.getKeywordsByContentType(contentType);
+                newKeywords.push(...contentKeywords);
+            });
+        }
+
+        // Adicionar keywords baseadas na análise demográfica
+        if (analysisData.demographic?.population > 50000) {
+            newKeywords.push('produtos grande escala', 'distribuição ampla');
+        }
+
+        // Filtrar keywords que já existem
+        const uniqueKeywords = newKeywords.filter(keyword => 
+            !currentKeywords.includes(keyword.toLowerCase())
+        );
+
+        if (uniqueKeywords.length > 0) {
+            const updatedKeywords = currentKeywords ? 
+                currentKeywords + ', ' + uniqueKeywords.join(', ') : 
+                uniqueKeywords.join(', ');
+            
+            keywordsField.value = updatedKeywords;
+            
+            // Destacar campo atualizado
+            keywordsField.style.background = '#d4edda';
+            keywordsField.style.border = '2px solid #28a745';
+            setTimeout(() => {
+                keywordsField.style.background = '';
+                keywordsField.style.border = '';
+            }, 3000);
+
+            console.log(`🔑 Adicionadas ${uniqueKeywords.length} keywords da análise de imagem`);
+        }
+    }
+
+    // Obter keywords por tipo de negócio
+    getKeywordsByBusinessType(businessType) {
+        const businessKeywords = {
+            'restaurante': ['pratos executivos', 'refeições', 'almoço', 'jantar', 'cardápio variado'],
+            'lanchonete': ['lanches rápidos', 'hambúrguer', 'batata frita', 'refrigerantes', 'fast food'],
+            'pizzaria': ['pizza', 'mussarela', 'calabresa', 'molho de tomate', 'massa pizza'],
+            'confeitaria': ['doces finos', 'bolos', 'tortas', 'salgados', 'chocolate'],
+            'padaria': ['pães', 'farinha', 'fermento', 'café da manhã', 'produtos frescos'],
+            'bar': ['bebidas', 'petiscos', 'cerveja', 'aperitivos', 'ambiente social'],
+            'churrascaria': ['carnes', 'sal grosso', 'carvão', 'rodízio', 'espetinhos']
+        };
+
+        return businessKeywords[businessType] || [];
+    }
+
+    // Obter keywords por tipo de conteúdo
+    getKeywordsByContentType(contentType) {
+        const contentKeywords = {
+            'Fotos de produtos/pratos': ['apresentação', 'qualidade visual', 'ingredientes frescos'],
+            'Stories promocionais': ['ofertas especiais', 'promoções', 'desconto'],
+            'Vídeos de preparo': ['processo culinário', 'ingredientes especiais', 'técnicas'],
+            'Depoimentos de clientes': ['satisfação', 'qualidade comprovada', 'confiança'],
+            'Promoções e ofertas': ['preços competitivos', 'valor agregado', 'economia'],
+            'Ambiente do estabelecimento': ['atmosfera', 'experiência', 'conforto']
+        };
+
+        return contentKeywords[contentType] || [];
+    }
+
+    // Gerar sugestões baseadas na análise de imagem
+    generateSuggestionsFromImageAnalysis(analysisData) {
+        console.log('🖼️ Gerando sugestões baseadas na análise de imagem...');
+        
+        const suggestions = [];
+        
+        // Sugestões baseadas no tipo de negócio
+        if (analysisData.businessIndicators?.businessType) {
+            const businessSuggestions = this.getProductsByBusinessType(analysisData.businessIndicators.businessType);
+            suggestions.push(...businessSuggestions);
+        }
+
+        // Sugestões baseadas no engajamento
+        if (analysisData.engagement?.avgLikes > 200) {
+            // Negócio com bom engajamento - produtos premium
+            const premiumProducts = this.catalog.filter(product => 
+                product.category?.toLowerCase().includes('premium') ||
+                product.name?.toLowerCase().includes('especial') ||
+                product.price > 50
+            ).slice(0, 5);
+            
+            premiumProducts.forEach(product => {
+                suggestions.push({
+                    ...product,
+                    reason: '🏆 Produto premium para negócio com alto engajamento',
+                    priority: 10,
+                    confidence: 0.8,
+                    source: 'image_analysis_engagement'
+                });
+            });
+        }
+
+        // Sugestões baseadas na audiência
+        if (analysisData.audience?.primaryAgeGroup) {
+            const ageBasedProducts = this.getProductsByAgeGroup(analysisData.audience.primaryAgeGroup);
+            suggestions.push(...ageBasedProducts);
+        }
+
+        // Sugestões baseadas na análise demográfica
+        if (analysisData.demographic?.population > 100000) {
+            // População grande - produtos em escala
+            const scaleProducts = this.catalog.filter(product => 
+                product.unit?.toLowerCase().includes('kg') ||
+                product.category?.toLowerCase().includes('atacado')
+            ).slice(0, 8);
+            
+            scaleProducts.forEach(product => {
+                suggestions.push({
+                    ...product,
+                    reason: '📈 Produto adequado para alta demanda populacional',
+                    priority: 8,
+                    confidence: 0.7,
+                    source: 'image_analysis_demographic'
+                });
+            });
+        }
+
+        console.log(`✅ ${suggestions.length} sugestões geradas da análise de imagem`);
+        return suggestions.slice(0, 20); // Limitar a 20 sugestões
+    }
+
+    // Obter produtos por tipo de negócio
+    getProductsByBusinessType(businessType) {
+        const suggestions = [];
+        const type = businessType.toLowerCase();
+        
+        // Filtrar produtos do catálogo baseado no tipo de negócio
+        const relevantProducts = this.catalog.filter(product => {
+            const productName = product.name?.toLowerCase() || '';
+            const productCategory = product.category?.toLowerCase() || '';
+            
+            switch (type) {
+                case 'restaurante':
+                    return productName.includes('carne') || productName.includes('tempero') || 
+                           productName.includes('óleo') || productCategory.includes('proteína');
+                
+                case 'lanchonete':
+                    return productName.includes('batata') || productName.includes('molho') || 
+                           productName.includes('pão') || productName.includes('queijo');
+                
+                case 'pizzaria':
+                    return productName.includes('mussarela') || productName.includes('molho') || 
+                           productName.includes('farinha') || productName.includes('orégano');
+                
+                case 'confeitaria':
+                    return productName.includes('açúcar') || productName.includes('chocolate') || 
+                           productName.includes('farinha') || productName.includes('creme');
+                
+                default:
+                    return productName.includes('básico') || productCategory.includes('essencial');
+            }
+        }).slice(0, 10);
+
+        relevantProducts.forEach(product => {
+            suggestions.push({
+                ...product,
+                reason: `🎯 Produto específico para ${businessType}`,
+                priority: 9,
+                confidence: 0.8,
+                source: 'image_analysis_business_type'
+            });
+        });
+
+        return suggestions;
+    }
+
+    // Obter produtos por faixa etária
+    getProductsByAgeGroup(ageGroup) {
+        const suggestions = [];
+        
+        // Produtos baseados na faixa etária dominante
+        const ageBasedProducts = this.catalog.filter(product => {
+            const productName = product.name?.toLowerCase() || '';
+            
+            switch (ageGroup) {
+                case '18-25':
+                    return productName.includes('salgado') || productName.includes('refrigerante') ||
+                           productName.includes('energético') || productName.includes('snack');
+                
+                case '26-35':
+                    return productName.includes('gourmet') || productName.includes('especial') ||
+                           productName.includes('orgânico') || productName.includes('premium');
+                
+                case '36-45':
+                    return productName.includes('familiar') || productName.includes('tradicion') ||
+                           productName.includes('caseiro') || productName.includes('natural');
+                
+                case '46-55':
+                    return productName.includes('diet') || productName.includes('light') ||
+                           productName.includes('integral') || productName.includes('saudável');
+                
+                default:
+                    return true;
+            }
+        }).slice(0, 8);
+
+        ageBasedProducts.forEach(product => {
+            suggestions.push({
+                ...product,
+                reason: `👥 Produto adequado para faixa etária ${ageGroup}`,
+                priority: 7,
+                confidence: 0.6,
+                source: 'image_analysis_age_group'
+            });
+        });
+
+        return suggestions;
+    }
+
+    // Recalcular sugestões com dados da imagem
+    async recalculateSuggestionsWithImageData() {
+        if (!this.currentProspect) return;
+
+        try {
+            console.log('🔄 Recalculando sugestões com análise de imagem...');
+            
+            // Recalcular sugestões incluindo dados da imagem
+            const newSuggestions = await this.suggestProducts(
+                this.currentProspect.company, 
+                this.currentProspect.menu
+            );
+            
+            // Atualizar dados atuais
+            this.currentProspect.suggestions = newSuggestions;
+            this.currentProspect.imageAnalysis = this.socialMediaAnalysisData;
+            
+            // Re-renderizar as sugestões
+            this.renderProductSuggestions();
+            
+            console.log('✅ Sugestões recalculadas com dados da imagem');
+            
+        } catch (error) {
+            console.error('❌ Erro ao recalcular sugestões:', error);
+        }
+    }
+
+    // 📱 NOVO: Funções para processar dados de redes sociais manuais
+    getSocialMediaManualData() {
+        if (typeof getSocialMediaAnalysis === 'function') {
+            return getSocialMediaAnalysis();
+        }
+        return null;
+    }
+
+    generateSocialRecommendations(socialData) {
+        const recommendations = [];
+        
+        // Recomendações baseadas no número de seguidores
+        if (socialData.totalFollowers > 10000) {
+            recommendations.push('📈 Alto alcance - Focar em produtos premium e variedade ampla');
+            recommendations.push('🎯 Considerar parcerias e campanhas promocionais especiais');
+        } else if (socialData.totalFollowers > 1000) {
+            recommendations.push('📊 Alcance médio - Priorizar produtos de alta rotação e qualidade');
+            recommendations.push('🔄 Desenvolver estratégias de fidelização de clientes');
+        } else {
+            recommendations.push('🌱 Negócio em crescimento - Focar em produtos básicos e competitivos');
+            recommendations.push('💡 Oportunidade para produtos introdutórios e promocionais');
+        }
+
+        // Recomendações baseadas no nível de engajamento
+        if (socialData.engagementLevel === 'Alto') {
+            recommendations.push('⚡ Alto engajamento - Cliente ativo digitalmente, priorizar novidades');
+            recommendations.push('📱 Facilitar pedidos online e comunicação digital');
+        } else if (socialData.engagementLevel === 'Médio') {
+            recommendations.push('🎯 Engajamento moderado - Balancear tradição com inovação');
+        } else {
+            recommendations.push('📞 Priorizar contato direto e relacionamento pessoal');
+        }
+
+        // Recomendações baseadas nas plataformas
+        if (socialData.platforms.includes('Instagram')) {
+            recommendations.push('📸 Presença no Instagram - Focar em produtos visuais e gourmet');
+        }
+        if (socialData.platforms.includes('Facebook')) {
+            recommendations.push('👥 Ativo no Facebook - Considerar produtos familiares e tradicionais');
+        }
+        if (socialData.platforms.includes('TikTok')) {
+            recommendations.push('🎵 Público jovem (TikTok) - Priorizar tendências e produtos inovadores');
+        }
+
+        return recommendations;
+    }
+
+    generateMarketOpportunities(socialData) {
+        const opportunities = [];
+        
+        // Oportunidades baseadas no número total de publicações
+        if (socialData.totalPublications > 100) {
+            opportunities.push('📱 Cliente muito ativo nas redes - Excelente para parceria digital');
+            opportunities.push('🌟 Potencial para ser influenciador local e showcases de produtos');
+        } else if (socialData.totalPublications > 50) {
+            opportunities.push('📊 Atividade regular - Bom potencial para feedback e reviews');
+        }
+
+        // Oportunidades baseadas na combinação de dados
+        const followerToFollowingRatio = socialData.details.reduce((acc, social) => {
+            return acc + (social.followers / Math.max(social.following, 1));
+        }, 0) / socialData.details.length;
+
+        if (followerToFollowingRatio > 2) {
+            opportunities.push('📈 Perfil influente - Potencial para recomendar produtos a outros clientes');
+        }
+
+        // Oportunidades específicas por plataforma
+        socialData.details.forEach(social => {
+            if (social.platform === 'WhatsApp Business') {
+                opportunities.push('💬 WhatsApp Business ativo - Facilitar comunicação direta via WhatsApp');
+            }
+            if (social.platform === 'YouTube' && social.followers > 1000) {
+                opportunities.push('📺 YouTuber com alcance - Considerar patrocínio de conteúdo culinário');
+            }
+        });
+
+        // Oportunidade padrão
+        if (opportunities.length === 0) {
+            opportunities.push('🎯 Cliente engajado digitalmente - Oportunidade para relacionamento personalizado');
+            opportunities.push('📦 Potencial para programas de fidelidade e ofertas exclusivas');
+        }
+
+        return opportunities;
     }
 }
 

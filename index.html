@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Prospecção de Clientes Inativos</title>
-    <link rel="stylesheet" href="styles.css?v=2.4.0.0">
+    <link rel="stylesheet" href="styles.css?v=1.0.0.0">
+    <link rel="stylesheet" href="prospeccao.css?v=1.0.0.0">
+    <link rel="stylesheet" href="social-media-styles.css?v=1.0.0.0">
+    <link rel="stylesheet" href="tab-terms-styles.css?v=1.0.0.0">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icon-192.png" type="image/png">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
@@ -348,6 +351,23 @@
     <iframe src="prospeccao.html" style="width: 100%; height: calc(100vh - 100px); border: none; border-radius: 10px;"></iframe>
 </div>
 
+    <!-- Modal de Termos por Aba -->
+    <div id="tabTermsOverlay" class="tab-terms-overlay">
+        <div class="tab-terms-modal">
+            <div class="tab-terms-header">
+                <h5 id="tabTermsTitle">Termos de Uso</h5>
+                <button class="close-tab-terms" onclick="window.tabTermsManager?.hideModal()">&times;</button>
+            </div>
+            <div class="tab-terms-content" id="tabTermsContent">
+                <!-- Conteúdo dos termos será inserido aqui -->
+            </div>
+            <div class="tab-terms-footer">
+                <em>⚠️ Ao aceitar, você concorda com todos os termos listados acima.</em>
+                <button class="btn" onclick="window.tabTermsManager?.acceptTerms()">✅ Aceito os Termos</button>
+            </div>
+        </div>
+    </div>
+
     <button id="install-btn">📱 Instalar App</button>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -355,13 +375,15 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     
-    <script src="database.js?v=2.4.0.0"></script>
-    <script src="client-manager.js?v=2.4.0.0"></script>
-    <script src="catalog.js?v=2.4.0.0"></script>
-    <script src="map.js?v=2.4.0.0"></script>
-    <script src="cnpj-api.js?v=2.4.0.0"></script>
-    <script src="service-worker.js?v=2.4.0.0"></script>
-    <script src="script.js?v=2.4.0.0"></script>
+    <script src="database.js?v=1.0.0.0"></script>
+    <script src="client-manager.js?v=1.0.0.0"></script>
+    <script src="catalog.js?v=1.0.0.0"></script>
+    <script src="map.js?v=1.0.0.0"></script>
+    <script src="cnpj-api.js?v=1.0.0.0"></script>
+    <script src="tab-terms-manager.js?v=1.0.0.0"></script>
+    <script src="social-media-analyzer.js?v=1.0.0.0"></script>
+    <script src="service-worker.js?v=1.0.0.0"></script>
+    <script src="script.js?v=1.0.0.0"></script>
     
     <script>
         // Inicializar managers globais

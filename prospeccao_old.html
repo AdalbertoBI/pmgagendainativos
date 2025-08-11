@@ -81,13 +81,13 @@
                                 <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'carnes, frios, laticínios, bebidas, enlatados, congelados, higiene, limpeza, hortifruti, cereais'">🛒 Supermercado</span>
                                 <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'massa pastel, óleo fritura, queijo, presunto, carne moída, palmito, catupiry, molhos'">🥟 Pastelaria</span>
                                 <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'cerveja, bebidas alcoólicas, refrigerantes, petiscos, amendoim, azeitona, queijos, carnes frias'">🍺 Bar/Choperia</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'arroz, feijão, açúcar, óleo, enlatados, massas, temperos, produtos limpeza, bebidas'">🏪 Mercearia</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'arroz, feijão, açúcar, óleo, enlatados, massas, temperos, produtos limpeza, bebidas'">� Mercearia</span>
                                 <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'carnes, aves, peixes, frutos mar, temperos, sal grosso, embalagens, papel filme, luvas'">🏨 Hotel/Pousada</span>
                                 <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'massa esfiha, carne, cebola, tomate, temperos árabes, queijo, ricota, espinafre'">🥙 Esfiharia</span>
                                 <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'shoyu, missô, nori, wasabi, gengibre, sake, arroz sushi, salmão, atum, pepino japonês'">🍱 Cozinha Oriental</span>
                                 <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'ingredientes grande escala, carnes, verduras, temperos, óleo, arroz, feijão, massas, conservas'">🏭 Cozinha Industrial</span>
                                 <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'carne bovina, linguiça, frango, sal grosso, carvão, farofa, vinagrete, pão alho'">🔥 Churrascaria</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'farinha trigo, ovos, semolina, massa fresca, molhos, queijos, azeite, ervas'">🍝 Fábrica Massas</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'farinha trigo, ovos, semolina, massa fresca, molhos, queijos, azeite, ervas'">� Fábrica Massas</span>
                                 <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'açúcar, chocolate, farinha, ovos, leite, creme leite, frutas, essências, corantes, confeitos'">🧁 Confeitaria</span>
                                 <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'leite, queijos, iogurte, manteiga, creme leite, requeijão, embalagens, conservantes'">🧀 Laticínios</span>
                                 <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'refrigerantes, sucos, água, snacks, salgadinhos, doces, cigarros, produtos conveniência'">🏪 Loja Conveniência</span>
@@ -95,7 +95,7 @@
                                 <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'frango assado, temperos, óleo, batata, polenta, farofa, molhos, embalagens'">🍗 Rotisserie</span>
                                 <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'vinhos, espumantes, cervejas especiais, queijos, embutidos, petiscos gourmet, taças'">🍷 Adega</span>
                                 <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'ingredientes eventos, carnes, saladas, bebidas, descartáveis, decoração comestível'">🏛️ Clube/Associação</span>
-                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'pratos prontos, saladas, carnes, acompanhamentos, sobremesas, bebidas, descartáveis'">🍽️ Buffet</span>
+                                <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'pratos prontos, saladas, carnes, acompanhamentos, sobremesas, bebidas, descartáveis'">�️ Buffet</span>
                                 <span class="keyword-example" onclick="document.getElementById('keywords').value += (document.getElementById('keywords').value ? ', ' : '') + 'pão hambúrguer, carne, bacon, queijo, alface, tomate, batata, molhos, refrigerantes'">🍔 Hamburgueria</span>
                             </div>
                         </div>
@@ -158,6 +158,45 @@
                 </form>
             </div>
 
+            <!-- 📱 SEÇÃO DE ANÁLISE DE REDES SOCIAIS - SEMPRE VISÍVEL -->
+            <div id="socialAnalysisSection" class="social-analysis-section card" style="display: block !important; visibility: visible !important; opacity: 1 !important; margin-bottom: 2rem;">
+                <h2><i class="fab fa-instagram"></i> Análise de Redes Sociais</h2>
+                
+                <!-- 🖼️ ÁREA PARA COLAR IMAGEM -->
+                <div class="form-group">
+                    <label>� Cole uma imagem da rede social (Ctrl+V):</label>
+                    <div id="imageDropZone" class="image-drop-zone" style="border: 3px dashed #ddd; border-radius: 10px; padding: 40px; text-align: center; background: #f8f9fa; margin: 15px 0; min-height: 200px; position: relative; cursor: pointer;">
+                        <div id="dropZoneContent">
+                            <i class="fas fa-cloud-upload-alt" style="font-size: 48px; color: #6c757d; margin-bottom: 15px;"></i>
+                            <p style="font-size: 18px; color: #6c757d; margin: 10px 0;">
+                                <strong>Cole uma imagem aqui (Ctrl+V)</strong><br>
+                                ou clique para selecionar arquivo
+                            </p>
+                            <small style="color: #888;">
+                                Formatos aceitos: PNG, JPG, JPEG<br>
+                                Screenshots de Instagram, Facebook, WhatsApp Business, etc.
+                            </small>
+                        </div>
+                        <input type="file" id="imageFileInput" accept="image/*" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
+                        <canvas id="previewCanvas" style="display: none; max-width: 100%; max-height: 300px; border: 2px solid #007bff; border-radius: 5px; margin-top: 15px;"></canvas>
+                    </div>
+                    
+                    <!-- 🎯 BOTÕES DE ANÁLISE -->
+                    <div class="analysis-buttons" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
+                        <button type="button" id="analyzeImageBtn" class="btn btn-primary" style="background: linear-gradient(135deg, #28a745, #20c997); padding: 12px 20px;" disabled onclick="analyzeImageData()">
+                            <i class="fas fa-search"></i> Analisar Imagem
+                        </button>
+                        <button type="button" id="clearImageBtn" class="btn btn-secondary" style="padding: 12px 20px;" onclick="clearImageAnalysis()">
+                            <i class="fas fa-trash"></i> Limpar
+                        </button>
+                    </div>
+                    
+                    <!-- 📊 RESULTADOS DA ANÁLISE -->
+                    <div id="imageAnalysisResults" class="analysis-results" style="display: none; margin-top: 20px; padding: 20px; background: #e8f5e8; border-radius: 8px; border-left: 4px solid #28a745;">
+                        <h4><i class="fas fa-chart-line"></i> Análise da Rede Social</h4>
+                        <div id="analysisData"></div>
+                    </div>
+                    
             <div class="loading-section" id="loadingSection" style="display: none;">
                 <div class="card">
                     <div class="loading-spinner">
@@ -266,137 +305,155 @@
 </div>
 
     <script src="prospeccao.js?v=1.0.0.0"></script>
+    <script src="image-analyzer.js?v=1.0.0"></script>
     <script src="cnpj-api.js?v=1.0.0.0"></script>
     <script src="enriquecimento-dados.js?v=1.0.0.0"></script>
     <script>
-        // Sistema de Redes Sociais Manuais
-        window.socialMediaData = [];
-
-        // Funcionalidade para adicionar redes sociais
-        document.addEventListener('DOMContentLoaded', function() {
-            const addButton = document.getElementById('addSocialMedia');
-            if (addButton) {
-                addButton.addEventListener('click', addSocialMedia);
-            }
-        });
-
-        function addSocialMedia() {
-            const platform = document.getElementById('socialPlatform').value;
-            const publications = document.getElementById('socialPublications').value;
-            const followers = document.getElementById('socialFollowers').value;
-            const following = document.getElementById('socialFollowing').value;
-
-            if (!platform) {
-                alert('❌ Por favor, selecione uma rede social!');
-                return;
-            }
-
-            // Verificar se a rede social já foi adicionada
-            const existingSocial = window.socialMediaData.find(item => item.platform === platform);
-            if (existingSocial) {
-                alert('❌ Esta rede social já foi adicionada! Remova-a primeiro para adicionar novamente.');
-                return;
-            }
-
-            const socialData = {
-                platform: platform,
-                publications: parseInt(publications) || 0,
-                followers: parseInt(followers) || 0,
-                following: parseInt(following) || 0
-            };
-
-            // Adicionar aos dados globais
-            window.socialMediaData.push(socialData);
-
-            // Atualizar a lista visual
-            updateSocialMediaList();
-
-            // Limpar o formulário
-            clearSocialForm();
-
-            console.log('✅ Rede social adicionada:', socialData);
-        }
-
-        function updateSocialMediaList() {
-            const listContainer = document.getElementById('socialMediaList');
-            if (!listContainer) return;
-
-            if (window.socialMediaData.length === 0) {
-                listContainer.innerHTML = '';
-                return;
-            }
-
-            let html = '<h4 style="margin-bottom: 15px; color: #495057;"><i class="fas fa-list"></i> Redes Sociais Cadastradas:</h4>';
-            
-            window.socialMediaData.forEach((social, index) => {
-                html += `
-                    <div class="social-media-item" style="background: white; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                        <div style="flex: 1;">
-                            <strong style="color: #495057;">${social.platform}</strong>
-                            <div style="font-size: 14px; color: #6c757d; margin-top: 5px;">
-                                📄 ${social.publications} publicações • 
-                                👥 ${social.followers.toLocaleString()} seguidores • 
-                                ➡️ ${social.following.toLocaleString()} seguindo
-                            </div>
-                        </div>
-                        <button onclick="removeSocialMedia(${index})" class="btn btn-sm" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 4px; font-size: 12px;">
-                            <i class="fas fa-trash"></i> Remover
-                        </button>
-                    </div>
-                `;
-            });
-
-            listContainer.innerHTML = html;
-        }
-
-        function removeSocialMedia(index) {
-            window.socialMediaData.splice(index, 1);
-            updateSocialMediaList();
-            console.log('🗑️ Rede social removida. Lista atual:', window.socialMediaData);
-        }
-
-        function clearSocialForm() {
-            document.getElementById('socialPlatform').value = '';
-            document.getElementById('socialPublications').value = '';
-            document.getElementById('socialFollowers').value = '';
-            document.getElementById('socialFollowing').value = '';
-        }
-
-        // Função para obter dados das redes sociais (usada pelo sistema de prospecção)
-        function getSocialMediaAnalysis() {
-            if (window.socialMediaData.length === 0) {
-                return null;
-            }
-
-            const totalFollowers = window.socialMediaData.reduce((sum, social) => sum + social.followers, 0);
-            const totalPublications = window.socialMediaData.reduce((sum, social) => sum + social.publications, 0);
-            const platforms = window.socialMediaData.map(social => social.platform);
-
-            // Calcular engajamento estimado baseado nos dados
-            let engagementLevel = 'Baixo';
-            if (totalFollowers > 1000 && totalPublications > 50) {
-                engagementLevel = 'Alto';
-            } else if (totalFollowers > 500 || totalPublications > 20) {
-                engagementLevel = 'Médio';
-            }
-
-            return {
-                platforms: platforms,
-                totalFollowers: totalFollowers,
-                totalPublications: totalPublications,
-                engagementLevel: engagementLevel,
-                details: window.socialMediaData
-            };
-        }
-
-        // Sincronizar com localStorage
+        // Sincroniza valor inicial do seletor com localStorage, caso o JS principal demore
         (function(){
             try {
                 var band = localStorage.getItem('priceBand') || 'retira';
-                var sel = document.getElementById('price-band-select-prosp');
+                var sel = document.getElementById('price-band-select-pros');
                 if (sel) sel.value = band;
             } catch(e) {}
         })();
+        
+        // Testar se o picture-in-picture foi carregado
+        window.addEventListener('load', function() {
+            console.log('� Verificando carregamento do sistema...');
+            console.log('📋 Todas as variáveis window:', Object.keys(window).filter(k => k.includes('social') || k.includes('Social') || k.includes('analyzer') || k.includes('Analyzer') || k.includes('PIP') || k.includes('pip')));
+            
+            // Verificar múltiplas formas da variável
+            const pip1 = window.socialMediaAnalyzerPIP;
+            const pip2 = window['socialMediaAnalyzerPIP'];
+            const pip3 = typeof socialMediaAnalyzerPIP !== 'undefined' ? socialMediaAnalyzerPIP : null;
+            
+            console.log('📱 Picture-in-Picture verificações:', {
+                'window.socialMediaAnalyzerPIP': !!pip1,
+                'window["socialMediaAnalyzerPIP"]': !!pip2,
+                'socialMediaAnalyzerPIP global': !!pip3,
+                'SocialMediaAnalyzer class': typeof SocialMediaAnalyzer
+            });
+            
+            const finalPIP = pip1 || pip2 || pip3;
+            
+            if (finalPIP) {
+                console.log('✅ Social Media Analyzer Picture-in-Picture carregado com sucesso!');
+                // Disponibilizar globalmente se não estiver
+                if (!window.socialMediaAnalyzerPIP) {
+                    window.socialMediaAnalyzerPIP = finalPIP;
+                }
+            } else {
+                console.error('❌ Social Media Analyzer Picture-in-Picture não foi carregado');
+                
+                // Tentar criar uma instância se a classe estiver disponível
+                if (typeof SocialMediaAnalyzer !== 'undefined') {
+                    try {
+                        console.log('🔄 Tentando criar instância manualmente...');
+                        window.socialMediaAnalyzerPIP = new SocialMediaAnalyzer();
+                        console.log('✅ Instância criada manualmente com sucesso!');
+                    } catch (error) {
+                        console.error('❌ Erro ao criar instância manualmente:', error);
+                    }
+                } else {
+                    console.error('❌ Classe SocialMediaAnalyzer não está disponível');
+                }
+            }
+            
+            // Garantir que a seção de análise social esteja visível
+            const socialSection = document.getElementById('socialAnalysisSection');
+            if (socialSection) {
+                socialSection.style.display = 'block';
+                socialSection.style.visibility = 'visible';
+                socialSection.style.opacity = '1';
+                console.log('✅ Seção de análise social está visível');
+                
+                // Verificar se tem conteúdo
+                const hasContent = socialSection.innerHTML.trim().length > 0;
+                console.log('📋 Seção tem conteúdo:', hasContent);
+                console.log('📏 Tamanho do conteúdo:', socialSection.innerHTML.length);
+                
+                // Verificar se está sendo ocultada por CSS
+                const computedStyle = window.getComputedStyle(socialSection);
+                console.log('👁️ Display:', computedStyle.display);
+                console.log('👁️ Visibility:', computedStyle.visibility);
+                console.log('👁️ Opacity:', computedStyle.opacity);
+                
+            } else {
+                console.error('❌ Seção socialAnalysisSection não encontrada');
+                
+                // Tentar criar a seção se ela não existir
+                const formSection = document.querySelector('.form-section');
+                if (formSection) {
+                    const socialDiv = document.createElement('div');
+                    socialDiv.id = 'socialAnalysisSection';
+                    socialDiv.className = 'social-analysis-section card';
+                    socialDiv.style.cssText = 'display: block !important; visibility: visible !important; opacity: 1 !important; margin-bottom: 2rem; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);';
+                    socialDiv.innerHTML = `
+                        <h2><i class="fab fa-instagram"></i> Análise de Redes Sociais</h2>
+                        <div class="form-group">
+                            <label>📸 Instagram do Cliente:</label>
+                            <div class="input-group" style="display: flex; gap: 10px; align-items: center; margin: 15px 0;">
+                                <input type="url" id="instagramUrl" placeholder="https://www.instagram.com/cliente" style="flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 5px; font-size: 16px;">
+                                <button type="button" class="btn btn-primary" style="padding: 12px 20px; background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045); color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;" onclick="if(window.socialMediaAnalyzerPIP) { const url = document.getElementById('instagramUrl').value; if(url) socialMediaAnalyzerPIP.analyzeInstagram(url); else alert('Digite a URL do Instagram'); } else alert('Sistema carregando...')">
+                                    📱 Picture-in-Picture
+                                </button>
+                            </div>
+                            <small class="text-muted">Digite a URL do perfil do Instagram e use o modo picture-in-picture para navegação natural</small>
+                        </div>
+                    `;
+                    
+                    // Inserir após o primeiro card
+                    const firstCard = formSection.querySelector('.card');
+                    if (firstCard) {
+                        firstCard.insertAdjacentElement('afterend', socialDiv);
+                        console.log('✅ Seção de análise social criada dinamicamente');
+                    }
+                }
+            }
+        });
+        
+        // Função para testar picture-in-picture
+        function testPictureInPicture() {
+            console.log('🎯 Botão Picture-in-Picture clicado');
+            
+            const url = document.getElementById('instagramUrl').value;
+            if (!url) {
+                alert('❌ Digite a URL do Instagram primeiro!');
+                return;
+            }
+            
+            // Verificar múltiplas formas de acessar o analyzer
+            const analyzer = window.socialMediaAnalyzerPIP || 
+                           window['socialMediaAnalyzerPIP'] || 
+                           (typeof socialMediaAnalyzerPIP !== 'undefined' ? socialMediaAnalyzerPIP : null);
+            
+            if (analyzer) {
+                console.log('✅ Analyzer encontrado, iniciando análise...');
+                try {
+                    const result = analyzer.analyzeInstagram(url);
+                    console.log('📊 Resultado:', result);
+                } catch (error) {
+                    console.error('❌ Erro na análise:', error);
+                    alert('❌ Erro ao executar análise: ' + error.message);
+                }
+            } else {
+                console.error('❌ Analyzer não encontrado');
+                alert('❌ Sistema Picture-in-Picture não carregado. Verifique o console para mais detalhes.');
+                
+                // Tentar carregar manualmente
+                if (typeof SocialMediaAnalyzer !== 'undefined') {
+                    try {
+                        console.log('🔄 Criando analyzer manualmente...');
+                        const manualAnalyzer = new SocialMediaAnalyzer();
+                        window.socialMediaAnalyzerPIP = manualAnalyzer;
+                        manualAnalyzer.analyzeInstagram(url);
+                    } catch (error) {
+                        console.error('❌ Erro ao criar manualmente:', error);
+                    }
+                }
+            }
+        }
     </script>
 </body>
 </html>
